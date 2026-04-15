@@ -1,0 +1,158 @@
+import React, { useEffect, useState } from 'react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useStore } from '../../store';
+import { Card, Btn, Badge, Avatar, Modal, FormRow, Input, Select, Textarea, ConfirmModal, C, TH, TD } from '../Common';
+import { roleColor } from '../../utils';
+import type { Member } from '../../types';
+
+export const ROLES = [
+  'Project Sponsor', 'Project Advisor', 'Project Leader', 'Project Manager',
+  'Project Consultants', 'Business Analyst', 'Business Process Owner',
+  'UI/UX Designer', 'Full-Stack Developer', 'Frontend Developer', 'Backend Developer',
+  'QA Engineer', 'DevOps Engineer', 'IT Support', 'HRM User', 'HRD User',
+  'Product Owner', 'IT Coordinator', 'HR Director', 'Other',
+];
+
+interface Props { projectId: string; }
+
+export default function MembersTab({ projectId }: Props) {
+  const { members, fetchMembers, createMember, updateMember, deleteMember } = useStore();
+  const [filter, setFilter]     = useState<'all' | 'internal' | 'client'>('all');
+  const [modal, setModal]       = useState<Partial<Member> | null>(null);
+  const [deleting, setDeleting] = useState<Member | null>(null);
+
+  useEffect(() => { fetchMembers(projectId); }, [projectId]);
+
+  const shown    = filter === 'all' ? members : members.filter(m => m.type === filter);
+  const internal = members.filter(m => m.type === 'internal');
+  const client   = members.filter(m => m.type === 'client');
+
+  const handleSave = async (form: Partial<Member>) => {
+    try {
+      if (form.id) { await updateMember(form.id, { ...form, projectId }); toast.success('Member updated'); }
+      else         { await createMember({ ...form, projectId }); toast.success('Member added'); }
+      setModal(null);
+    } catch { toast.error('Failed to save'); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    try { await deleteMember(deleting.id); toast.success('Removed'); }
+    catch { toast.error('Failed to delete'); }
+    setDeleting(null);
+  };
+
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Internal Team', count: internal.length, icon: '👥', bg: C.primaryBg, color: C.primary },
+          { label: 'Client Members', count: client.length, icon: '🏢', bg: C.amberBg, color: C.amber },
+        ].map(s => (
+          <Card key={s.label} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ fontSize: 24 }}>{s.icon}</div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.count}</div>
+              <div style={{ fontSize: 12, color: C.text2 }}>{s.label}</div></div>
+          </Card>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['all', 'internal', 'client'] as const).map(v => (
+            <button key={v} onClick={() => setFilter(v)}
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 20, border: `1.5px solid ${filter === v ? C.primary : C.border}`, background: filter === v ? C.primaryBg : C.white, color: filter === v ? C.primary : C.text2, cursor: 'pointer' }}>
+              {v.charAt(0).toUpperCase() + v.slice(1)} ({v === 'all' ? members.length : v === 'internal' ? internal.length : client.length})
+            </button>
+          ))}
+        </div>
+        <Btn onClick={() => setModal({})} small><Plus size={14} /> Add Member</Btn>
+      </div>
+
+      <Card>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: C.bg }}>
+              {['Member', 'Nickname', 'Role', 'Position', 'Email', 'Tel', 'Type', 'Notes', ''].map(h => (
+                <th key={h} style={TH}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((mb, i) => (
+              <tr key={mb.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}
+                onMouseEnter={e => e.currentTarget.style.background = C.primaryBg}
+                onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? C.white : C.bg}>
+                <td style={TD}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Avatar name={mb.name} size={30} />
+                    <span style={{ fontWeight: 600, color: C.text }}>{mb.name}</span>
+                  </div>
+                </td>
+                <td style={{ ...TD, color: C.text2 }}>{mb.nickname}</td>
+                <td style={TD}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: roleColor(mb.role), background: roleColor(mb.role) + '18', padding: '3px 10px', borderRadius: 20 }}>
+                    {mb.role || '—'}
+                  </span>
+                </td>
+                <td style={{ ...TD, color: C.text2, fontSize: 11 }}>{mb.position || '—'}</td>
+                <td style={{ ...TD, color: C.blue }}>{mb.email}</td>
+                <td style={{ ...TD, fontFamily: 'monospace', fontSize: 12 }}>{mb.tel}</td>
+                <td style={TD}>
+                  <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>
+                    {mb.type === 'internal' ? 'Internal' : 'Client'}
+                  </Badge>
+                </td>
+                <td style={{ ...TD, color: C.text3, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>{mb.notes || '—'}</td>
+                <td style={TD}>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    <button onClick={() => setModal(mb)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}><Pencil size={11} /></button>
+                    <button onClick={() => setDeleting(mb)} style={{ background: C.redBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}><Trash2 size={11} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {shown.length === 0 && <div style={{ padding: 40, textAlign: 'center', color: C.text3 }}>No members yet.</div>}
+      </Card>
+
+      {modal !== null && <MemberModal data={modal} onClose={() => setModal(null)} onSave={handleSave} />}
+      {deleting && <ConfirmModal message={`Remove ${deleting.name}?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
+    </div>
+  );
+}
+
+function MemberModal({ data, onClose, onSave }: { data: Partial<Member>; onClose: () => void; onSave: (f: Partial<Member>) => void }) {
+  const [form, setForm] = useState<Partial<Member>>({ name: '', nickname: '', role: '', position: '', email: '', tel: '', type: 'internal', notes: '', ...data });
+  const up = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+  return (
+    <Modal title={form.id ? 'Edit Member' : 'Add Member'} onClose={onClose} width={520}>
+      <FormRow label="Full Name" required>
+        <Input autoFocus value={form.name ?? ''} onChange={v => up('name', v)} placeholder="e.g. John Smith" />
+      </FormRow>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <FormRow label="Nickname"><Input value={form.nickname ?? ''} onChange={v => up('nickname', v)} placeholder="e.g. John" /></FormRow>
+        <FormRow label="Type">
+          <Select value={form.type ?? 'internal'} onChange={v => up('type', v)}
+            options={[{ value: 'internal', label: 'Internal Team' }, { value: 'client', label: 'Client' }]} />
+        </FormRow>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <FormRow label="Role">
+          <Select value={form.role ?? ''} onChange={v => up('role', v)}
+            options={[{ value: '', label: 'Select role…' }, ...ROLES.map(r => ({ value: r, label: r }))]} />
+        </FormRow>
+        <FormRow label="Position"><Input value={form.position ?? ''} onChange={v => up('position', v)} placeholder="e.g. Senior Developer" /></FormRow>
+      </div>
+      <FormRow label="Email"><Input type="email" value={form.email ?? ''} onChange={v => up('email', v)} placeholder="email@example.com" /></FormRow>
+      <FormRow label="Tel"><Input value={form.tel ?? ''} onChange={v => up('tel', v)} placeholder="+66-81-234-5678" /></FormRow>
+      <FormRow label="Notes"><Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional remarks…" /></FormRow>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={() => { if (!form.name?.trim()) return; onSave(form); }}>Save</Btn>
+      </div>
+    </Modal>
+  );
+}

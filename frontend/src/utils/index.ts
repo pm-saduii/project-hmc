@@ -1,0 +1,148 @@
+import {
+  format, parseISO, isValid, differenceInCalendarDays, addDays,
+  startOfMonth, endOfMonth,
+} from 'date-fns';
+import type { Task } from '../types';
+
+// ── Date helpers — ALL display as DD/MM/YYYY ──────────────────────────────────
+export const calcDuration = (s: string, e: string): number => {
+  if (!s || !e) return 0;
+  const a = parseISO(s), b = parseISO(e);
+  return (!isValid(a) || !isValid(b)) ? 0 : Math.max(0, differenceInCalendarDays(b, a));
+};
+
+/** Display: 25/12/2024 */
+export const fmtDate = (str: string): string => {
+  if (!str) return '—';
+  const d = parseISO(str);
+  return isValid(d) ? format(d, 'dd/MM/yyyy') : str;
+};
+
+/** For <input type="date"> value attribute — always YYYY-MM-DD */
+export const toInput = (str: string): string => {
+  if (!str) return '';
+  const d = parseISO(str);
+  return isValid(d) ? format(d, 'yyyy-MM-dd') : '';
+};
+
+/** Month label: Mar 25 */
+export const fmtMonth = (str: string): string => {
+  if (!str || str.length < 7) return str;
+  const [y, m] = str.split('-');
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return format(d, 'MMM yy');
+};
+
+export const getProjectDateRange = (tasks: Task[]) => {
+  const valid = tasks.filter(t => t.startDate && t.endDate);
+  if (!valid.length) {
+    const n = new Date();
+    return { minDate: n, maxDate: addDays(n, 30) };
+  }
+  const starts = valid.map(t => parseISO(t.startDate)).filter(isValid);
+  const ends   = valid.map(t => parseISO(t.endDate)).filter(isValid);
+  return {
+    minDate: addDays(new Date(Math.min(...starts.map(d => d.getTime()))), -3),
+    maxDate: addDays(new Date(Math.max(...ends.map(d => d.getTime()))),    7),
+  };
+};
+
+export const dayOffset = (minDate: Date, dateStr: string): number => {
+  if (!dateStr) return 0;
+  const d = parseISO(dateStr);
+  if (!isValid(d)) return 0;
+  return Math.max(0, differenceInCalendarDays(d, minDate));
+};
+
+export const getMonths = (minDate: Date, maxDate: Date): Date[] => {
+  const result: Date[] = [];
+  const cur = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+  while (cur <= maxDate) {
+    result.push(new Date(cur));
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return result;
+};
+
+export const getDays = (minDate: Date, totalDays: number) =>
+  Array.from({ length: totalDays }, (_, i) => {
+    const d = addDays(minDate, i);
+    return { i, d, isWeekend: d.getDay() === 0 || d.getDay() === 6, showLabel: d.getDate() % 5 === 1 };
+  });
+
+// ── Task tree helpers ─────────────────────────────────────────────────────────
+export const flattenTree = (tasks: Task[], expandedIds: Set<string>): Task[] => {
+  const roots = tasks.filter(t => !t.parentId).sort((a, b) => a.order - b.order);
+  const out: Task[] = [];
+  const walk = (t: Task) => {
+    out.push(t);
+    if (expandedIds.has(t.id))
+      tasks.filter(x => x.parentId === t.id).sort((a, b) => a.order - b.order).forEach(walk);
+  };
+  roots.forEach(walk);
+  return out;
+};
+
+export const hasChildren = (tasks: Task[], id: string) => tasks.some(t => t.parentId === id);
+
+// ── Money ─────────────────────────────────────────────────────────────────────
+export const fmtMoney = (n: number): string =>
+  new Intl.NumberFormat('en', { minimumFractionDigits: 0 }).format(n || 0);
+
+// ── Avatar ────────────────────────────────────────────────────────────────────
+const AVT_COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EC4899','#8B5CF6','#EF4444','#F97316'];
+export const avatarColor = (name: string): string => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVT_COLORS[Math.abs(h) % AVT_COLORS.length];
+};
+export const getInitials = (name: string): string =>
+  name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
+
+// ── Role colors ───────────────────────────────────────────────────────────────
+const ROLE_COLORS: Record<string, string> = {
+  'Project Sponsor': '#8B5CF6', 'Project Advisor': '#6366F1',
+  'Project Leader': '#4F46E5',  'Project Manager': '#4F46E5',
+  'Project Consultants': '#0EA5E9', 'Business Analyst': '#0EA5E9',
+  'Business Process Owner': '#F97316', 'UI/UX Designer': '#EC4899',
+  'Full-Stack Developer': '#F59E0B',   'Frontend Developer': '#F59E0B',
+  'Backend Developer': '#F97316', 'QA Engineer': '#10B981',
+  'DevOps Engineer': '#64748B',   'IT Support': '#64748B',
+  'HRM User': '#EF4444', 'HRD User': '#EF4444',
+  'Product Owner': '#8B5CF6',     'IT Coordinator': '#64748B', 'HR Director': '#EF4444',
+};
+export const roleColor = (role: string): string => ROLE_COLORS[role] || '#94A3B8';
+
+// ── Status colors ─────────────────────────────────────────────────────────────
+export const PROCESS_STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  'Open':         { bg: '#FEE2E2', color: '#991B1B' },
+  'In Progress':  { bg: '#DBEAFE', color: '#1E40AF' },
+  'Resolved':     { bg: '#D1FAE5', color: '#065F46' },
+  'Blocked':      { bg: '#FCD34D', color: '#92400E' },
+  'Draft':        { bg: '#F3F4F6', color: '#5B6B7A' },
+  'Submitted':    { bg: '#FEF3C7', color: '#92400E' },
+  'Under Review': { bg: '#DBEAFE', color: '#1E40AF' },
+  'Approved':     { bg: '#D1FAE5', color: '#065F46' },
+  'Rejected':     { bg: '#FEE2E2', color: '#991B1B' },
+  'Implemented':  { bg: '#D1FAE5', color: '#065F46' },
+  'Close':        { bg: '#E5E7EB', color: '#4B5563' },
+};
+
+export const RISK_LEVEL_COLOR: Record<string, string> = {
+  Low: '#10B981', Medium: '#F59E0B', High: '#EF4444',
+};
+
+// ── Export XLSX helper ────────────────────────────────────────────────────────
+export const exportCSV = (rows: string[][], filename: string) => {
+  const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a   = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+// ── Today ISO ─────────────────────────────────────────────────────────────────
+export const todayISO = () => format(new Date(), 'yyyy-MM-dd');
+
+export { format, parseISO, isValid, addDays };

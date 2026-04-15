@@ -1,0 +1,246 @@
+import React, { useMemo, useRef, useState, useCallback, RefObject } from 'react';
+import { format, addDays, parseISO, isValid } from 'date-fns';
+import { ZoomIn, ZoomOut } from 'lucide-react';
+import { C } from '../Common';
+import { getProjectDateRange, getMonths, getDays, dayOffset, fmtDate, hasChildren } from '../../utils';
+import { ROW_H, GNT_HDR } from '../Table/TasksTab';
+import type { Task } from '../../types';
+
+interface Props {
+  tasks: Task[];
+  visibleTasks: Task[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onUpdate: (id: string, field: string, value: string) => void;
+  ganttBodyRef?: RefObject<HTMLDivElement>;
+  onGanttScroll?: () => void;
+}
+
+export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, onUpdate, ganttBodyRef, onGanttScroll }: Props) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
+  const [drag, setDrag]       = useState<{ taskId: string; startX: number; deltaDays: number } | null>(null);
+  const [dayWidth, setDayWidth] = useState(26);
+  const [showScrollHint, setShowScrollHint] = useState(true);
+
+  const { minDate, maxDate } = useMemo(() => getProjectDateRange(tasks), [tasks]);
+  const totalDays = useMemo(() => Math.max(30, Math.round((maxDate.getTime() - minDate.getTime()) / 86400000)), [minDate, maxDate]);
+  const months    = useMemo(() => getMonths(minDate, maxDate), [minDate, maxDate]);
+  const days      = useMemo(() => getDays(minDate, totalDays), [minDate, totalDays]);
+  const totalW    = totalDays * dayWidth;
+  const totalH    = GNT_HDR + visibleTasks.length * ROW_H;
+  const todayX    = dayOffset(minDate, format(new Date(), 'yyyy-MM-dd')) * dayWidth + dayWidth / 2;
+
+  const handleZoom = (direction: 'in' | 'out') => {
+    const delta = direction === 'in' ? 2 : -2;
+    const newWidth = Math.max(14, Math.min(60, dayWidth + delta));
+    setDayWidth(newWidth);
+  };
+
+  const barColor = (t: Task) =>
+    t.percentComplete >= 100 ? C.green : t.percentComplete >= 60 ? C.blue : C.primary;
+
+  const onDragStart = useCallback((e: React.MouseEvent, taskId: string) => {
+    e.preventDefault();
+    setDrag({ taskId, startX: e.clientX, deltaDays: 0 });
+  }, []);
+
+  const onDragMove = useCallback((e: React.MouseEvent) => {
+    if (!drag) return;
+    const delta = Math.round((e.clientX - drag.startX) / dayWidth);
+    if (delta !== drag.deltaDays) setDrag(d => d ? { ...d, deltaDays: delta } : null);
+  }, [drag, dayWidth]);
+
+  const onDragEnd = useCallback((e: React.MouseEvent) => {
+    if (!drag) return;
+    const delta = Math.round((e.clientX - drag.startX) / dayWidth);
+    setDrag(null);
+    if (delta === 0) return;
+    const task = tasks.find(t => t.id === drag.taskId);
+    if (!task) return;
+    const ns = addDays(parseISO(task.startDate), delta);
+    const ne = addDays(parseISO(task.endDate),   delta);
+    if (isValid(ns) && isValid(ne)) {
+      onUpdate(task.id, 'startDate', format(ns, 'yyyy-MM-dd'));
+      onUpdate(task.id, 'endDate',   format(ne, 'yyyy-MM-dd'));
+    }
+  }, [drag, tasks, onUpdate, dayWidth]);
+
+  const arrows = useMemo(() => {
+    return visibleTasks.flatMap((task, ri) => {
+      if (!task.relatedTask) return [];
+      const predIdx = visibleTasks.findIndex(t => t.id === task.relatedTask);
+      if (predIdx < 0) return [];
+      const pred = visibleTasks[predIdx];
+      return [{
+        x1: dayOffset(minDate, pred.endDate)   * dayWidth + dayWidth,
+        y1: GNT_HDR + predIdx * ROW_H + ROW_H / 2,
+        x2: dayOffset(minDate, task.startDate) * dayWidth,
+        y2: GNT_HDR + ri      * ROW_H + ROW_H / 2,
+        key: task.id,
+      }];
+    });
+  }, [visibleTasks, minDate, dayWidth]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Zoom controls */}
+      <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: C.bg, borderBottom: `1px solid ${C.border}`, alignItems: 'center', justifyContent: 'flex-start', flexShrink: 0 }}>
+        <button onClick={() => handleZoom('out')} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.text2, fontFamily: 'Poppins, sans-serif' }} title="Zoom out">
+          <ZoomOut size={14} /> Zoom Out
+        </button>
+        <button onClick={() => handleZoom('in')} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.text2, fontFamily: 'Poppins, sans-serif' }} title="Zoom in">
+          <ZoomIn size={14} /> Zoom In
+        </button>
+        <span style={{ fontSize: 10, color: C.text3, marginLeft: 8 }}>({dayWidth}px/day)</span>
+      </div>
+
+      {/* Sticky header - month + day labels */}
+      <div style={{ flexShrink: 0, height: GNT_HDR, overflowX: 'hidden', background: C.bg, borderBottom: `1px solid ${C.border}` }}>
+        <svg width={totalW} height={GNT_HDR} style={{ display: 'block' }}>
+          {months.map((mo, i) => {
+            const x   = dayOffset(minDate, format(mo, 'yyyy-MM-dd')) * dayWidth;
+            const nx  = months[i + 1];
+            const end = nx ? dayOffset(minDate, format(nx, 'yyyy-MM-dd')) * dayWidth : totalW;
+            return (
+              <g key={i}>
+                <rect x={x} y={0} width={end - x} height={28} fill={C.bg} />
+                <rect x={x} y={0} width={1} height={GNT_HDR} fill={C.border} />
+                <text x={x + 8} y={18} fill={C.text2} fontSize={10} fontFamily="Poppins, sans-serif" fontWeight={600} letterSpacing="0.06em">
+                  {format(mo, 'MMM yyyy').toUpperCase()}
+                </text>
+              </g>
+            );
+          })}
+          {days.map(({ i, d, isWeekend, showLabel }) => (
+            <g key={i}>
+              <rect x={i * dayWidth} y={28} width={dayWidth} height={24} fill={isWeekend ? C.bg2 : C.bg} />
+              <rect x={i * dayWidth} y={28} width={1} height={24} fill={C.border} />
+              {showLabel && (
+                <text x={i * dayWidth + dayWidth / 2} y={43} textAnchor="middle" fill={isWeekend ? C.border2 : C.text3} fontSize={9} fontFamily="Poppins, sans-serif">
+                  {d.getDate()}
+                </text>
+              )}
+            </g>
+          ))}
+          {/* Today in header */}
+          {todayX > 0 && todayX < totalW && (
+            <g>
+              <rect x={todayX - 18} y={28} width={36} height={24} fill={C.red} rx={4} />
+              <text x={todayX} y={43} textAnchor="middle" fill="#fff" fontSize={9} fontFamily="Poppins, sans-serif" fontWeight={700}>TODAY</text>
+            </g>
+          )}
+        </svg>
+      </div>
+
+      {/* Scrollable body - rows only */}
+      <div
+        ref={ganttBodyRef}
+        onScroll={(e) => { onGanttScroll?.(); if (showScrollHint && (e.currentTarget.scrollLeft > 20)) setShowScrollHint(false); }}
+        onMouseMove={onDragMove}
+        onMouseUp={onDragEnd}
+        onMouseLeave={onDragEnd}
+        style={{ flex: 1, overflowY: 'scroll', overflowX: 'auto', userSelect: 'none', background: C.white, position: 'relative' }}>
+        {/* Mobile scroll hint */}
+        {showScrollHint && window.innerWidth < 768 && (
+          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '6px 12px', borderRadius: 20, fontSize: 10, fontFamily: 'Poppins, sans-serif', whiteSpace: 'nowrap', zIndex: 50, pointerEvents: 'none', animation: 'fadeInOut 3s forwards' }}>
+            ← Scroll horizontally
+          </div>
+        )}
+        <svg
+          ref={svgRef}
+          width={totalW}
+          height={visibleTasks.length * ROW_H}
+          style={{ display: 'block' }}>
+          {/* Weekend bg */}
+          {days.map(({ i, isWeekend }) => isWeekend && (
+            <rect key={i} x={i * dayWidth} y={0} width={dayWidth} height={visibleTasks.length * ROW_H} fill={C.bg} opacity={0.8} />
+          ))}
+          {/* Row stripes */}
+          {visibleTasks.map((_, ri) => ri % 2 === 0 && (
+            <rect key={ri} x={0} y={ri * ROW_H} width={totalW} height={ROW_H} fill="#FAFBFF" />
+          ))}
+          {/* Row dividers */}
+          {visibleTasks.map((_, ri) => (
+            <line key={ri} x1={0} y1={(ri + 1) * ROW_H} x2={totalW} y2={(ri + 1) * ROW_H} stroke={C.border} strokeWidth={1} />
+          ))}
+          {/* Today vertical line */}
+          {todayX > 0 && todayX < totalW && (
+            <line x1={todayX} y1={0} x2={todayX} y2={visibleTasks.length * ROW_H} stroke={C.red} strokeWidth={1.5} strokeDasharray="4,3" opacity={0.6} />
+          )}
+          {/* Dependency arrows */}
+          {arrows.map(a => {
+            const mx = (a.x1 + a.x2) / 2;
+            // Re-offset: arrows now relative to body (no GNT_HDR offset)
+            const y1 = a.y1 - GNT_HDR;
+            const y2 = a.y2 - GNT_HDR;
+            return (
+              <g key={a.key}>
+                <path d={`M${a.x1},${y1} C${mx},${y1} ${mx},${y2} ${a.x2},${y2}`}
+                  fill="none" stroke={C.primary} strokeWidth={1.5} opacity={0.35} />
+                <polygon points={`${a.x2},${y2} ${a.x2 - 5},${y2 - 3} ${a.x2 - 5},${y2 + 3}`} fill={C.primary} opacity={0.45} />
+              </g>
+            );
+          })}
+          {/* Bars */}
+          {visibleTasks.map((task, ri) => {
+            if (!task.startDate || !task.endDate) return null;
+            const isDrag  = drag?.taskId === task.id;
+            const delta   = isDrag ? (drag?.deltaDays ?? 0) : 0;
+            const bx      = (dayOffset(minDate, task.startDate) + delta) * dayWidth;
+            const bw      = Math.max(task.duration * dayWidth, dayWidth);
+            const by      = ri * ROW_H + 7;
+            const bh      = ROW_H - 14;
+            const isParent = hasChildren(tasks, task.id);
+            const isSel   = selectedId === task.id;
+            const bc      = barColor(task);
+            const pw      = (task.percentComplete / 100) * bw;
+            return (
+              <g key={task.id} style={{ cursor: drag ? 'grabbing' : 'grab' }}
+                onMouseDown={e => onDragStart(e, task.id)}
+                onClick={() => onSelect(task.id)}
+                onMouseEnter={e => {
+                  const r = svgRef.current?.getBoundingClientRect();
+                  if (r) setTooltip({ task, x: e.clientX - r.left, y: e.clientY - r.top });
+                }}
+                onMouseLeave={() => setTooltip(null)}>
+                <rect x={bx + 1} y={by + 2} width={bw} height={bh} rx={4} fill="rgba(0,0,0,0.06)" />
+                <rect x={bx} y={by} width={bw} height={bh} rx={4}
+                  fill={bc + '22'} stroke={isSel ? C.text : bc} strokeWidth={isSel ? 2 : 1} opacity={isDrag ? 0.7 : 1} />
+                {pw > 0 && <rect x={bx} y={by} width={pw} height={bh} rx={4} fill={bc} opacity={0.55} />}
+                {isParent && (
+                  <>
+                    <polygon points={`${bx},${by + bh / 2} ${bx + 6},${by} ${bx + 6},${by + bh}`} fill={bc} />
+                    <polygon points={`${bx + bw},${by + bh / 2} ${bx + bw - 6},${by} ${bx + bw - 6},${by + bh}`} fill={bc} />
+                  </>
+                )}
+                {bw > 48 && (
+                  <>
+                    <defs><clipPath id={`clip-${task.id}`}><rect x={bx + 6} y={by} width={bw - 12} height={bh} /></clipPath></defs>
+                    <text x={bx + 10} y={by + bh / 2 + 4} fill={C.text} fontSize={10} fontFamily="Poppins, sans-serif"
+                      fontWeight={isParent ? 600 : 400} clipPath={`url(#clip-${task.id})`} style={{ pointerEvents: 'none' }}>
+                      {task.taskName}
+                    </text>
+                  </>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Tooltip */}
+        {tooltip && (
+          <div style={{ position: 'sticky', left: tooltip.x + 14, top: tooltip.y, pointerEvents: 'none', zIndex: 50,
+            background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px',
+            boxShadow: C.shadow2, fontSize: 12, minWidth: 180, display: 'inline-block' }}>
+            <div style={{ fontWeight: 700, color: C.text, marginBottom: 5 }}>{tooltip.task.taskName}</div>
+            <div style={{ color: C.text2 }}>WBS: {tooltip.task.wbs}</div>
+            <div style={{ color: C.text2 }}>{fmtDate(tooltip.task.startDate)} → {fmtDate(tooltip.task.endDate)}</div>
+            <div style={{ color: C.text2 }}>{tooltip.task.duration} days · {tooltip.task.percentComplete}%</div>
+            {tooltip.task.resource && <div style={{ color: C.text2, marginTop: 4 }}>👤 {tooltip.task.resource}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

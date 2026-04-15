@@ -1,0 +1,71 @@
+import React, { useState } from 'react';
+import { Badge, Tabs, C, PROJECT_STATUS } from '../Common';
+import { fmtDate } from '../../utils';
+import type { Project } from '../../types';
+import TasksTab          from '../Table/TasksTab';
+import MembersTab        from '../Members/MembersTab';
+import MilestonesTab     from '../Milestones/MilestonesTab';
+import EffortTab         from '../Effort/EffortTab';
+import ChangeRequestTab  from '../ChangeRequest/ChangeRequestTab';
+import IssuesTab         from '../Issues/IssuesTab';
+import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
+import ProjectReport     from './ProjectReport';
+import { useStore }      from '../../store';
+
+interface Props { project: Project; }
+
+export default function ProjectDetail({ project }: Props) {
+  const [activeTab, setActiveTab]   = useState('tasks');
+  const [showReport, setShowReport] = useState(false);
+  const { tasks, members, milestones, efforts, changeRequests, issues, risks } = useStore();
+
+  const s = PROJECT_STATUS[project.status] ?? PROJECT_STATUS['Planning'];
+
+  const TABS = [
+    { id: 'tasks',   label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
+    { id: 'members', label: 'Members',    icon: '👥', count: members.length },
+    { id: 'ms',      label: 'Milestones', icon: '🏁', count: milestones.length },
+    { id: 'effort',  label: 'Effort',     icon: '⚡', count: efforts.length },
+    { id: 'cr',      label: 'Change Req', icon: '📝', count: changeRequests.length },
+    { id: 'issues',  label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
+    { id: 'risks',   label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
+    { id: 'report',  label: 'Report',     icon: '📊' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <div style={{ padding: '14px 24px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+            <div style={{ width: 10, height: 42, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: 19, fontWeight: 800, color: C.text, margin: 0 }}>{project.name}</h2>
+                <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
+              </div>
+              <div style={{ fontSize: 12, color: C.text3, marginTop: 3 }}>
+                {project.code} · {project.client} · {fmtDate(project.startDate)} – {fmtDate(project.endDate)}
+              </div>
+            </div>
+          </div>
+          <Tabs tabs={TABS} active={activeTab} onChange={id => {
+            if (id === 'report') { setShowReport(true); return; }
+            setActiveTab(id);
+          }} />
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflow: 'hidden', background: activeTab === 'tasks' ? C.white : C.bg }}>
+        {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} /></div>}
+        {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} /></div>}
+        {activeTab === 'ms'      && <div style={{ height: '100%', overflowY: 'auto' }}><MilestonesTab     projectId={project.id} /></div>}
+        {activeTab === 'effort'  && <div style={{ height: '100%', overflowY: 'auto' }}><EffortTab         projectId={project.id} /></div>}
+        {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
+        {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
+        {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} /></div>}
+      </div>
+
+      {showReport && <ProjectReport project={project} onClose={() => setShowReport(false)} />}
+    </div>
+  );
+}

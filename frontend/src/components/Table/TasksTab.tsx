@@ -1,0 +1,501 @@
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Plus, Download, ChevronDown } from 'lucide-react';
+import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useStore } from '../../store';
+import { taskApi } from '../../services/api';
+import { Btn, EditableCell, Avatar, Modal, FormRow, Input, Select, C } from '../Common';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth } from '../../utils';
+import GanttChart from '../Gantt/GanttChart';
+import type { Task, ViewMode } from '../../types';
+
+interface Props { projectId: string; }
+
+export const ROW_H   = 36;
+export const TBL_HDR = 36;
+export const GNT_HDR = 52;
+
+// Columns for table view
+const COLS = [
+  { label: 'WBS',           w: 52  },
+  { label: 'Task Name',     w: 200 },
+  { label: 'Start',         w: 94  },
+  { label: 'Finish',        w: 94  },
+  { label: 'Actual Finish', w: 100 },
+  { label: 'Days',          w: 46  },
+  { label: '% Done',        w: 110 },
+  { label: 'Resource',      w: 116 },
+  { label: '',              w: 76  },
+];
+
+// Inline % editor
+function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean; onSave: (n: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState(String(value));
+  const color = value >= 100 ? C.green : value >= 60 ? C.blue : C.primary;
+  const commit = () => {
+    setEditing(false);
+    const n = Math.min(100, Math.max(0, parseInt(draft) || 0));
+    if (n !== value) onSave(n);
+    setDraft(String(n));
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+      <div style={{ flex: 1, height: 5, background: C.bg2, borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: 3 }} />
+      </div>
+      {editing && !isParent ? (
+        <input autoFocus type="number" min={0} max={100} value={draft}
+          onChange={e => setDraft(e.target.value)} onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+          style={{ width: 44, textAlign: 'right', border: `1.5px solid ${C.primary}`, borderRadius: 5, padding: '1px 4px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg }}
+        />
+      ) : (
+        <span onClick={() => !isParent && setEditing(true)}
+          title={isParent ? 'Auto-calculated' : 'Click to edit'}
+          style={{ fontSize: 11, fontWeight: 700, color: isParent ? C.text3 : color, width: 36, textAlign: 'right', cursor: isParent ? 'default' : 'pointer', flexShrink: 0 }}>
+          {value}%
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default function TasksTab({ projectId }: Props) {
+  const { tasks, fetchTasks, createTask, updateTask, deleteTask } = useStore();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<string | null>(null);
+  const [view, setView]         = useState<ViewMode>('split');
+  const [addModal, setAddModal] = useState(false);
+  const [editModal, setEditModal] = useState<Task | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [splitW, setSplitW]     = useState(630);  // resizable split width
+
+  // Scroll sync
+  const tableBodyRef = useRef<HTMLDivElement>(null);
+  const ganttBodyRef = useRef<HTMLDivElement>(null);
+  const syncing      = useRef(false);
+
+  // Resize drag
+  const dragRef    = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartW = useRef(0);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchTasks(projectId).finally(() => setLoading(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    const parentIds = new Set(
+      tasks.filter(t => t.projectId === projectId && t.parentId).map(t => t.parentId)
+    );
+    setExpanded(parentIds);
+  }, [tasks.length, projectId]);
+
+  const projectTasks = tasks.filter(t => t.projectId === projectId);
+  const visible      = flattenTree(projectTasks, expanded);
+
+  const toggle = (id: string) => setExpanded(p => {
+    const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s;
+  });
+
+  const handleUpdate = useCallback(async (id: string, updates: Partial<Task>) => {
+    try { await updateTask(id, updates); }
+    catch { toast.error('Failed to save'); }
+  }, [updateTask]);
+
+  const handlePct = useCallback(async (id: string, pct: number) => {
+    try {
+      const res = await taskApi.setComplete(id, pct);
+      useStore.setState({ tasks: res.allTasks ?? useStore.getState().tasks });
+    } catch { toast.error('Failed to save'); }
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    try { await deleteTask(id); toast.success('Deleted'); }
+    catch { toast.error('Failed to delete'); }
+  };
+
+  const handleCreate = async (form: Partial<Task>) => {
+    try { await createTask({ ...form, projectId }); toast.success('Task created'); setAddModal(false); }
+    catch { toast.error('Failed to create'); }
+  };
+
+  const handleEditSave = async (form: Partial<Task>) => {
+    if (!form.id) return;
+    try { await updateTask(form.id, form); toast.success('Saved'); setEditModal(null); }
+    catch { toast.error('Failed to save'); }
+  };
+
+  // Scroll sync
+  const onTableScroll = useCallback(() => {
+    if (syncing.current || !tableBodyRef.current || !ganttBodyRef.current) return;
+    syncing.current = true;
+    ganttBodyRef.current.scrollTop = tableBodyRef.current.scrollTop;
+    requestAnimationFrame(() => { syncing.current = false; });
+  }, []);
+  const onGanttScroll = useCallback(() => {
+    if (syncing.current || !tableBodyRef.current || !ganttBodyRef.current) return;
+    syncing.current = true;
+    tableBodyRef.current.scrollTop = ganttBodyRef.current.scrollTop;
+    requestAnimationFrame(() => { syncing.current = false; });
+  }, []);
+
+  // Resize handlers
+  const onResizeStart = (e: React.MouseEvent) => {
+    dragRef.current    = true;
+    dragStartX.current = e.clientX;
+    dragStartW.current = splitW;
+    e.preventDefault();
+  };
+  const onResizeMove = useCallback((e: MouseEvent) => {
+    if (!dragRef.current) return;
+    const delta = e.clientX - dragStartX.current;
+    setSplitW(Math.max(300, Math.min(900, dragStartW.current + delta)));
+  }, []);
+  const onResizeEnd = useCallback(() => { dragRef.current = false; }, []);
+  useEffect(() => {
+    window.addEventListener('mousemove', onResizeMove);
+    window.addEventListener('mouseup', onResizeEnd);
+    return () => { window.removeEventListener('mousemove', onResizeMove); window.removeEventListener('mouseup', onResizeEnd); };
+  }, [onResizeMove, onResizeEnd]);
+
+  // ── XLSX export ──────────────────────────────────────────────────────────
+  const exportXLSX = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['WBS','Task Name','Start','Finish','Actual Finish','Days','% Done','Resource'],
+      ...projectTasks.map(t => [t.wbs, t.taskName, t.startDate, t.endDate, t.actualFinish || '', t.duration, t.percentComplete, t.resource]),
+    ]);
+    ws['!cols'] = [{wch:8},{wch:35},{wch:14},{wch:14},{wch:14},{wch:8},{wch:10},{wch:20}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
+    XLSX.writeFile(wb, `tasks-${projectId}.xlsx`);
+    toast.success('Exported XLSX'); setShowExport(false);
+  };
+
+  // ── PDF export with Gantt ─────────────────────────────────────────────────
+  const exportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const proj = useStore.getState().activeProject;
+
+    // Header
+    doc.setFillColor(79,70,229); doc.rect(0,0,W,22,'F');
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+    doc.text(`${proj?.name ?? projectId} — Task Plan`, 12, 13);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W-12, 13, { align:'right' });
+    doc.setTextColor(0);
+
+    // Task table (top half)
+    const taskRows = projectTasks.map(t => [
+      t.wbs,
+      '  '.repeat(t.level) + t.taskName,
+      t.startDate, t.endDate,
+      t.actualFinish || '—',
+      `${t.duration}d`,
+      `${t.percentComplete}%`,
+      t.resource || '—',
+    ]);
+    autoTable(doc, {
+      startY: 26,
+      head: [['WBS','Task Name','Start','Finish','Actual Finish','Days','%','Resource']],
+      body: taskRows.length ? taskRows : [['','No tasks','','','','','','']],
+      styles: { fontSize: 7, cellPadding: 1.8, font: 'helvetica' },
+      headStyles: { fillColor: [79,70,229], textColor: 255, fontSize: 7, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245,247,250] },
+      columnStyles: {
+        0:{cellWidth:12}, 1:{cellWidth:60}, 2:{cellWidth:20},
+        3:{cellWidth:20}, 4:{cellWidth:22}, 5:{cellWidth:12},
+        6:{cellWidth:12}, 7:{cellWidth:W-172},
+      },
+      margin: { left:12, right:12 },
+      didParseCell(data) {
+        if (data.column.index === 6 && data.section === 'body') {
+          const p = parseInt(data.cell.raw as string)||0;
+          data.cell.styles.textColor = p>=100?[16,185,129]:p>=60?[59,130,246]:[79,70,229];
+          data.cell.styles.fontStyle = 'bold';
+        }
+      },
+    });
+
+    // @ts-ignore
+    const afterTable: number = (doc as any).lastAutoTable?.finalY ?? 60;
+
+    // Gantt SVG section — draw bars
+    const ganttY    = afterTable + 6;
+    const ganttH    = doc.internal.pageSize.getHeight() - ganttY - 10;
+    if (ganttH > 20 && projectTasks.length > 0) {
+      const validTasks = projectTasks.filter(t => t.startDate && t.endDate);
+      const allDates   = validTasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
+      const minD = new Date(Math.min(...allDates.map(d=>d.getTime())));
+      const maxD = new Date(Math.max(...allDates.map(d=>d.getTime())));
+      const totalDays  = Math.max(1, Math.round((maxD.getTime()-minD.getTime())/86400000));
+      const ganttW     = W - 24;
+      const dayPx      = ganttW / totalDays;
+      const barH       = Math.min(6, (ganttH - 10) / Math.max(projectTasks.length, 1));
+      const rowPx      = barH + 2;
+
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(79,70,229);
+      doc.text('Gantt Chart', 12, ganttY + 4);
+
+      // Today line
+      const todayOff = Math.round((new Date().getTime()-minD.getTime())/86400000);
+      if (todayOff >= 0 && todayOff <= totalDays) {
+        const tx = 12 + todayOff * dayPx;
+        doc.setDrawColor(239,68,68); doc.setLineWidth(0.4);
+        doc.line(tx, ganttY+8, tx, ganttY+8+projectTasks.length*rowPx);
+      }
+
+      projectTasks.forEach((task, i) => {
+        if (!task.startDate || !task.endDate) return;
+        const offS   = Math.round((new Date(task.startDate).getTime()-minD.getTime())/86400000);
+        const offE   = Math.round((new Date(task.endDate).getTime()-minD.getTime())/86400000);
+        const bx     = 12 + offS * dayPx;
+        const bw     = Math.max((offE-offS)*dayPx, 1);
+        const by     = ganttY + 8 + i * rowPx;
+        const fillW  = bw * (task.percentComplete/100);
+        const isPar  = hasChildren(projectTasks, task.id);
+
+        // Background bar
+        doc.setFillColor(238,242,255); doc.setDrawColor(79,70,229); doc.setLineWidth(0.2);
+        doc.roundedRect(bx, by, bw, barH, 0.5, 0.5, 'FD');
+        // Progress bar
+        if (fillW > 0.5) {
+          const [r,g,b] = task.percentComplete>=100?[16,185,129]:task.percentComplete>=60?[59,130,246]:[79,70,229];
+          doc.setFillColor(r,g,b);
+          doc.roundedRect(bx, by, fillW, barH, 0.5, 0.5, 'F');
+        }
+        // Label (if wide enough)
+        if (bw > 14) {
+          doc.setFontSize(5); doc.setFont('helvetica', isPar?'bold':'normal'); doc.setTextColor(30);
+          doc.text(task.taskName.substring(0,22), bx+1, by+barH-1, { maxWidth: bw-2 });
+        }
+      });
+    }
+
+    doc.save(`tasks-${projectId}.pdf`);
+    toast.success('Exported PDF'); setShowExport(false);
+  };
+
+  const barColor = (t: Task) => t.percentComplete>=100?C.green:t.percentComplete>=60?C.blue:C.primary;
+
+  // ── Table ─────────────────────────────────────────────────────────────────
+  const tableContent = (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+      <div style={{ display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:TBL_HDR }}>
+        {COLS.map(c => (
+          <div key={c.label} style={{ width:c.w, minWidth:c.w, padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center' }}>
+            {c.label}
+          </div>
+        ))}
+      </div>
+      <div ref={tableBodyRef} onScroll={onTableScroll}
+        style={{ flex:1, overflowY:'scroll', overflowX:'auto' }}>
+        {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading…</div>}
+        {!loading && visible.map((task, i) => {
+          const isPar = hasChildren(projectTasks, task.id);
+          const isExp = expanded.has(task.id);
+          const isSel = selected === task.id;
+          return (
+            <div key={task.id} onClick={() => setSelected(task.id)}
+              style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel?C.primaryBg:i%2===0?C.white:C.bg, borderLeft: isSel?`3px solid ${C.primary}`:'3px solid transparent', cursor:'pointer', flexShrink:0 }}>
+              <div style={{ width:52, minWidth:52, padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'monospace', flexShrink:0 }}>{task.wbs}</div>
+              <div style={{ width:200, minWidth:200, padding:`0 4px 0 ${8+task.level*16}px`, display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+                <button onClick={e=>{ e.stopPropagation(); toggle(task.id); }}
+                  style={{ width:16, height:16, background:'none', border:'none', cursor:'pointer', color:C.text2, padding:0, visibility:isPar?'visible':'hidden', fontSize:12, flexShrink:0 }}>
+                  {isExp?'▾':'▸'}
+                </button>
+                {isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
+                <EditableCell value={task.taskName} onSave={v=>handleUpdate(task.id,{taskName:v})} />
+              </div>
+              <div style={{ width:94, minWidth:94, padding:'0 6px', flexShrink:0 }}>
+                <EditableCell value={task.startDate} type="date" onSave={v=>handleUpdate(task.id,{startDate:v})} style={{ color:isPar?C.text3:C.text }} />
+              </div>
+              <div style={{ width:94, minWidth:94, padding:'0 6px', flexShrink:0 }}>
+                <EditableCell value={task.endDate} type="date" onSave={v=>handleUpdate(task.id,{endDate:v})} style={{ color:isPar?C.text3:C.text }} />
+              </div>
+              <div style={{ width:100, minWidth:100, padding:'0 6px', flexShrink:0 }}>
+                <EditableCell value={task.actualFinish||''} type="date" onSave={v=>handleUpdate(task.id,{actualFinish:v})} placeholder="—" style={{ color:task.actualFinish?C.green:C.text3 }} />
+              </div>
+              <div style={{ width:46, minWidth:46, padding:'0 6px', fontSize:11, color:C.text2, fontFamily:'monospace', flexShrink:0 }}>{task.duration}d</div>
+              <div style={{ width:110, minWidth:110, padding:'0 6px', flexShrink:0 }}>
+                <PctCell value={task.percentComplete} isParent={isPar} onSave={n=>handlePct(task.id,n)} />
+              </div>
+              <div style={{ width:116, minWidth:116, padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                {task.resource && <Avatar name={task.resource} size={20} />}
+                <EditableCell value={task.resource} onSave={v=>handleUpdate(task.id,{resource:v})} placeholder="Assign…" />
+              </div>
+              <div style={{ width:76, minWidth:76, padding:'0 5px', flexShrink:0, display:'flex', gap:4 }}>
+                <button onClick={e=>{ e.stopPropagation(); setEditModal(task); }}
+                  style={{ height:22, padding:'0 7px', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary, fontSize:11, fontWeight:600 }}>Edit</button>
+                <button onClick={e=>{ e.stopPropagation(); handleDelete(task.id); }}
+                  style={{ width:22, height:22, background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red, fontSize:11 }}>✕</button>
+              </div>
+            </div>
+          );
+        })}
+        {!loading && visible.length===0 && (
+          <div style={{ padding:40, textAlign:'center', color:C.text3 }}>No tasks. Click "+ Add Task".</div>
+        )}
+      </div>
+      <div style={{ flexShrink:0, padding:'5px 12px', borderTop:`1px solid ${C.border}`, display:'flex', gap:16, fontSize:11, color:C.text3 }}>
+        <span>{projectTasks.filter(t=>!t.parentId).length} root</span>
+        <span>{projectTasks.length} total</span>
+        <span>{Math.round(projectTasks.reduce((s,t)=>s+t.percentComplete,0)/Math.max(projectTasks.length,1))}% avg</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      {/* Sub-toolbar */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 16px', borderBottom:`1px solid ${C.border}`, flexShrink:0, background:C.white }}>
+        <div style={{ display:'flex', gap:3, background:C.bg, borderRadius:8, padding:3 }}>
+          {(['table','split','gantt'] as ViewMode[]).map(m => (
+            <button key={m} onClick={()=>setView(m)}
+              style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', background:view===m?C.white:C.bg, color:view===m?C.primary:C.text2, boxShadow:view===m?C.shadow:'none', transition:'all 0.15s' }}>
+              {m==='table'?'☰ Table':m==='split'?'⊟ Split':'▦ Gantt'}
+            </button>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:8, position:'relative' }}>
+          <div style={{ position:'relative' }}>
+            <Btn variant="ghost" small onClick={()=>setShowExport(v=>!v)}>
+              <Download size={13} /> Export <ChevronDown size={11} />
+            </Btn>
+            {showExport && (
+              <div style={{ position:'absolute', right:0, top:'110%', background:C.white, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:C.shadow2, zIndex:50, minWidth:160, overflow:'hidden' }}>
+                {[['📊 Excel (.xlsx)', exportXLSX],['📄 PDF + Gantt', exportPDF]].map(([label, fn]) => (
+                  <button key={label as string} onClick={fn as ()=>void}
+                    style={{ display:'block', width:'100%', padding:'10px 16px', textAlign:'left', border:'none', background:'none', cursor:'pointer', fontSize:13, color:C.text, fontFamily:'Poppins, sans-serif' }}
+                    onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+                    onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                    {label as string}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <Btn small onClick={()=>setAddModal(true)}><Plus size={13} /> Add Task</Btn>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex:1, overflow:'hidden', display:'flex' }}>
+        {(view==='table'||view==='split') && (
+          <div style={{ width:view==='split'?splitW:undefined, flex:view==='table'?1:undefined, minWidth:300, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0 }}>
+            {tableContent}
+          </div>
+        )}
+        {/* Resizable divider */}
+        {view==='split' && (
+          <div onMouseDown={onResizeStart}
+            style={{ width:6, cursor:'col-resize', background:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}
+            onMouseEnter={e=>e.currentTarget.style.background=C.primaryBg}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            <div style={{ width:2, height:40, background:C.border2, borderRadius:2 }} />
+          </div>
+        )}
+        {(view==='gantt'||view==='split') && (
+          <div style={{ flex:1, overflow:'hidden', minWidth:200 }}>
+            <GanttChart tasks={projectTasks} visibleTasks={visible} selectedId={selected}
+              onSelect={setSelected} ganttBodyRef={ganttBodyRef} onGanttScroll={onGanttScroll}
+              onUpdate={async(id,field,value)=>handleUpdate(id,{[field]:value})} />
+          </div>
+        )}
+      </div>
+
+      {addModal  && <TaskModal    tasks={projectTasks} onClose={()=>setAddModal(false)} onSave={handleCreate} />}
+      {editModal && <TaskEditModal task={editModal} tasks={projectTasks} onClose={()=>setEditModal(null)} onSave={handleEditSave} />}
+    </div>
+  );
+}
+
+function TaskModal({ tasks, onClose, onSave }: { tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
+  const today    = new Date().toISOString().split('T')[0];
+  const nextWeek = new Date(Date.now()+7*86400000).toISOString().split('T')[0];
+  const [form, setForm] = useState<Partial<Task>>({ taskName:'', startDate:today, endDate:nextWeek, resource:'', parentId:'', relatedTask:'' });
+  const up = (k:string,v:string) => setForm(p=>({...p,[k]:v}));
+  const dur = calcDuration(form.startDate??'', form.endDate??'');
+  return (
+    <Modal title="New Task" onClose={onClose} width={480}>
+      <FormRow label="Task Name" required>
+        <input autoFocus value={form.taskName??''} onChange={e=>up('taskName',e.target.value)} placeholder="Enter task name"
+          style={{ fontFamily:'Poppins, sans-serif', fontSize:13, padding:'8px 12px', border:`1.5px solid ${C.border}`, borderRadius:8, outline:'none', width:'100%', boxSizing:'border-box' }}
+          onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border} />
+      </FormRow>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+      </div>
+      {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
+      <FormRow label="Resource">
+        <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
+          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+          onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+      </FormRow>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <FormRow label="Parent Task">
+          <Select value={form.parentId??''} onChange={v=>up('parentId',v)} options={[{value:'',label:'— None —'},...tasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
+        <FormRow label="Predecessor (FS)">
+          <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)} options={[{value:'',label:'— None —'},...tasks.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+        </FormRow>
+      </div>
+      <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={()=>{ if(!form.taskName?.trim()) return; onSave(form); }}>Create Task</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+function TaskEditModal({ task, tasks, onClose, onSave }: { task:Task; tasks:Task[]; onClose:()=>void; onSave:(f:Partial<Task>)=>void }) {
+  const [form, setForm] = useState<Partial<Task>>({ ...task });
+  const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
+  const dur = calcDuration(form.startDate??'', form.endDate??'');
+  return (
+    <Modal title="Edit Task" onClose={onClose} width={520}>
+      <FormRow label="Task Name" required>
+        <input autoFocus value={form.taskName??''} onChange={e=>up('taskName',e.target.value)}
+          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+          onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+      </FormRow>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <FormRow label="Start Date"><input type="date" value={form.startDate??''} onChange={e=>up('startDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+        <FormRow label="End Date"><input type="date" value={form.endDate??''} onChange={e=>up('endDate',e.target.value)} style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/></FormRow>
+      </div>
+      <FormRow label="Actual Finish Date">
+        <input type="date" value={form.actualFinish??''} onChange={e=>up('actualFinish',e.target.value)}
+          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.green}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box',colorScheme:'light' }}/>
+      </FormRow>
+      {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
+      <FormRow label="% Complete">
+        <input type="number" min={0} max={100} value={form.percentComplete??0} onChange={e=>up('percentComplete',Math.min(100,Math.max(0,Number(e.target.value))))}
+          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}/>
+      </FormRow>
+      <FormRow label="Resource">
+        <input value={form.resource??''} onChange={e=>up('resource',e.target.value)} placeholder="Assigned person"
+          style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
+          onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
+      </FormRow>
+      <FormRow label="Parent Task (change to restructure)">
+        <Select value={form.parentId??''} onChange={v=>up('parentId',v)}
+          options={[{value:'',label:'— None (Root) —'},...tasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+      </FormRow>
+      <FormRow label="Predecessor (FS)">
+        <Select value={form.relatedTask??''} onChange={v=>up('relatedTask',v)}
+          options={[{value:'',label:'— None —'},...tasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+      </FormRow>
+      <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={()=>{ if(!form.taskName?.trim()) return; onSave(form); }}>Save Changes</Btn>
+      </div>
+    </Modal>
+  );
+}
