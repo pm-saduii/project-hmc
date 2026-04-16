@@ -186,7 +186,9 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
             const isDrag  = drag?.taskId === task.id;
             const delta   = isDrag ? (drag?.deltaDays ?? 0) : 0;
             const bx      = (dayOffset(minDate, task.startDate) + delta) * dayWidth;
-            const bw      = Math.max(task.duration * dayWidth, dayWidth);
+            // Use calendar days for bar width (not working days) so bar spans the full date range on the calendar grid
+            const calendarDays = Math.max(1, dayOffset(new Date(task.startDate), task.endDate) + 1);
+            const bw      = Math.max(calendarDays * dayWidth, dayWidth);
             const by      = ri * ROW_H + 7;
             const bh      = ROW_H - 14;
             const isParent = hasChildren(tasks, task.id);
