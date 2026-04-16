@@ -141,13 +141,15 @@ export const taskApi = {
 
   update: async (id: string, t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
     // Recompute duration if dates are being updated
-    if (t.startDate || t.endDate) {
+    if ('startDate' in t || 'endDate' in t) {
       // Fetch current task to get the other date if only one is changing
       const { data: cur } = await supabase.from('tasks').select('start_date,end_date').eq('id', id).single();
-      const sDate = t.startDate || (cur?.start_date as string) || '';
-      const eDate = t.endDate || (cur?.end_date as string) || '';
+      const sDate = t.startDate !== undefined ? t.startDate : (cur?.start_date as string) || '';
+      const eDate = t.endDate !== undefined ? t.endDate : (cur?.end_date as string) || '';
       if (sDate && eDate) {
         t.duration = computeWorkingDays(sDate, eDate);
+      } else {
+        t.duration = 0;
       }
     }
     const row = objToRow(t as Record<string, unknown>);
