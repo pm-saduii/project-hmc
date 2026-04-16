@@ -5,10 +5,20 @@ import {
 import type { Task } from '../types';
 
 // ── Date helpers — ALL display as DD/MM/YYYY ──────────────────────────────────
+/** Calculate working days between two dates (excludes Sat/Sun, same day = 1) */
 export const calcDuration = (s: string, e: string): number => {
   if (!s || !e) return 0;
   const a = parseISO(s), b = parseISO(e);
-  return (!isValid(a) || !isValid(b)) ? 0 : Math.max(0, differenceInCalendarDays(b, a));
+  if (!isValid(a) || !isValid(b)) return 0;
+  if (a.getTime() > b.getTime()) return 0;
+  let count = 0;
+  const cur = new Date(a);
+  while (cur <= b) {
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6) count++; // skip Sun(0) and Sat(6)
+    cur.setDate(cur.getDate() + 1);
+  }
+  return Math.max(1, count);
 };
 
 /** Display: 25/12/2024 */

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, Download, ChevronDown } from 'lucide-react';
+import { Plus, Download, ChevronDown, ZoomIn, ZoomOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -8,14 +8,13 @@ import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Avatar, Modal, FormRow, Input, Select, C } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtMonth } from '../../utils';
-import GanttChart from '../Gantt/GanttChart';
+import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
 
 interface Props { projectId: string; }
 
-export const ROW_H   = 36;
-export const TBL_HDR = 36;
-export const GNT_HDR = 52;
+export const ROW_H = 36;
+export const HDR_H = 48;   // unified header height for both table and gantt
 
 // Columns for table view
 const COLS = [
@@ -72,7 +71,8 @@ export default function TasksTab({ projectId }: Props) {
   const [editModal, setEditModal] = useState<Task | null>(null);
   const [loading, setLoading]   = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [splitW, setSplitW]     = useState(630);  // resizable split width
+  const [splitW, setSplitW]     = useState(630);
+  const [zoomIndex, setZoomIndex] = useState(3); // default = Week
 
   // Scroll sync
   const tableBodyRef = useRef<HTMLDivElement>(null);
@@ -177,117 +177,179 @@ export default function TasksTab({ projectId }: Props) {
     toast.success('Exported XLSX'); setShowExport(false);
   };
 
-  // ── PDF export with Gantt ─────────────────────────────────────────────────
+  // ── PDF export: left=table, right=Gantt, 1 task per line ─────────────────
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
     const proj = useStore.getState().activeProject;
 
-    // Header
-    doc.setFillColor(79,70,229); doc.rect(0,0,W,22,'F');
-    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-    doc.text(`${proj?.name ?? projectId} — Task Plan`, 12, 13);
-    doc.setFontSize(8); doc.setFont('helvetica','normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W-12, 13, { align:'right' });
+    // Header band
+    doc.setFillColor(79,70,229); doc.rect(0,0,W,18,'F');
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+    doc.text(`${proj?.name ?? projectId} — Task Plan + Gantt`, 10, 11);
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, W-10, 11, { align:'right' });
     doc.setTextColor(0);
 
-    // Task table (top half)
-    const taskRows = projectTasks.map(t => [
-      t.wbs,
-      '  '.repeat(t.level) + t.taskName,
-      t.startDate, t.endDate,
-      t.actualFinish || '—',
-      `${t.duration}d`,
-      `${t.percentComplete}%`,
-      t.resource || '—',
-    ]);
-    autoTable(doc, {
-      startY: 26,
-      head: [['WBS','Task Name','Start','Finish','Actual Finish','Days','%','Resource']],
-      body: taskRows.length ? taskRows : [['','No tasks','','','','','','']],
-      styles: { fontSize: 7, cellPadding: 1.8, font: 'helvetica' },
-      headStyles: { fillColor: [79,70,229], textColor: 255, fontSize: 7, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245,247,250] },
-      columnStyles: {
-        0:{cellWidth:12}, 1:{cellWidth:60}, 2:{cellWidth:20},
-        3:{cellWidth:20}, 4:{cellWidth:22}, 5:{cellWidth:12},
-        6:{cellWidth:12}, 7:{cellWidth:W-172},
-      },
-      margin: { left:12, right:12 },
-      didParseCell(data) {
-        if (data.column.index === 6 && data.section === 'body') {
-          const p = parseInt(data.cell.raw as string)||0;
-          data.cell.styles.textColor = p>=100?[16,185,129]:p>=60?[59,130,246]:[79,70,229];
-          data.cell.styles.fontStyle = 'bold';
-        }
-      },
+    const startY = 22;
+    const tableW = 120; // mm for the left table
+    const ganttX = tableW + 12; // start of gantt area
+    const ganttW = W - ganttX - 6;
+    const rowH   = 5.2; // mm per row
+    const headerH = 7;
+
+    // Flatten all tasks for display (with indentation in name)
+    const allVisible = flattenTree(projectTasks, new Set(projectTasks.map(t => t.id)));
+
+    // ── Left side: Task table ──
+    // Table header
+    doc.setFillColor(79,70,229);
+    doc.rect(6, startY, tableW, headerH, 'F');
+    doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+    const cols = [
+      { label: 'WBS',   x: 8,   w: 12 },
+      { label: 'Task',  x: 20,  w: 50 },
+      { label: 'Start', x: 70,  w: 18 },
+      { label: 'Finish',x: 88,  w: 18 },
+      { label: '%',     x: 106, w: 12 },
+      { label: 'Days',  x: 118, w: 8  },
+    ];
+    cols.forEach(c => doc.text(c.label, c.x, startY + 5));
+
+    // Table rows
+    doc.setFont('helvetica','normal'); doc.setTextColor(0);
+    allVisible.forEach((task, i) => {
+      const ry = startY + headerH + i * rowH;
+      if (ry + rowH > H - 8) return; // don't overflow page
+      // Alternate row bg
+      if (i % 2 === 0) { doc.setFillColor(248,250,252); doc.rect(6, ry, tableW, rowH, 'F'); }
+      // Row border
+      doc.setDrawColor(226,232,240); doc.setLineWidth(0.15);
+      doc.line(6, ry + rowH, 6 + tableW, ry + rowH);
+
+      doc.setFontSize(6); doc.setTextColor(100);
+      doc.text(task.wbs || '', 8, ry + rowH - 1.2);
+
+      // Indented task name — use larger indent for subtasks, no special chars for PDF
+      const indent = task.level * 6;
+      const isPar = hasChildren(projectTasks, task.id);
+      doc.setFont('helvetica', isPar ? 'bold' : 'normal');
+      doc.setTextColor(isPar ? 79 : 30, isPar ? 70 : 30, isPar ? 229 : 30);
+      const prefix = isPar ? '>> ' : (task.level > 0 ? '- ' : '');
+      doc.text(prefix + task.taskName.substring(0, 26), 20 + indent, ry + rowH - 1.2, { maxWidth: 48 - indent });
+
+      doc.setFont('helvetica','normal'); doc.setTextColor(80);
+      doc.setFontSize(5.5);
+      doc.text(task.startDate ? fmtDate(task.startDate) : '', 70, ry + rowH - 1.2);
+      doc.text(task.endDate ? fmtDate(task.endDate) : '', 88, ry + rowH - 1.2);
+
+      // % with color
+      const pct = task.percentComplete;
+      const [pr,pg,pb] = pct >= 100 ? [16,185,129] : pct >= 60 ? [59,130,246] : [79,70,229];
+      doc.setFont('helvetica','bold'); doc.setTextColor(pr,pg,pb);
+      doc.text(`${pct}%`, 106, ry + rowH - 1.2);
+
+      doc.setFont('helvetica','normal'); doc.setTextColor(80);
+      doc.text(`${task.duration}d`, 118, ry + rowH - 1.2);
     });
 
-    // @ts-ignore
-    const afterTable: number = (doc as any).lastAutoTable?.finalY ?? 60;
+    // ── Right side: Gantt bars (aligned with table rows) ──
+    const validTasks = allVisible.filter(t => t.startDate && t.endDate);
+    if (validTasks.length > 0) {
+      const allDates = validTasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
+      const minD = new Date(Math.min(...allDates.map(d => d.getTime())));
+      const maxD = new Date(Math.max(...allDates.map(d => d.getTime())));
+      const totalDays = Math.max(1, Math.round((maxD.getTime() - minD.getTime()) / 86400000));
+      const dayPx = ganttW / totalDays;
 
-    // Gantt SVG section — draw bars
-    const ganttY    = afterTable + 6;
-    const ganttH    = doc.internal.pageSize.getHeight() - ganttY - 10;
-    if (ganttH > 20 && projectTasks.length > 0) {
-      const validTasks = projectTasks.filter(t => t.startDate && t.endDate);
-      const allDates   = validTasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
-      const minD = new Date(Math.min(...allDates.map(d=>d.getTime())));
-      const maxD = new Date(Math.max(...allDates.map(d=>d.getTime())));
-      const totalDays  = Math.max(1, Math.round((maxD.getTime()-minD.getTime())/86400000));
-      const ganttW     = W - 24;
-      const dayPx      = ganttW / totalDays;
-      const barH       = Math.min(6, (ganttH - 10) / Math.max(projectTasks.length, 1));
-      const rowPx      = barH + 2;
+      // Gantt header - month labels
+      doc.setFillColor(245,247,250);
+      doc.rect(ganttX, startY, ganttW, headerH, 'F');
+      doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
+      doc.rect(ganttX, startY, ganttW, headerH, 'S');
+      doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(79,70,229);
 
-      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(79,70,229);
-      doc.text('Gantt Chart', 12, ganttY + 4);
-
-      // Today line
-      const todayOff = Math.round((new Date().getTime()-minD.getTime())/86400000);
-      if (todayOff >= 0 && todayOff <= totalDays) {
-        const tx = 12 + todayOff * dayPx;
-        doc.setDrawColor(239,68,68); doc.setLineWidth(0.4);
-        doc.line(tx, ganttY+8, tx, ganttY+8+projectTasks.length*rowPx);
+      // Month labels in header
+      const cur = new Date(minD.getFullYear(), minD.getMonth(), 1);
+      while (cur <= maxD) {
+        const offD = Math.round((cur.getTime() - minD.getTime()) / 86400000);
+        if (offD >= 0) {
+          const lx = ganttX + offD * dayPx;
+          doc.setDrawColor(200,210,230); doc.setLineWidth(0.1);
+          doc.line(lx, startY, lx, startY + headerH);
+          const monthLabel = cur.toLocaleString('en', { month: 'short', year: '2-digit' });
+          if (lx + 12 < ganttX + ganttW) {
+            doc.text(monthLabel, lx + 1, startY + 5);
+          }
+        }
+        cur.setMonth(cur.getMonth() + 1);
       }
 
-      projectTasks.forEach((task, i) => {
+      // Today line
+      const todayOff = Math.round((new Date().getTime() - minD.getTime()) / 86400000);
+      if (todayOff >= 0 && todayOff <= totalDays) {
+        const tx = ganttX + todayOff * dayPx;
+        doc.setDrawColor(239,68,68); doc.setLineWidth(0.3);
+        doc.line(tx, startY + headerH, tx, startY + headerH + allVisible.length * rowH);
+      }
+
+      // Gantt bars — one per task row, aligned with table
+      allVisible.forEach((task, i) => {
+        const ry = startY + headerH + i * rowH;
+        if (ry + rowH > H - 8) return;
         if (!task.startDate || !task.endDate) return;
-        const offS   = Math.round((new Date(task.startDate).getTime()-minD.getTime())/86400000);
-        const offE   = Math.round((new Date(task.endDate).getTime()-minD.getTime())/86400000);
-        const bx     = 12 + offS * dayPx;
-        const bw     = Math.max((offE-offS)*dayPx, 1);
-        const by     = ganttY + 8 + i * rowPx;
-        const fillW  = bw * (task.percentComplete/100);
-        const isPar  = hasChildren(projectTasks, task.id);
+
+        const s2 = Math.round((new Date(task.startDate).getTime() - minD.getTime()) / 86400000);
+        const e2 = Math.round((new Date(task.endDate).getTime() - minD.getTime()) / 86400000);
+        const bx = ganttX + s2 * dayPx;
+        const bw = Math.max((e2 - s2) * dayPx, 1);
+        const by = ry + 1;
+        const bh = rowH - 2;
+        const fw = bw * (task.percentComplete / 100);
+        const isPar = hasChildren(projectTasks, task.id);
+
+        // Row grid line
+        doc.setDrawColor(226,232,240); doc.setLineWidth(0.1);
+        doc.line(ganttX, ry + rowH, ganttX + ganttW, ry + rowH);
 
         // Background bar
-        doc.setFillColor(238,242,255); doc.setDrawColor(79,70,229); doc.setLineWidth(0.2);
-        doc.roundedRect(bx, by, bw, barH, 0.5, 0.5, 'FD');
-        // Progress bar
-        if (fillW > 0.5) {
-          const [r,g,b] = task.percentComplete>=100?[16,185,129]:task.percentComplete>=60?[59,130,246]:[79,70,229];
+        doc.setFillColor(238,242,255); doc.setDrawColor(79,70,229); doc.setLineWidth(0.12);
+        doc.roundedRect(bx, by, bw, bh, 0.4, 0.4, 'FD');
+
+        // Progress fill
+        if (fw > 0.3) {
+          const [r,g,b] = task.percentComplete >= 100 ? [16,185,129] : task.percentComplete >= 60 ? [59,130,246] : [79,70,229];
           doc.setFillColor(r,g,b);
-          doc.roundedRect(bx, by, fillW, barH, 0.5, 0.5, 'F');
+          doc.roundedRect(bx, by, fw, bh, 0.4, 0.4, 'F');
         }
-        // Label (if wide enough)
+
+        // Bar label
         if (bw > 14) {
-          doc.setFontSize(5); doc.setFont('helvetica', isPar?'bold':'normal'); doc.setTextColor(30);
-          doc.text(task.taskName.substring(0,22), bx+1, by+barH-1, { maxWidth: bw-2 });
+          doc.setFontSize(4); doc.setFont('helvetica', isPar ? 'bold' : 'normal'); doc.setTextColor(30);
+          doc.text(task.taskName.substring(0, 18), bx + 0.8, by + bh - 0.6, { maxWidth: bw - 1 });
         }
       });
     }
 
-    doc.save(`tasks-${projectId}.pdf`);
+    // Divider line between table and gantt
+    doc.setDrawColor(79,70,229); doc.setLineWidth(0.3);
+    doc.line(ganttX - 3, startY, ganttX - 3, startY + headerH + allVisible.length * rowH);
+
+    // Footer
+    doc.setFontSize(6); doc.setTextColor(160);
+    doc.text('ProjectMS — Task Plan + Gantt', 10, H - 4);
+    doc.text('Page 1 of 1', W - 10, H - 4, { align: 'right' });
+
+    doc.save(`tasks-gantt-${projectId}.pdf`);
     toast.success('Exported PDF'); setShowExport(false);
   };
 
-  const barColor = (t: Task) => t.percentComplete>=100?C.green:t.percentComplete>=60?C.blue:C.primary;
-
-  // ── Table ─────────────────────────────────────────────────────────────────
+  // ── Table content ─────────────────────────────────────────────────────────
   const tableContent = (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
-      <div style={{ display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:TBL_HDR }}>
+      {/* Table header — same height as Gantt header (HDR_H) */}
+      <div style={{ display:'flex', background:C.bg, borderBottom:`1px solid ${C.border}`, flexShrink:0, height:HDR_H }}>
         {COLS.map(c => (
           <div key={c.label} style={{ width:c.w, minWidth:c.w, padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center' }}>
             {c.label}
@@ -296,20 +358,27 @@ export default function TasksTab({ projectId }: Props) {
       </div>
       <div ref={tableBodyRef} onScroll={onTableScroll}
         style={{ flex:1, overflowY:'scroll', overflowX:'auto' }}>
-        {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading…</div>}
+        {loading && <div style={{ padding:40, textAlign:'center', color:C.text3 }}>Loading...</div>}
         {!loading && visible.map((task, i) => {
           const isPar = hasChildren(projectTasks, task.id);
           const isExp = expanded.has(task.id);
           const isSel = selected === task.id;
+          const isChild = !!task.parentId;
           return (
             <div key={task.id} onClick={() => setSelected(task.id)}
               style={{ display:'flex', alignItems:'center', height:ROW_H, borderBottom:`1px solid ${C.border}`, background: isSel?C.primaryBg:i%2===0?C.white:C.bg, borderLeft: isSel?`3px solid ${C.primary}`:'3px solid transparent', cursor:'pointer', flexShrink:0 }}>
               <div style={{ width:52, minWidth:52, padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'monospace', flexShrink:0 }}>{task.wbs}</div>
-              <div style={{ width:200, minWidth:200, padding:`0 4px 0 ${8+task.level*16}px`, display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                <button onClick={e=>{ e.stopPropagation(); toggle(task.id); }}
-                  style={{ width:16, height:16, background:'none', border:'none', cursor:'pointer', color:C.text2, padding:0, visibility:isPar?'visible':'hidden', fontSize:12, flexShrink:0 }}>
-                  {isExp?'▾':'▸'}
-                </button>
+              <div style={{ width:200, minWidth:200, padding:`0 4px 0 ${8+task.level*20}px`, display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+                {isPar ? (
+                  <button onClick={e=>{ e.stopPropagation(); toggle(task.id); }}
+                    style={{ width:18, height:18, background:C.primaryBg, border:`1px solid ${C.primary}33`, borderRadius:4, cursor:'pointer', color:C.primary, padding:0, fontSize:11, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {isExp?'▾':'▸'}
+                  </button>
+                ) : (
+                  <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
+                    {isChild && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
+                  </span>
+                )}
                 {isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
                 <EditableCell value={task.taskName} onSave={v=>handleUpdate(task.id,{taskName:v})} />
               </div>
@@ -328,7 +397,7 @@ export default function TasksTab({ projectId }: Props) {
               </div>
               <div style={{ width:116, minWidth:116, padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
                 {task.resource && <Avatar name={task.resource} size={20} />}
-                <EditableCell value={task.resource} onSave={v=>handleUpdate(task.id,{resource:v})} placeholder="Assign…" />
+                <EditableCell value={task.resource} onSave={v=>handleUpdate(task.id,{resource:v})} placeholder="Assign..." />
               </div>
               <div style={{ width:76, minWidth:76, padding:'0 5px', flexShrink:0, display:'flex', gap:4 }}>
                 <button onClick={e=>{ e.stopPropagation(); setEditModal(task); }}
@@ -353,15 +422,37 @@ export default function TasksTab({ projectId }: Props) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
-      {/* Sub-toolbar */}
+      {/* Sub-toolbar with zoom controls */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 16px', borderBottom:`1px solid ${C.border}`, flexShrink:0, background:C.white }}>
-        <div style={{ display:'flex', gap:3, background:C.bg, borderRadius:8, padding:3 }}>
-          {(['table','split','gantt'] as ViewMode[]).map(m => (
-            <button key={m} onClick={()=>setView(m)}
-              style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', background:view===m?C.white:C.bg, color:view===m?C.primary:C.text2, boxShadow:view===m?C.shadow:'none', transition:'all 0.15s' }}>
-              {m==='table'?'☰ Table':m==='split'?'⊟ Split':'▦ Gantt'}
-            </button>
-          ))}
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          <div style={{ display:'flex', gap:3, background:C.bg, borderRadius:8, padding:3 }}>
+            {(['table','split','gantt'] as ViewMode[]).map(m => (
+              <button key={m} onClick={()=>setView(m)}
+                style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', background:view===m?C.white:C.bg, color:view===m?C.primary:C.text2, boxShadow:view===m?C.shadow:'none', transition:'all 0.15s' }}>
+                {m==='table'?'☰ Table':m==='split'?'⊟ Split':'▦ Gantt'}
+              </button>
+            ))}
+          </div>
+          {/* Zoom controls (visible when Gantt is showing) */}
+          {(view==='split'||view==='gantt') && (
+            <div style={{ display:'flex', gap:4, alignItems:'center', marginLeft:8 }}>
+              <button onClick={()=>setZoomIndex(Math.max(0, zoomIndex-1))}
+                disabled={zoomIndex===0}
+                style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:6, padding:'4px 7px', cursor:zoomIndex===0?'not-allowed':'pointer', display:'flex', alignItems:'center', gap:3, fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', opacity:zoomIndex===0?0.4:1 }}
+                title="Zoom out">
+                <ZoomOut size={13} />
+              </button>
+              <span style={{ fontSize:11, fontWeight:600, color:C.primary, minWidth:56, textAlign:'center', fontFamily:'Poppins, sans-serif' }}>
+                {ZOOM_LEVELS[zoomIndex].name}
+              </span>
+              <button onClick={()=>setZoomIndex(Math.min(ZOOM_LEVELS.length-1, zoomIndex+1))}
+                disabled={zoomIndex===ZOOM_LEVELS.length-1}
+                style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:6, padding:'4px 7px', cursor:zoomIndex===ZOOM_LEVELS.length-1?'not-allowed':'pointer', display:'flex', alignItems:'center', gap:3, fontSize:11, color:C.text2, fontFamily:'Poppins, sans-serif', opacity:zoomIndex===ZOOM_LEVELS.length-1?0.4:1 }}
+                title="Zoom in">
+                <ZoomIn size={13} />
+              </button>
+            </div>
+          )}
         </div>
         <div style={{ display:'flex', gap:8, position:'relative' }}>
           <div style={{ position:'relative' }}>
@@ -405,6 +496,7 @@ export default function TasksTab({ projectId }: Props) {
           <div style={{ flex:1, overflow:'hidden', minWidth:200 }}>
             <GanttChart tasks={projectTasks} visibleTasks={visible} selectedId={selected}
               onSelect={setSelected} ganttBodyRef={ganttBodyRef} onGanttScroll={onGanttScroll}
+              zoomIndex={zoomIndex} onZoomChange={setZoomIndex}
               onUpdate={async(id,field,value)=>handleUpdate(id,{[field]:value})} />
           </div>
         )}

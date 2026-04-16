@@ -96,7 +96,21 @@ export const taskApi = {
   },
 
   create: async (t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
-    const row = objToRow(t as Record<string, unknown>);
+    // Fetch existing tasks to compute wbs, level, order
+    const existing = t.projectId ? (await taskApi.getByProject(t.projectId)).data : [];
+    const parentId = t.parentId || '';
+    const parent = parentId ? existing.find(x => x.id === parentId) : undefined;
+    const level = parent ? parent.level + 1 : 0;
+    const siblings = existing.filter(x => (x.parentId || '') === parentId);
+    const order = siblings.length > 0 ? Math.max(...siblings.map(x => x.order)) + 1 : (existing.length + 1);
+    // Compute WBS
+    const parentWbs = parent?.wbs || '';
+    const siblingIndex = siblings.length + 1;
+    const wbs = parentWbs ? `${parentWbs}.${siblingIndex}` : `${existing.filter(x => !x.parentId).length + 1}`;
+    // Compute duration (working days, excluding weekends)
+    const duration = computeWorkingDays(t.startDate || '', t.endDate || '');
+
+    const row = objToRow({ ...t, wbs, level, order, duration } as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
     const { data, error } = await supabase
@@ -106,12 +120,24 @@ export const taskApi = {
       .single();
     if (error) throw new Error(error.message);
     const created = rowToObj<Task>(data);
-    // Fetch all tasks for this project to support parent recalc on client
+    // Fetch all tasks and recalc parent dates/percent
     const all = await taskApi.getByProject(created.projectId);
-    return { data: created, allTasks: all.data };
+    const allTasks = recalcParents(all.data);
+    await persistParentChanges(all.data, allTasks);
+    return { data: created, allTasks };
   },
 
   update: async (id: string, t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
+    // Recompute duration if dates are being updated
+    if (t.startDate || t.endDate) {
+      // Fetch current task to get the other date if only one is changing
+      const { data: cur } = await supabase.from('tasks').select('start_date,end_date').eq('id', id).single();
+      const sDate = t.startDate || (cur?.start_date as string) || '';
+      const eDate = t.endDate || (cur?.end_date as string) || '';
+      if (sDate && eDate) {
+        t.duration = computeWorkingDays(sDate, eDate);
+      }
+    }
     const row = objToRow(t as Record<string, unknown>);
     delete row.id;
     delete row.created_at;
@@ -123,8 +149,11 @@ export const taskApi = {
       .single();
     if (error) throw new Error(error.message);
     const updated = rowToObj<Task>(data);
+    // Fetch all tasks and recalc parent dates/percent
     const all = await taskApi.getByProject(updated.projectId);
-    return { data: updated, allTasks: all.data };
+    const allTasks = recalcParents(all.data);
+    await persistParentChanges(all.data, allTasks);
+    return { data: updated, allTasks };
   },
 
   setComplete: async (id: string, pct: number): Promise<{ allTasks: Task[] }> => {
@@ -136,19 +165,10 @@ export const taskApi = {
       .single();
     if (error) throw new Error(error.message);
     const task = rowToObj<Task>(data);
-    // Recalculate parent percentages on client side
+    // Recalculate parent percentages and dates on client side
     const all = await taskApi.getByProject(task.projectId);
     const allTasks = recalcParents(all.data);
-    // Persist updated parent percentages
-    for (const t of allTasks) {
-      const orig = all.data.find((o) => o.id === t.id);
-      if (orig && orig.percentComplete !== t.percentComplete) {
-        await supabase
-          .from('tasks')
-          .update({ percent_complete: t.percentComplete })
-          .eq('id', t.id);
-      }
-    }
+    await persistParentChanges(all.data, allTasks);
     return { allTasks };
   },
 
@@ -164,7 +184,9 @@ export const taskApi = {
     await deleteTaskAndChildren(id);
     if (projectId) {
       const all = await taskApi.getByProject(projectId);
-      return { allTasks: all.data };
+      const allTasks = recalcParents(all.data);
+      await persistParentChanges(all.data, allTasks);
+      return { allTasks };
     }
     return { allTasks: [] };
   },
@@ -184,18 +206,85 @@ async function deleteTaskAndChildren(taskId: string): Promise<void> {
   await supabase.from('tasks').delete().eq('id', taskId);
 }
 
+/** Compute working days between two ISO date strings (excludes Sat/Sun, same day = 1) */
+function computeWorkingDays(startStr: string, endStr: string): number {
+  if (!startStr || !endStr) return 0;
+  const a = new Date(startStr);
+  const b = new Date(endStr);
+  if (isNaN(a.getTime()) || isNaN(b.getTime()) || a > b) return 0;
+  let count = 0;
+  const cur = new Date(a);
+  while (cur <= b) {
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return Math.max(1, count);
+}
+
+async function persistParentChanges(origTasks: Task[], newTasks: Task[]): Promise<void> {
+  for (const t of newTasks) {
+    const orig = origTasks.find((o) => o.id === t.id);
+    if (!orig) continue;
+    const updates: Record<string, unknown> = {};
+    if (orig.percentComplete !== t.percentComplete) updates.percent_complete = t.percentComplete;
+    if (orig.startDate !== t.startDate) updates.start_date = t.startDate;
+    if (orig.endDate !== t.endDate) updates.end_date = t.endDate;
+    if (orig.duration !== t.duration) updates.duration = t.duration;
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('tasks').update(updates).eq('id', t.id);
+    }
+  }
+}
+
 function recalcParents(tasks: Task[]): Task[] {
   const result = tasks.map((t) => ({ ...t }));
+  // Process bottom-up: find all parent IDs, then recalc each
   const parentIds = [...new Set(result.filter((t) => t.parentId).map((t) => t.parentId))];
 
-  for (const pid of parentIds) {
-    const parent = result.find((t) => t.id === pid);
-    if (!parent) continue;
-    const children = result.filter((t) => t.parentId === pid);
-    if (children.length === 0) continue;
-    const totalDuration = children.reduce((s, c) => s + (c.duration || 1), 0);
-    const weighted = children.reduce((s, c) => s + c.percentComplete * (c.duration || 1), 0);
-    parent.percentComplete = totalDuration > 0 ? Math.round(weighted / totalDuration) : 0;
+  // Multiple passes to handle nested parents (bottom-up)
+  let changed = true;
+  let iterations = 0;
+  while (changed && iterations < 10) {
+    changed = false;
+    iterations++;
+    for (const pid of parentIds) {
+      const parent = result.find((t) => t.id === pid);
+      if (!parent) continue;
+      const children = result.filter((t) => t.parentId === pid);
+      if (children.length === 0) continue;
+
+      // Recalc percent complete (weighted by duration)
+      const totalDuration = children.reduce((s, c) => s + (c.duration || 1), 0);
+      const weighted = children.reduce((s, c) => s + c.percentComplete * (c.duration || 1), 0);
+      const newPct = totalDuration > 0 ? Math.round(weighted / totalDuration) : 0;
+      if (parent.percentComplete !== newPct) {
+        parent.percentComplete = newPct;
+        changed = true;
+      }
+
+      // Recalc start date = min of children start dates
+      const childStarts = children.map((c) => c.startDate).filter(Boolean).sort();
+      if (childStarts.length > 0 && parent.startDate !== childStarts[0]) {
+        parent.startDate = childStarts[0];
+        changed = true;
+      }
+
+      // Recalc end date = max of children end dates
+      const childEnds = children.map((c) => c.endDate).filter(Boolean).sort();
+      if (childEnds.length > 0 && parent.endDate !== childEnds[childEnds.length - 1]) {
+        parent.endDate = childEnds[childEnds.length - 1];
+        changed = true;
+      }
+
+      // Recalc duration from new dates (working days, excluding weekends)
+      if (parent.startDate && parent.endDate) {
+        const dur = computeWorkingDays(parent.startDate, parent.endDate);
+        if (parent.duration !== dur) {
+          parent.duration = dur;
+        }
+      }
+    }
   }
   return result;
 }
