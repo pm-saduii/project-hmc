@@ -103,10 +103,22 @@ export const taskApi = {
     const level = parent ? parent.level + 1 : 0;
     const siblings = existing.filter(x => (x.parentId || '') === parentId);
     const order = siblings.length > 0 ? Math.max(...siblings.map(x => x.order)) + 1 : (existing.length + 1);
-    // Compute WBS
+    // Compute WBS — use max existing index to avoid collisions after deletions
     const parentWbs = parent?.wbs || '';
-    const siblingIndex = siblings.length + 1;
-    const wbs = parentWbs ? `${parentWbs}.${siblingIndex}` : `${existing.filter(x => !x.parentId).length + 1}`;
+    let nextIndex: number;
+    if (parentWbs) {
+      // Child: parse last segment of sibling WBS values to find max
+      const siblingIndices = siblings.map(s => {
+        const parts = (s.wbs || '').split('.');
+        return parseInt(parts[parts.length - 1]) || 0;
+      });
+      nextIndex = siblingIndices.length > 0 ? Math.max(...siblingIndices) + 1 : 1;
+    } else {
+      // Root: parse root WBS numbers to find max
+      const rootIndices = existing.filter(x => !x.parentId).map(x => parseInt(x.wbs || '0') || 0);
+      nextIndex = rootIndices.length > 0 ? Math.max(...rootIndices) + 1 : 1;
+    }
+    const wbs = parentWbs ? `${parentWbs}.${nextIndex}` : `${nextIndex}`;
     // Compute duration (working days, excluding weekends)
     const duration = computeWorkingDays(t.startDate || '', t.endDate || '');
 

@@ -151,9 +151,11 @@ export default function ProjectReport({ project, onClose }: Props) {
     let midY: number = Math.max(taskTableEndY, msTableEndY) + 4;
 
     // If not enough space for bottom section, add a new page
+    let addedPage = false;
     if (midY + 30 > H - 10) {
       doc.addPage();
       midY = 14;
+      addedPage = true;
     }
 
     // CR | Issues | Risks (3 columns)
@@ -177,10 +179,14 @@ export default function ProjectReport({ project, onClose }: Props) {
       });
     });
 
-    // Footer
-    doc.setFontSize(6.5); doc.setTextColor(160);
-    doc.text('ProjectMS Enterprise — Executive Report', 12, H-4);
-    doc.text('Page 1 of 1  ·  Confidential', W-12, H-4, {align:'right'});
+    // Footer on all pages
+    const totalPages = addedPage ? 2 : 1;
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFontSize(6.5); doc.setTextColor(160);
+      doc.text('ProjectMS Enterprise — Executive Report', 12, H-4);
+      doc.text(`Page ${p} of ${totalPages}  ·  Confidential`, W-12, H-4, {align:'right'});
+    }
 
     doc.save(`report-${project.code}-${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success('PDF exported');
