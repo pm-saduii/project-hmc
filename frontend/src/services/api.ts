@@ -215,9 +215,9 @@ function computeWorkingDays(startStr: string, endStr: string): number {
   let count = 0;
   const cur = new Date(a);
   while (cur <= b) {
-    const day = cur.getDay();
+    const day = cur.getUTCDay();
     if (day !== 0 && day !== 6) count++;
-    cur.setDate(cur.getDate() + 1);
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return Math.max(1, count);
 }

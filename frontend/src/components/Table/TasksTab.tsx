@@ -497,7 +497,8 @@ export default function TasksTab({ projectId }: Props) {
             <GanttChart tasks={projectTasks} visibleTasks={visible} selectedId={selected}
               onSelect={setSelected} ganttBodyRef={ganttBodyRef} onGanttScroll={onGanttScroll}
               zoomIndex={zoomIndex} onZoomChange={setZoomIndex}
-              onUpdate={async(id,field,value)=>handleUpdate(id,{[field]:value})} />
+              onUpdate={async(id,field,value)=>handleUpdate(id,{[field]:value})}
+              onBatchUpdate={async(id,fields)=>handleUpdate(id,fields)} />
           </div>
         )}
       </div>

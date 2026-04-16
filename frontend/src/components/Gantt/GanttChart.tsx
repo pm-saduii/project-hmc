@@ -25,13 +25,14 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onUpdate: (id: string, field: string, value: string) => void;
+  onBatchUpdate?: (id: string, fields: Record<string, string>) => void;
   ganttBodyRef?: RefObject<HTMLDivElement>;
   onGanttScroll?: () => void;
   zoomIndex: number;
   onZoomChange: (idx: number) => void;
 }
 
-export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, onUpdate, ganttBodyRef, onGanttScroll, zoomIndex, onZoomChange }: Props) {
+export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, onUpdate, onBatchUpdate, ganttBodyRef, onGanttScroll, zoomIndex, onZoomChange }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [drag, setDrag]       = useState<{ taskId: string; startX: number; deltaDays: number } | null>(null);
@@ -70,10 +71,14 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
     const ns = addDays(parseISO(task.startDate), delta);
     const ne = addDays(parseISO(task.endDate),   delta);
     if (isValid(ns) && isValid(ne)) {
-      onUpdate(task.id, 'startDate', format(ns, 'yyyy-MM-dd'));
-      onUpdate(task.id, 'endDate',   format(ne, 'yyyy-MM-dd'));
+      if (onBatchUpdate) {
+        onBatchUpdate(task.id, { startDate: format(ns, 'yyyy-MM-dd'), endDate: format(ne, 'yyyy-MM-dd') });
+      } else {
+        onUpdate(task.id, 'startDate', format(ns, 'yyyy-MM-dd'));
+        onUpdate(task.id, 'endDate',   format(ne, 'yyyy-MM-dd'));
+      }
     }
-  }, [drag, tasks, onUpdate, dayWidth]);
+  }, [drag, tasks, onUpdate, onBatchUpdate, dayWidth]);
 
   const arrows = useMemo(() => {
     return visibleTasks.flatMap((task, ri) => {
