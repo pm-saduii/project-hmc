@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [selected,   setSelected]   = useState<Project | null>(null);
   const [showAdd,    setShowAdd]    = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showHypercare, setShowHypercare] = useState(false);
 
   // Note: fetchProjects is called from App.tsx, not needed here
   
@@ -30,7 +31,9 @@ export default function Dashboard() {
     }
   }, [selected?.id, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs]);
 
-  // All projects are now open
+  // Separate normal projects from Hypercare
+  const normalProjects = projects.filter(p => p.status !== 'Hyper Care').sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+  const hypercareProjects = projects.filter(p => p.status === 'Hyper Care').sort((a, b) => a.name.localeCompare(b.name));
   const allProjects = projects.sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
 
   const getProgress = (pid: string) => {
@@ -127,10 +130,27 @@ export default function Dashboard() {
           <Btn onClick={() => setShowAdd(true)} small style={{ padding: '5px 10px' }}><Plus size={12} /></Btn>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 0' }}>
-          {allProjects.length === 0 && (
+          {normalProjects.length === 0 && hypercareProjects.length === 0 && (
             <div style={{ padding: '30px 10px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No projects yet</div>
           )}
-          {allProjects.map(p => renderProjectCard(p))}
+          {normalProjects.map(p => renderProjectCard(p))}
+
+          {/* Hypercare section — collapsible, hidden by default */}
+          {hypercareProjects.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <button
+                onClick={() => setShowHypercare(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 10px', background: C.amberBg, border: `1px solid ${C.amber}33`, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: C.amber, fontFamily: 'Poppins, sans-serif', transition: 'all 0.15s' }}>
+                {showHypercare ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                Hyper Care ({hypercareProjects.length})
+              </button>
+              {showHypercare && (
+                <div style={{ marginTop: 6 }}>
+                  {hypercareProjects.map(p => renderProjectCard(p))}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ height: 16 }} />
         </div>
       </div>
@@ -163,6 +183,9 @@ export default function Dashboard() {
 
 // ── Welcome / global summary ──────────────────────────────────────────────────
 function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void }) {
+  const [showHC, setShowHC] = useState(false);
+  const normalProjects = projects.filter(p => p.status !== 'Hyper Care');
+  const hypercareProjects = projects.filter(p => p.status === 'Hyper Care');
   const planning   = projects.filter(p => p.status === 'Planning');
   const reqDesign  = projects.filter(p => p.status === 'Req & Design');
   const goLive     = projects.filter(p => p.status === 'Go Live');
@@ -172,11 +195,12 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
       <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
       <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project on the left to view its executive summary.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 28 }}>
         {[
-          { label: 'Planning',     value: planning.length,   color: C.amber,   bg: C.amberBg,   icon: '📋' },
-          { label: 'Req & Design', value: reqDesign.length,  color: C.primary, bg: C.primaryBg, icon: '🚀' },
-          { label: 'Go Live',      value: goLive.length,     color: C.green,   bg: C.greenBg,   icon: '✅' },
+          { label: 'Planning',     value: planning.length,          color: C.amber,   bg: C.amberBg,   icon: '📋' },
+          { label: 'Req & Design', value: reqDesign.length,         color: C.primary, bg: C.primaryBg, icon: '🚀' },
+          { label: 'Go Live',      value: goLive.length,            color: C.green,   bg: C.greenBg,   icon: '✅' },
+          { label: 'Hyper Care',   value: hypercareProjects.length, color: C.amber,   bg: C.amberBg,   icon: '🛡️' },
         ].map(s => (
           <Card key={s.label} style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{s.icon}</div>
@@ -187,7 +211,7 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 14 }}>
-        {projects.map(p => {
+        {normalProjects.map(p => {
           const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
           const prog  = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
           const s     = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
@@ -217,6 +241,51 @@ function WelcomeSummary({ projects, tasks, onOpen }: { projects: Project[]; task
           );
         })}
       </div>
+
+      {/* Hypercare section — collapsible, hidden by default */}
+      {hypercareProjects.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <button
+            onClick={() => setShowHC(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: C.amberBg, border: `1px solid ${C.amber}33`, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: C.amber, fontFamily: 'Poppins, sans-serif', transition: 'all 0.15s', width: '100%' }}>
+            {showHC ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            🛡️ Hyper Care Projects ({hypercareProjects.length})
+          </button>
+          {showHC && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 14, marginTop: 12 }}>
+              {hypercareProjects.map(p => {
+                const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
+                const prog  = roots.length ? Math.round(roots.reduce((s: number, t: any) => s + t.percentComplete, 0) / roots.length) : 0;
+                const st    = PROJECT_STATUS[p.status] ?? PROJECT_STATUS['Planning'];
+                return (
+                  <Card key={p.id} style={{ overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onClick={() => onOpen(p)}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = ''; (e.currentTarget as HTMLElement).style.transform = ''; }}>
+                    <div style={{ height: 4, background: p.color || C.amber }} />
+                    <div style={{ padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p.name}</div>
+                          <div style={{ fontSize: 10, color: C.text3 }}>{p.code} · {p.client}</div>
+                        </div>
+                        <Badge bg={st.bg} color={st.color}>{st.label}</Badge>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2, marginBottom: 6 }}>
+                        <span>Progress</span><span style={{ fontWeight: 700, color: C.primary }}>{prog}%</span>
+                      </div>
+                      <ProgressBar value={prog} height={5} color={p.color || C.amber} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text3, marginTop: 8 }}>
+                        <span>📅 {fmtDate(p.startDate)}</span><span>🏁 {fmtDate(p.endDate)}</span>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
