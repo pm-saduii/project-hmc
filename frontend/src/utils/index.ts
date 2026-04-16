@@ -14,9 +14,9 @@ export const calcDuration = (s: string, e: string): number => {
   let count = 0;
   const cur = new Date(a);
   while (cur <= b) {
-    const day = cur.getUTCDay();
+    const day = cur.getDay();
     if (day !== 0 && day !== 6) count++; // skip Sun(0) and Sat(6)
-    cur.setUTCDate(cur.getUTCDate() + 1);
+    cur.setDate(cur.getDate() + 1);
   }
   return Math.max(1, count);
 };
