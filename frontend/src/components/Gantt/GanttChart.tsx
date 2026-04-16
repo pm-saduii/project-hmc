@@ -3,8 +3,21 @@ import { format, addDays, parseISO, isValid } from 'date-fns';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { C } from '../Common';
 import { getProjectDateRange, getMonths, getDays, dayOffset, fmtDate, hasChildren } from '../../utils';
-import { ROW_H, GNT_HDR } from '../Table/TasksTab';
+import { ROW_H, HDR_H } from '../Table/TasksTab';
 import type { Task } from '../../types';
+
+// ── Zoom levels (step-by-step) ──────────────────────────────────────────────
+export const ZOOM_LEVELS = [
+  { name: 'Quarter', dayWidth: 1.2 },
+  { name: 'Month',   dayWidth: 3.5 },
+  { name: 'Half Mo', dayWidth: 7   },
+  { name: 'Week',    dayWidth: 14  },
+  { name: 'Day',     dayWidth: 36  },
+] as const;
+
+export type ZoomLevel = typeof ZOOM_LEVELS[number];
+
+const DEFAULT_ZOOM_INDEX = 3; // Week
 
 interface Props {
   tasks: Task[];
@@ -12,30 +25,27 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onUpdate: (id: string, field: string, value: string) => void;
+  onBatchUpdate?: (id: string, fields: Record<string, string>) => void;
   ganttBodyRef?: RefObject<HTMLDivElement>;
   onGanttScroll?: () => void;
+  zoomIndex: number;
+  onZoomChange: (idx: number) => void;
 }
 
-export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, onUpdate, ganttBodyRef, onGanttScroll }: Props) {
+export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, onUpdate, onBatchUpdate, ganttBodyRef, onGanttScroll, zoomIndex, onZoomChange }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
   const [drag, setDrag]       = useState<{ taskId: string; startX: number; deltaDays: number } | null>(null);
-  const [dayWidth, setDayWidth] = useState(26);
   const [showScrollHint, setShowScrollHint] = useState(true);
+
+  const dayWidth = ZOOM_LEVELS[zoomIndex].dayWidth;
 
   const { minDate, maxDate } = useMemo(() => getProjectDateRange(tasks), [tasks]);
   const totalDays = useMemo(() => Math.max(30, Math.round((maxDate.getTime() - minDate.getTime()) / 86400000)), [minDate, maxDate]);
   const months    = useMemo(() => getMonths(minDate, maxDate), [minDate, maxDate]);
   const days      = useMemo(() => getDays(minDate, totalDays), [minDate, totalDays]);
   const totalW    = totalDays * dayWidth;
-  const totalH    = GNT_HDR + visibleTasks.length * ROW_H;
   const todayX    = dayOffset(minDate, format(new Date(), 'yyyy-MM-dd')) * dayWidth + dayWidth / 2;
-
-  const handleZoom = (direction: 'in' | 'out') => {
-    const delta = direction === 'in' ? 2 : -2;
-    const newWidth = Math.max(14, Math.min(60, dayWidth + delta));
-    setDayWidth(newWidth);
-  };
 
   const barColor = (t: Task) =>
     t.percentComplete >= 100 ? C.green : t.percentComplete >= 60 ? C.blue : C.primary;
@@ -61,10 +71,14 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
     const ns = addDays(parseISO(task.startDate), delta);
     const ne = addDays(parseISO(task.endDate),   delta);
     if (isValid(ns) && isValid(ne)) {
-      onUpdate(task.id, 'startDate', format(ns, 'yyyy-MM-dd'));
-      onUpdate(task.id, 'endDate',   format(ne, 'yyyy-MM-dd'));
+      if (onBatchUpdate) {
+        onBatchUpdate(task.id, { startDate: format(ns, 'yyyy-MM-dd'), endDate: format(ne, 'yyyy-MM-dd') });
+      } else {
+        onUpdate(task.id, 'startDate', format(ns, 'yyyy-MM-dd'));
+        onUpdate(task.id, 'endDate',   format(ne, 'yyyy-MM-dd'));
+      }
     }
-  }, [drag, tasks, onUpdate, dayWidth]);
+  }, [drag, tasks, onUpdate, onBatchUpdate, dayWidth]);
 
   const arrows = useMemo(() => {
     return visibleTasks.flatMap((task, ri) => {
@@ -74,50 +88,42 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
       const pred = visibleTasks[predIdx];
       return [{
         x1: dayOffset(minDate, pred.endDate)   * dayWidth + dayWidth,
-        y1: GNT_HDR + predIdx * ROW_H + ROW_H / 2,
+        y1: predIdx * ROW_H + ROW_H / 2,
         x2: dayOffset(minDate, task.startDate) * dayWidth,
-        y2: GNT_HDR + ri      * ROW_H + ROW_H / 2,
+        y2: ri      * ROW_H + ROW_H / 2,
         key: task.id,
       }];
     });
   }, [visibleTasks, minDate, dayWidth]);
 
+  // Show day numbers only when zoomed in enough
+  const showDayLabels = dayWidth >= 10;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Zoom controls */}
-      <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: C.bg, borderBottom: `1px solid ${C.border}`, alignItems: 'center', justifyContent: 'flex-start', flexShrink: 0 }}>
-        <button onClick={() => handleZoom('out')} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.text2, fontFamily: 'Poppins, sans-serif' }} title="Zoom out">
-          <ZoomOut size={14} /> Zoom Out
-        </button>
-        <button onClick={() => handleZoom('in')} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.text2, fontFamily: 'Poppins, sans-serif' }} title="Zoom in">
-          <ZoomIn size={14} /> Zoom In
-        </button>
-        <span style={{ fontSize: 10, color: C.text3, marginLeft: 8 }}>({dayWidth}px/day)</span>
-      </div>
-
-      {/* Sticky header - month + day labels */}
-      <div style={{ flexShrink: 0, height: GNT_HDR, overflowX: 'hidden', background: C.bg, borderBottom: `1px solid ${C.border}` }}>
-        <svg width={totalW} height={GNT_HDR} style={{ display: 'block' }}>
+      {/* Sticky header - month + day labels — height matches table header (HDR_H) */}
+      <div style={{ flexShrink: 0, height: HDR_H, overflowX: 'hidden', background: C.bg, borderBottom: `1px solid ${C.border}` }}>
+        <svg width={totalW} height={HDR_H} style={{ display: 'block' }}>
           {months.map((mo, i) => {
             const x   = dayOffset(minDate, format(mo, 'yyyy-MM-dd')) * dayWidth;
             const nx  = months[i + 1];
             const end = nx ? dayOffset(minDate, format(nx, 'yyyy-MM-dd')) * dayWidth : totalW;
             return (
               <g key={i}>
-                <rect x={x} y={0} width={end - x} height={28} fill={C.bg} />
-                <rect x={x} y={0} width={1} height={GNT_HDR} fill={C.border} />
-                <text x={x + 8} y={18} fill={C.text2} fontSize={10} fontFamily="Poppins, sans-serif" fontWeight={600} letterSpacing="0.06em">
+                <rect x={x} y={0} width={end - x} height={24} fill={C.bg} />
+                <rect x={x} y={0} width={1} height={HDR_H} fill={C.border} />
+                <text x={x + 8} y={16} fill={C.text2} fontSize={10} fontFamily="Poppins, sans-serif" fontWeight={600} letterSpacing="0.06em">
                   {format(mo, 'MMM yyyy').toUpperCase()}
                 </text>
               </g>
             );
           })}
-          {days.map(({ i, d, isWeekend, showLabel }) => (
+          {showDayLabels && days.map(({ i, d, isWeekend, showLabel }) => (
             <g key={i}>
-              <rect x={i * dayWidth} y={28} width={dayWidth} height={24} fill={isWeekend ? C.bg2 : C.bg} />
-              <rect x={i * dayWidth} y={28} width={1} height={24} fill={C.border} />
+              <rect x={i * dayWidth} y={24} width={dayWidth} height={HDR_H - 24} fill={isWeekend ? C.bg2 : C.bg} />
+              <rect x={i * dayWidth} y={24} width={1} height={HDR_H - 24} fill={C.border} />
               {showLabel && (
-                <text x={i * dayWidth + dayWidth / 2} y={43} textAnchor="middle" fill={isWeekend ? C.border2 : C.text3} fontSize={9} fontFamily="Poppins, sans-serif">
+                <text x={i * dayWidth + dayWidth / 2} y={HDR_H - 6} textAnchor="middle" fill={isWeekend ? C.border2 : C.text3} fontSize={9} fontFamily="Poppins, sans-serif">
                   {d.getDate()}
                 </text>
               )}
@@ -126,8 +132,8 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
           {/* Today in header */}
           {todayX > 0 && todayX < totalW && (
             <g>
-              <rect x={todayX - 18} y={28} width={36} height={24} fill={C.red} rx={4} />
-              <text x={todayX} y={43} textAnchor="middle" fill="#fff" fontSize={9} fontFamily="Poppins, sans-serif" fontWeight={700}>TODAY</text>
+              <rect x={todayX - 18} y={24} width={36} height={HDR_H - 24} fill={C.red} rx={4} />
+              <text x={todayX} y={HDR_H - 6} textAnchor="middle" fill="#fff" fontSize={9} fontFamily="Poppins, sans-serif" fontWeight={700}>TODAY</text>
             </g>
           )}
         </svg>
@@ -171,14 +177,11 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
           {/* Dependency arrows */}
           {arrows.map(a => {
             const mx = (a.x1 + a.x2) / 2;
-            // Re-offset: arrows now relative to body (no GNT_HDR offset)
-            const y1 = a.y1 - GNT_HDR;
-            const y2 = a.y2 - GNT_HDR;
             return (
               <g key={a.key}>
-                <path d={`M${a.x1},${y1} C${mx},${y1} ${mx},${y2} ${a.x2},${y2}`}
+                <path d={`M${a.x1},${a.y1} C${mx},${a.y1} ${mx},${a.y2} ${a.x2},${a.y2}`}
                   fill="none" stroke={C.primary} strokeWidth={1.5} opacity={0.35} />
-                <polygon points={`${a.x2},${y2} ${a.x2 - 5},${y2 - 3} ${a.x2 - 5},${y2 + 3}`} fill={C.primary} opacity={0.45} />
+                <polygon points={`${a.x2},${a.y2} ${a.x2 - 5},${a.y2 - 3} ${a.x2 - 5},${a.y2 + 3}`} fill={C.primary} opacity={0.45} />
               </g>
             );
           })}
@@ -188,7 +191,9 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
             const isDrag  = drag?.taskId === task.id;
             const delta   = isDrag ? (drag?.deltaDays ?? 0) : 0;
             const bx      = (dayOffset(minDate, task.startDate) + delta) * dayWidth;
-            const bw      = Math.max(task.duration * dayWidth, dayWidth);
+            // Use calendar days for bar width (not working days) so bar spans the full date range on the calendar grid
+            const calendarDays = Math.max(1, dayOffset(parseISO(task.startDate), task.endDate) + 1);
+            const bw      = Math.max(calendarDays * dayWidth, dayWidth);
             const by      = ri * ROW_H + 7;
             const bh      = ROW_H - 14;
             const isParent = hasChildren(tasks, task.id);
