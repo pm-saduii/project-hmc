@@ -167,57 +167,6 @@ export default function ProjectReport({ project, onClose }: Props) {
       });
     });
 
-    // @ts-ignore
-    const ganttY: number = Math.max((doc as any).lastAutoTable?.finalY??midY+25, midY+25)+5;
-    const ganttAvailH = H-ganttY-8;
-
-    // Gantt bars
-    if(ganttAvailH>15 && pt.length>0) {
-      const valid  = pt.filter(t=>t.startDate&&t.endDate);
-      if(valid.length>0){
-        const allDates = valid.flatMap(t=>[new Date(t.startDate),new Date(t.endDate)]);
-        const minD  = new Date(Math.min(...allDates.map(d=>d.getTime())));
-        const maxD  = new Date(Math.max(...allDates.map(d=>d.getTime())));
-        const span  = Math.max(1,Math.round((maxD.getTime()-minD.getTime())/86400000));
-        const gW    = W-24;
-        const dayPx = gW/span;
-        const barH  = Math.min(5,(ganttAvailH-8)/Math.max(pt.length,1));
-        const rowPx = barH+1.5;
-
-        doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(79,70,229);
-        doc.text('Gantt Chart', 12, ganttY+4);
-
-        const todayOff = Math.round((new Date().getTime()-minD.getTime())/86400000);
-        if(todayOff>=0&&todayOff<=span){
-          const tx=12+todayOff*dayPx;
-          doc.setDrawColor(239,68,68); doc.setLineWidth(0.3);
-          doc.line(tx,ganttY+6,tx,ganttY+6+pt.length*rowPx);
-        }
-
-        pt.forEach((task,i)=>{
-          if(!task.startDate||!task.endDate) return;
-          const s2 = Math.round((new Date(task.startDate).getTime()-minD.getTime())/86400000);
-          const e2 = Math.round((new Date(task.endDate).getTime()-minD.getTime())/86400000);
-          const bx = 12+s2*dayPx;
-          const bw = Math.max((e2-s2)*dayPx,1);
-          const by = ganttY+6+i*rowPx;
-          const fw = bw*(task.percentComplete/100);
-          const isPar = hasChildren(pt,task.id);
-          doc.setFillColor(238,242,255); doc.setDrawColor(79,70,229); doc.setLineWidth(0.15);
-          doc.roundedRect(bx,by,bw,barH,0.4,0.4,'FD');
-          if(fw>0.3){
-            const [r,g,b]= task.percentComplete>=100?[16,185,129]:task.percentComplete>=60?[59,130,246]:[79,70,229];
-            doc.setFillColor(r,g,b);
-            doc.roundedRect(bx,by,fw,barH,0.4,0.4,'F');
-          }
-          if(bw>12){
-            doc.setFontSize(4.5); doc.setFont('helvetica',isPar?'bold':'normal'); doc.setTextColor(30);
-            doc.text(task.taskName.substring(0,20),bx+0.8,by+barH-0.8,{maxWidth:bw-1.5});
-          }
-        });
-      }
-    }
-
     // Footer
     doc.setFontSize(6.5); doc.setTextColor(160);
     doc.text('ProjectMS Enterprise — Executive Report', 12, H-4);
