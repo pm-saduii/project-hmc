@@ -4,24 +4,20 @@
 // Usage: import { supabase } from '../services/supabase'
 
 import { createClient } from '@supabase/supabase-js';
-import { createMockSupabase } from './mockSupabase';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const isMockMode = import.meta.env.VITE_MOCK_MODE === 'true';
 
-if (!isMockMode && (!supabaseUrl || !supabaseAnonKey)) {
+if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY — database features are unavailable'
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY — running in demo mode'
   );
 }
 
-export const supabase = isMockMode
-  ? createMockSupabase() as unknown as ReturnType<typeof createClient>
-  : createClient(
-      supabaseUrl || 'https://placeholder.supabase.co',
-      supabaseAnonKey || 'placeholder',
-    );
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder'
+);
 
 /**
  * Test Supabase connection
@@ -42,5 +38,5 @@ export async function testSupabaseConnection(): Promise<boolean> {
  * Check if Supabase is configured (env vars present)
  */
 export function isSupabaseConfigured(): boolean {
-  return isMockMode || Boolean(supabaseUrl && supabaseAnonKey);
+  return Boolean(supabaseUrl && supabaseAnonKey);
 }

@@ -18,21 +18,13 @@ export function useTheme() {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      const saved = localStorage.getItem('projectms-theme');
-      if (saved === 'dark' || saved === 'light') return saved;
-    } catch (error) {
-      console.warn('Theme preference storage is unavailable.', error);
-    }
+    const saved = localStorage.getItem('projectms-theme');
+    if (saved === 'dark' || saved === 'light') return saved;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem('projectms-theme', theme);
-    } catch (error) {
-      console.warn('Theme preference could not be saved.', error);
-    }
+    localStorage.setItem('projectms-theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 

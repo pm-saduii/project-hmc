@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
-import { supabase, isMockMode, isSupabaseConfigured } from '../services/supabase';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { clearAuthCache } from '../services/api';
 import { useStore } from '../store';
 import type { Profile, UserRole } from '../types';
@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   async function syncProjectMemberships(email: string, userId: string) {
-    if (isMockMode || !email || !userId) return;
+    if (!email || !userId) return;
     try {
       const response = await fetch('/api/link-member', {
         method: 'POST',

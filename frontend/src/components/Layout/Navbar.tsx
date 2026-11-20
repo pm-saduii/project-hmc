@@ -9,9 +9,7 @@ import ManageUsersModal from '../Users/ManageUsersModal';
 import SystemNotesModal from '../SystemNotes/SystemNotesModal';
 import TimesheetModal from '../Timesheet/TimesheetModal';
 import TaskTemplateModal from '../Setup/TaskTemplateModal';
-import { isMockMode } from '../../services/supabase';
-import { resetMockDatabase } from '../../services/mockSupabase';
-import { Bell, Home, LogOut, Moon, Sun, Copy, Users, Settings, StickyNote, Clock3, RotateCcw } from 'lucide-react';
+import { Bell, Home, LogOut, Moon, Sun, Copy, Users, Settings, StickyNote, Clock3 } from 'lucide-react';
 
 const F = 'Poppins, sans-serif';
 
@@ -153,11 +151,7 @@ export default function Navbar() {
       {/* Brand */}
       <div
         onClick={() => {
-          try {
-            window.sessionStorage.removeItem('dashboard-view-state');
-          } catch (error) {
-            console.warn('Dashboard view preference could not be cleared.', error);
-          }
+          window.sessionStorage.removeItem('dashboard-view-state');
           setActiveProject(null);
           window.dispatchEvent(new CustomEvent('app-home'));
         }}
@@ -171,15 +165,10 @@ export default function Navbar() {
         }}>
           <Home size={18} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div>
           <span style={{ fontSize: 16, fontWeight: 800, color: textColor, fontFamily: F, letterSpacing: '-0.3px' }}>
             Project Tracking System
           </span>
-          {isMockMode && (
-            <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.5px', color: '#166534', background: '#DCFCE7', borderRadius: 999, padding: '3px 7px' }}>
-              MOCK DATA
-            </span>
-          )}
         </div>
       </div>
 
@@ -207,19 +196,6 @@ export default function Navbar() {
             <span style={{ color: textMuted }}>
               {projects.length} project{projects.length !== 1 ? 's' : ''}
             </span>
-            {isMockMode && (
-              <button
-                onClick={resetMockDatabase}
-                title="Restore the original sample data stored in this browser"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 9px',
-                  borderRadius: 8, border: `1px solid ${navBorder}`, background: navBg,
-                  color: textMuted, cursor: 'pointer', fontSize: 10,
-                }}
-              >
-                <RotateCcw size={12} /> Reset demo
-              </button>
-            )}
             <span style={{ color: textMuted, fontSize: 10, opacity: 0.9 }}>
               commit {commitId}
             </span>

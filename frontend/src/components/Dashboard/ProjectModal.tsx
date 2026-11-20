@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
-import { isMockMode } from '../../services/supabase';
 import { Modal, FormRow, Input, Select, Textarea, Btn } from '../Common';
 import type { Project } from '../../types';
 
@@ -117,11 +116,6 @@ export default function ProjectModal({ project, onClose }: Props) {
   const handleTestSend = async () => {
     if (!project?.id) return;
     setTesting(true);
-    if (isMockMode) {
-      toast.success('Demo mode: no email was sent');
-      setTesting(false);
-      return;
-    }
     try {
       const res = await fetch('/api/send-task-reminders', {
         method: 'POST',
