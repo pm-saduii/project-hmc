@@ -6,7 +6,7 @@ import { Card, Btn, Badge, Avatar, Modal, FormRow, Input, Select, Textarea, Conf
 import { roleColor } from '../../utils';
 import type { Member, Profile, UserRole } from '../../types';
 import { updateUserRole } from '../../services/api';
-import { supabase } from '../../services/supabase';
+import { isMockMode, supabase } from '../../services/supabase';
 
 export const ROLES = [
   'Project Sponsor', 'Project Advisor', 'Project Manager', 'Project Leader',
@@ -120,6 +120,7 @@ export default function MembersTab({ projectId, extraActions }: Props) {
   const client   = members.filter(m => m.type === 'client').sort(sortMembers);
 
   const syncMemberEmail = async (email: string) => {
+    if (isMockMode) return;
     const normalized = String(email || '').trim().toLowerCase();
     if (!normalized) return;
     try {
@@ -162,6 +163,10 @@ export default function MembersTab({ projectId, extraActions }: Props) {
 
   const handleSyncProjectMembers = async () => {
     if (!projectId) return;
+    if (isMockMode) {
+      toast.success('Demo mode: sample project members are already loaded');
+      return;
+    }
     setSyncing(true);
     try {
       const response = await fetch('/api/sync-project-members', {

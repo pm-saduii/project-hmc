@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import { useStore } from '../../store';
-import { supabase } from '../../services/supabase';
+import { isMockMode, supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { Card, Btn, Badge, ProgressBar, Modal, C, MILESTONE_STATUS, TH, TD } from '../Common';
@@ -127,7 +127,12 @@ export default function Dashboard() {
     if (dueMilestones.length) messages.push(`มี ${dueMilestones.length} milestone ที่กำลังจะครบหรือเลย Due Date ภายใน 10 วัน`);
 
     const todayKey = new Date().toISOString().slice(0, 10);
-    const lastNotified = window.localStorage.getItem('projectNotificationsLastDate');
+    let lastNotified: string | null = null;
+    try {
+      lastNotified = window.localStorage.getItem('projectNotificationsLastDate');
+    } catch (error) {
+      console.warn('Notification preference storage is unavailable.', error);
+    }
     if (messages.length > 0 && lastNotified !== todayKey) {
       toast.custom((t) => (
         <div style={{
@@ -149,7 +154,11 @@ export default function Dashboard() {
           <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>ตรวจสอบได้ในหน้า Portfolio Overview หรือ Milestones</div>
         </div>
       ));
-      window.localStorage.setItem('projectNotificationsLastDate', todayKey);
+      try {
+        window.localStorage.setItem('projectNotificationsLastDate', todayKey);
+      } catch (error) {
+        console.warn('Notification preference could not be saved.', error);
+      }
     }
     setNotificationsShown(true);
   }, [tasks, milestones, notificationsShown]);
@@ -189,12 +198,16 @@ export default function Dashboard() {
   }, [projects, selected?.id, restoreDone]);
 
   React.useEffect(() => {
-    window.sessionStorage.setItem(
-      DASHBOARD_VIEW_STATE_KEY,
-      JSON.stringify({
-        selectedProjectId: selected?.id || null,
-      })
-    );
+    try {
+      window.sessionStorage.setItem(
+        DASHBOARD_VIEW_STATE_KEY,
+        JSON.stringify({
+          selectedProjectId: selected?.id || null,
+        })
+      );
+    } catch (error) {
+      console.warn('Dashboard view preference could not be saved.', error);
+    }
   }, [selected?.id]);
 
   // Separate normal projects from Hypercare
@@ -339,6 +352,11 @@ export default function Dashboard() {
                 {permissions.canViewPortfolioOverview && (
                   <Btn variant="outline" onClick={async () => {
                     setSendingAll(true);
+                    if (isMockMode) {
+                      toast.success('Demo mode: no reminder emails were sent');
+                      setSendingAll(false);
+                      return;
+                    }
                     try {
                       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
                       if (sessionError) throw sessionError;

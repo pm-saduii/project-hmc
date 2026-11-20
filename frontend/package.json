@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "npm run dev:vercel",
     "dev:vite": "vite",
+    "dev:mock": "vite --mode mock",
     "dev:vercel": "cd .. && vercel dev --listen 5175",
     "build": "tsc && vite build",
+    "build:mock": "tsc && vite build --mode mock",
+    "export:mock": "tsc && vite build --mode mock",
     "preview": "vite preview"
   },
   "dependencies": {

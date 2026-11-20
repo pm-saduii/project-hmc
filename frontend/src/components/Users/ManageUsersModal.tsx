@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import { Eye, EyeOff, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2, UserPlus, UserRound, Users, X } from 'lucide-react';
-import { supabase } from '../../services/supabase';
+import { isMockMode, supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { getCurrentUserRoleAndId } from '../../services/api';
 import { getPermissionsByRole, USER_SCREEN_OPTIONS, type ScreenAccessLevel, type UserScreenPermissions } from '../../constants/rolePermissions';
@@ -189,18 +189,25 @@ export default function ManageUsersModal({ onClose }: { onClose: () => void }) {
         if (error) throw new Error(error.message);
       }
       if (isAuthDetailsDirty) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData.session?.access_token;
-        if (!accessToken) throw new Error('UNAUTHENTICATED');
-        const details: Record<string, string> = { userId: selectedUser.id };
-        if (draftEmail.trim().toLowerCase() !== selectedUser.email.toLowerCase()) details.email = draftEmail.trim().toLowerCase();
-        if (draftPassword) details.password = draftPassword;
-        const response = await fetch('/api/users/manage', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify(details),
-        });
-        await readApiResponse(response);
+        if (isMockMode) {
+          const { error } = await supabase.from('profiles').update({
+            email: draftEmail.trim().toLowerCase(),
+          }).eq('id', selectedUser.id);
+          if (error) throw new Error(error.message);
+        } else {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const accessToken = sessionData.session?.access_token;
+          if (!accessToken) throw new Error('UNAUTHENTICATED');
+          const details: Record<string, string> = { userId: selectedUser.id };
+          if (draftEmail.trim().toLowerCase() !== selectedUser.email.toLowerCase()) details.email = draftEmail.trim().toLowerCase();
+          if (draftPassword) details.password = draftPassword;
+          const response = await fetch('/api/users/manage', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify(details),
+          });
+          await readApiResponse(response);
+        }
       }
       toast.success('User changes saved');
       setDraftPassword('');
@@ -225,6 +232,26 @@ export default function ManageUsersModal({ onClose }: { onClose: () => void }) {
     }
     setInviting(true);
     try {
+      if (isMockMode) {
+        if (users.some((item) => item.email.toLowerCase() === email)) throw new Error('A user with this email already exists');
+        const { error } = await supabase.from('profiles').insert({
+          id: `demo-user-${Date.now()}`,
+          email,
+          full_name: inviteName.trim(),
+          avatar_url: '',
+          role: inviteRole,
+          is_active: true,
+          project_access_scope: 'member',
+          screen_permissions: null,
+        });
+        if (error) throw new Error(error.message);
+        toast.success('Demo user added locally');
+        setInviteName('');
+        setInviteEmail('');
+        setShowInviteForm(false);
+        await loadUsers();
+        return;
+      }
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (!accessToken) throw new Error('UNAUTHENTICATED');

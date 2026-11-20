@@ -22,6 +22,15 @@ npm run dev
 
 กำหนด `VITE_SUPABASE_URL` และ `VITE_SUPABASE_ANON_KEY` ใน `frontend/.env.local` ก่อนเชื่อมต่อ Supabase
 
+## Export HTML mockup (ไม่เชื่อมฐานข้อมูล)
+
+```bash
+cd frontend
+npm run export:mock
+```
+
+คำสั่งนี้สร้างไฟล์เดี่ยว `frontend/dist/project-mockup.html` ซึ่งเปิดหรือส่งต่อได้โดยตรง ไม่ต้องเปิด dev server ข้อมูลตัวอย่างและการแก้ไขทำงานใน browser เท่านั้น ไม่มีการเชื่อมฐานข้อมูล และกด **Reset demo** เพื่อคืนข้อมูลเริ่มต้นได้ หากต้องการทดลองผ่าน dev server ให้ใช้ `npm run dev:mock`.
+
 ## คำสั่งจากโฟลเดอร์หลัก
 
 ```bash

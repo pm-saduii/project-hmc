@@ -463,7 +463,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [suggestModalOpen, setSuggestModalOpen] = useState(false);
   const [isSuggestionLocked, setIsSuggestionLocked] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem('task-suggestion-locked') === 'true';
+    try {
+      return window.localStorage.getItem('task-suggestion-locked') === 'true';
+    } catch {
+      return false;
+    }
   });
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState('');
@@ -576,7 +580,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
   useEffect(() => {
     if (!columnPrefsLoaded || typeof window === 'undefined') return;
-    window.localStorage.setItem(columnStorageKey, JSON.stringify(columnVisibility));
+    try {
+      window.localStorage.setItem(columnStorageKey, JSON.stringify(columnVisibility));
+    } catch (error) {
+      console.warn('Task column preferences could not be saved.', error);
+    }
   }, [columnStorageKey, columnPrefsLoaded, columnVisibility]);
 
   const projectTasks = tasks.filter(t => t.projectId === projectId);
@@ -1318,7 +1326,11 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem('task-suggestion-locked', String(isSuggestionLocked));
+    try {
+      window.localStorage.setItem('task-suggestion-locked', String(isSuggestionLocked));
+    } catch (error) {
+      console.warn('Task suggestion preference could not be saved.', error);
+    }
   }, [isSuggestionLocked]);
 
   useEffect(() => {
