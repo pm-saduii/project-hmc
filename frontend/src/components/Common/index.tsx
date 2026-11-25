@@ -171,7 +171,15 @@ export const ProgressBar: React.FC<{ value: number; color?: string; height?: num
   </div>
 );
 
-export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; width?: number; height?: number | string; contentStyle?: React.CSSProperties; closeOnBackdrop?: boolean }> = ({ title, onClose, children, width = 540, height, contentStyle, closeOnBackdrop = true }) => (
+export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; width?: number; height?: number | string; contentStyle?: React.CSSProperties; closeOnBackdrop?: boolean; inline?: boolean }> = ({ title, onClose, children, width = 540, height, contentStyle, closeOnBackdrop = true, inline = false }) => inline ? (
+  // Page mode: the same content rendered as a section of a routed page (no backdrop, no close button).
+  <section style={{ display: 'flex', flexDirection: 'column', background: C.white, borderRadius: 12, border: `1px solid ${C.border}`, boxShadow: C.shadow, height, minHeight: 0, fontFamily: 'Poppins, sans-serif' }}>
+    <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+      <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{title}</span>
+    </div>
+    <div style={{ padding: 20, ...(height ? { flex: '1 1 auto', minHeight: 0, overflowY: 'auto' as const } : {}), ...contentStyle }}>{children}</div>
+  </section>
+) : (
   <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
     <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }} onClick={closeOnBackdrop ? onClose : undefined} />
     <div style={{ position: 'relative', display: height ? 'flex' : undefined, flexDirection: height ? 'column' : undefined, background: C.white, borderRadius: 16, width, height, maxWidth: 'calc(100vw - 32px)', maxHeight: '92vh', overflowY: height ? 'hidden' : 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: 'Poppins, sans-serif' }}>

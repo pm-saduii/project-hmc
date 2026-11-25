@@ -50,7 +50,7 @@ async function readApiResponse(response: Response): Promise<Record<string, unkno
   }
   return result;
 }
-export default function ManageUsersModal({ onClose }: { onClose: () => void }) {
+export default function ManageUsersModal({ onClose, inline = false }: { onClose: () => void; inline?: boolean }) {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -289,7 +289,7 @@ export default function ManageUsersModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="Manage Users" onClose={onClose} width={1080} height="88vh" closeOnBackdrop={false} contentStyle={{ padding: 16 }}>
+    <Modal title="Users" onClose={onClose} width={1080} height={inline ? "calc(100vh - 150px)" : "88vh"} closeOnBackdrop={false} inline={inline} contentStyle={{ padding: 16 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(300px, 0.9fr)', gap: 16, height: '100%', minHeight: 0 }}>
         <section style={{ minWidth: 0, display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderBottom: `1px solid ${C.border}`, background: C.bg2 }}>

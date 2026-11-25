@@ -8,7 +8,7 @@ import type { Project } from '../../types';
 
 const COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EC4899','#EF4444','#8B5CF6','#F97316'];
 
-interface Props { project?: Project; onClose: () => void; }
+interface Props { project?: Project; onClose: () => void; /** Render as the Project Info › Settings page instead of a popup. */ inline?: boolean; }
 
 interface ProjectForm {
   name: string;
@@ -37,7 +37,7 @@ function normalizeDescription(raw: string): string {
   }
 }
 
-export default function ProjectModal({ project, onClose }: Props) {
+export default function ProjectModal({ project, onClose, inline = false }: Props) {
   const { createProject, updateProject, fetchTasks, projects, masterCodes } = useStore();
   const [saving, setSaving] = useState(false);
   const [copyFromProjectId, setCopyFromProjectId] = useState('');
@@ -144,7 +144,7 @@ export default function ProjectModal({ project, onClose }: Props) {
   };
 
   return (
-    <Modal title={project ? 'Edit Project' : 'New Project'} onClose={onClose} width={960}>
+    <Modal title={inline ? 'Project Settings' : project ? 'Edit Project' : 'New Project'} onClose={onClose} width={960} inline={inline}>
       <FormRow label="Project Name" required>
         <Input autoFocus value={form.name} onChange={v => up('name', v)} placeholder="e.g. E-Commerce Platform" />
       </FormRow>
@@ -249,7 +249,7 @@ export default function ProjectModal({ project, onClose }: Props) {
             {testing ? 'Sending test…' : 'Send Test Email'}
           </Btn>
         )}
-        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        {!inline && <Btn variant="ghost" onClick={onClose}>Cancel</Btn>}
         <Btn onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : project ? 'Save Changes' : 'Create Project'}</Btn>
       </div>
     </Modal>

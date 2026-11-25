@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Copy, Download, Home, Plus, Save, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -19,6 +20,9 @@ import ActivitiesTab     from '../Activities/ActivitiesTab';
 import ProjectEnvironmentTab from './ProjectEnvironmentTab';
 import ExecutiveOnePage  from './ExecutiveOnePage';
 import LessonsLearnedTab from './LessonsLearnedTab';
+import ProjectModal from './ProjectModal';
+import TaskTemplateModal from '../Setup/TaskTemplateModal';
+import { PROJECT_GROUPS } from '../../utils/projectRoutes';
 import { useStore }      from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
@@ -529,7 +533,6 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
 }
 
 export default function ProjectDetail({ project }: Props) {
-  const [activeTab, setActiveTab]   = useState('tasks');
   const [activeChecklistTab, setActiveChecklistTab] = useState<ProjectChecklistCategoryId>('project');
   const [isMobile, setIsMobile] = useState(false);
   const readOnlyContentRef = React.useRef<HTMLDivElement>(null);
@@ -538,6 +541,31 @@ export default function ProjectDetail({ project }: Props) {
   const [copyPassword, setCopyPassword] = useState('');
   const [copying, setCopying] = useState(false);
   const permissions = useRolePermissions();
+
+  // ── Navigation from the URL: /projects/:projectId/:group/:sub ──────────────
+  // The route is /projects/:projectId/*, so group and sub come from the splat.
+  const [groupParam = '', subParam = ''] = (useParams()['*'] || '').split('/');
+  const navigate = useNavigate();
+  const [replaceTasksOpen, setReplaceTasksOpen] = useState(false);
+  const canSee = (screen: string) => (screen === 'portfolio-overview'
+    ? permissions.getScreenAccess('portfolio-overview') === 'full'
+    : permissions.isTabVisible(screen));
+  const visibleGroups = PROJECT_GROUPS
+    .map((group) => ({ ...group, subs: group.subs.filter((sub) => canSee(sub.screen)) }))
+    .filter((group) => group.subs.length > 0);
+  const requestedGroup = visibleGroups.find((group) => group.key === groupParam);
+  const requestedSub = requestedGroup?.subs.find((sub) => sub.key === subParam);
+  const shownGroup = requestedSub ? requestedGroup! : (requestedGroup ?? visibleGroups[0]);
+  const shownSub = requestedSub ?? shownGroup?.subs[0];
+  const activeTab = !shownSub ? '' : shownSub.key === 'settings' ? 'settings' : shownSub.screen;
+  const pathFor = (group: string, sub: string) => `/projects/${encodeURIComponent(project.id)}/${group}/${sub}`;
+  useEffect(() => {
+    // Missing, unknown or hidden screen in the URL: show the first allowed one instead.
+    if (shownGroup && shownSub && (shownGroup.key !== groupParam || shownSub.key !== subParam)) {
+      navigate(pathFor(shownGroup.key, shownSub.key), { replace: true });
+    }
+  }, [shownGroup?.key, shownSub?.key, groupParam, subParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const {
     projects,
     tasks,
@@ -623,7 +651,6 @@ export default function ProjectDetail({ project }: Props) {
     <button
       type="button"
       onClick={() => {
-        setActiveTab(scope);
         openCopyModal();
       }}
       title={`Copy ${copyTabLabel[scope]} from another project`}
@@ -683,39 +710,7 @@ export default function ProjectDetail({ project }: Props) {
     }
   };
 
-  /* Old Section
-  const allTabs = [
-    { id: 'tasks',    label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
-    { id: 'summary',  label: 'Summary',    icon: '📈' },
-    { id: 'members',  label: 'Members',    icon: '👥', count: members.length },
-    { id: 'ms',       label: 'Milestones', icon: '🏁', count: milestones.length },
-    { id: 'effort',   label: 'Effort',     icon: '⚡', count: efforts.length },
-    { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
-    { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
-    { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
-    { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
-    { id: 'report',   label: 'Report',     icon: '📊' },
-  ];
-  */
-  const allTabs = [
-    { id: 'tasks',    label: 'Tasks',      icon: '📋', count: tasks.filter(t => t.projectId === project.id).length },
-    { id: 'summary',  label: 'Summary',    icon: '📈' },
-    { id: 'members',  label: 'Members',    icon: '👥', count: members.length },
-    { id: 'ms',       label: 'Milestones', icon: '🏁', count: milestones.length },
-    { id: 'effort',   label: 'Effort',     icon: '⚡', count: efforts.length },
-    { id: 'checklists', label: 'Checklist', icon: '☑️' },
-    { id: 'lessons', label: 'Lessons Learned', icon: '💡' },
-    { id: 'cr',       label: 'Change Req', icon: '📝', count: changeRequests.length },
-    { id: 'issues',   label: 'Issues',     icon: '🔴', count: issues.filter(i => i.status !== 'Resolved' && i.status !== 'Blocked').length },
-    { id: 'risks',    label: 'Risks',      icon: '🎯', count: risks.filter(r => r.status === 'Monitoring' || r.status === 'Mitigating').length },
-    { id: 'activities', label: 'Activities', icon: '🗓️', count: activities.filter((a) => a.projectId === project.id).length },
-    { id: 'env',      label: 'Program URL', icon: '🌐', count: projectEnvironments.filter((e) => e.projectId === project.id).length },
-    { id: 'onepage',  label: 'One Page',   icon: '🧭' },
-  ];
-
-  // Filter tabs based on role permissions
-  const TABS = allTabs.filter(tab => permissions.isTabVisible(tab.id));
-  const activeScreenAccess = permissions.getScreenAccess(activeTab);
+  const activeScreenAccess = permissions.getScreenAccess(activeTab === 'settings' ? 'portfolio-overview' : activeTab);
 
   React.useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -723,19 +718,6 @@ export default function ProjectDetail({ project }: Props) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  React.useEffect(() => {
-    const handleSetTab = (e: Event) => {
-      const tab = (e as CustomEvent<{ tab: string }>).detail?.tab;
-      if (tab && permissions.isTabVisible(tab)) setActiveTab(tab);
-    };
-    window.addEventListener('app-set-tab', handleSetTab);
-    return () => window.removeEventListener('app-set-tab', handleSetTab);
-  }, [permissions]);
-
-  React.useEffect(() => {
-    if (TABS.length && !permissions.isTabVisible(activeTab)) setActiveTab(TABS[0].id);
-  }, [activeTab, permissions, TABS]);
 
   React.useEffect(() => {
     const content = readOnlyContentRef.current;
@@ -804,20 +786,56 @@ export default function ProjectDetail({ project }: Props) {
               </div>
             </div>
           </div>
-          <Tabs tabs={TABS} active={activeTab} onChange={id => {
-            if (id === 'checklists') setActiveChecklistTab('project');
-            setActiveTab(id);
-          }} />
+          {/* Level 1: section groups (a dropdown on phones) */}
+          <Tabs
+            tabs={visibleGroups.map((group) => ({ id: group.key, label: group.label }))}
+            active={shownGroup?.key || ''}
+            onChange={(key) => {
+              const group = visibleGroups.find((item) => item.key === key);
+              if (group) navigate(pathFor(group.key, group.subs[0].key));
+            }}
+          />
+          {/* Level 2: pages inside the group */}
+          {shownGroup && (
+            <nav aria-label={`${shownGroup.label} pages`} style={{ display: 'flex', gap: 6, padding: '10px 0 12px', overflowX: 'auto' }}>
+              {shownGroup.subs.map((sub) => {
+                const selected = sub.key === shownSub?.key;
+                return (
+                  <button
+                    key={sub.key}
+                    type="button"
+                    aria-current={selected ? 'page' : undefined}
+                    onClick={() => {
+                      if (sub.key === 'checklist') setActiveChecklistTab('project');
+                      navigate(pathFor(shownGroup.key, sub.key));
+                    }}
+                    style={{
+                      height: 30, padding: '0 14px', borderRadius: 999, fontSize: 12, fontWeight: selected ? 600 : 500,
+                      fontFamily: 'Poppins, sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
+                      border: `1px solid ${selected ? '#C7D2FE' : C.border}`,
+                      background: selected ? C.primaryBg : C.white,
+                      color: selected ? C.primary : C.text2,
+                    }}
+                  >
+                    {sub.label}
+                  </button>
+                );
+              })}
+            </nav>
+          )}
         </div>
       </div>
 
       <div ref={readOnlyContentRef} aria-readonly={activeScreenAccess === 'read'} style={{ flex: 1, overflow: 'hidden', background: activeTab === 'tasks' ? C.white : C.bg }}>
-        {TABS.length === 0 ? (
+        {visibleGroups.length === 0 ? (
           <div style={{ display: 'grid', placeItems: 'center', height: '100%', padding: 24, color: C.text2, fontSize: 13, textAlign: 'center' }}>
             No project screens are enabled for your account. Contact an administrator.
           </div>
         ) : <>
-        {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} extraActions={copyButton('tasks')} /></div>}
+        {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} extraActions={<>
+          {copyButton('tasks')}
+          <Btn small variant="ghost" onClick={() => setReplaceTasksOpen(true)} title="Replace all tasks from another project or a template">Replace tasks</Btn>
+        </>} /></div>}
         {activeTab === 'summary' && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectSummaryTab project={project} /></div>}
         {activeTab === 'members' && <div style={{ height: '100%', overflowY: 'auto' }}><MembersTab        projectId={project.id} extraActions={copyButton('members')} /></div>}
         {activeTab === 'ms'      && <div style={{ height: '100%', overflowY: 'auto' }}><MilestonesTab     projectId={project.id} extraActions={copyButton('ms')} /></div>}
@@ -839,9 +857,11 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'activities' && <div style={{ height: '100%', overflowY: 'auto' }}><ActivitiesTab projectId={project.id} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
         {activeTab === 'onepage' && <div style={{ height: '100%', overflowY: 'auto' }}><ExecutiveOnePage project={project} /></div>}
+        {activeTab === 'settings' && <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}><ProjectModal key={project.id} project={project} inline onClose={() => undefined} /></div>}
         </>}
       </div>
 
+      {replaceTasksOpen && <TaskTemplateModal only="copy" onClose={() => setReplaceTasksOpen(false)} />}
       {copyModalOpen && copyScope && (
         <Modal title={`Copy ${copyTabLabel[copyScope]} From Another Project`} onClose={() => setCopyModalOpen(false)} width={560}>
           <div style={{ display: 'grid', gap: 10 }}>

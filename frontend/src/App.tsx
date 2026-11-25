@@ -4,11 +4,20 @@ import { useStore } from './store';
 import { useAuth } from './contexts/AuthContext';
 import { useTheme } from './contexts/ThemeContext';
 import { useRealtimeSubscription } from './hooks/useRealtime';
-import Navbar        from './components/Layout/Navbar';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import AppShell      from './components/Layout/AppShell';
 import Dashboard     from './components/Dashboard/Dashboard';
-import ProjectDetail from './components/Dashboard/ProjectDetail';
 import AuthPage      from './components/Auth/AuthPage';
+import TimesheetModal from './components/Timesheet/TimesheetModal';
+import ManageUsersModal from './components/Users/ManageUsersModal';
+import SystemNotesModal from './components/SystemNotes/SystemNotesModal';
+import ProjectPage   from './pages/ProjectPage';
+import EmailLogsPage from './pages/EmailLogsPage';
+import { AdminOnly, PageBody, SystemSettingsPage } from './pages/AdminPages';
+import { NotFoundPage } from './pages/StatusPages';
 import { C } from './components/Common';
+
+const noop = () => undefined;
 
 export default function App() {
   const { user, loading: authLoading, configured } = useAuth();
@@ -17,6 +26,7 @@ export default function App() {
   const fetchMasterCodes = useStore(state => state.fetchMasterCodes);
   const activeProject = useStore(state => state.activeProject);
   const projectsLoading = useStore(state => state.projectsLoading);
+  const projects = useStore(state => state.projects);
   const dataLoading = useStore(state => state.dataLoading);
   const error = useStore(state => state.error);
 
@@ -59,39 +69,48 @@ export default function App() {
     return <AuthPage />;
   }
 
+  // Dashboard / Projects show the connection state while the project list loads.
+  const portfolio = (mode: 'dashboard' | 'projects') => (projectsLoading && !error ? (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
+      <div style={{ width: 36, height: 36, border: `3px solid ${C.primary}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 14 }}>Loading projects…</p>
+    </div>
+  ) : error && !projects.length ? (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 8 }}>
+      <p style={{ color: C.red, fontWeight: 600, fontSize: 15 }}>Connection Error</p>
+      <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 13 }}>{error}</p>
+      <p style={{ color: isDark ? '#64748B' : C.text3, fontSize: 12 }}>
+        {configured ? 'Check your Supabase configuration.' : 'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local'}
+      </p>
+    </div>
+  ) : (
+    <Dashboard mode={mode} />
+  ));
+
   const bg = isDark ? '#0F172A' : C.bg;
   const toastBg = isDark ? '#1E293B' : C.white;
   const toastColor = isDark ? '#F1F5F9' : C.text;
   const toastBorder = isDark ? '#334155' : C.border;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: bg, fontFamily: 'Poppins, sans-serif', overflow: 'hidden' }}>
-      <Navbar />
-
-      <main style={{ flex: 1, overflow: 'hidden' }}>
-        {!activeProject ? (
-          <div style={{ height: '100%', overflowY: 'auto' }}>
-            {projectsLoading && !error ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
-                <div style={{ width: 36, height: 36, border: `3px solid ${C.primary}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 14 }}>Loading projects…</p>
-              </div>
-            ) : error ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 8 }}>
-                <p style={{ color: C.red, fontWeight: 600, fontSize: 15 }}>Connection Error</p>
-                <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 13 }}>{error}</p>
-                <p style={{ color: isDark ? '#64748B' : C.text3, fontSize: 12 }}>
-                  {configured ? 'Check your Supabase configuration.' : 'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local'}
-                </p>
-              </div>
-            ) : (
-              <Dashboard />
-            )}
-          </div>
-        ) : (
-          <ProjectDetail project={activeProject} />
-        )}
-      </main>
+    <div style={{ height: '100vh', background: bg, fontFamily: 'Poppins, sans-serif', overflow: 'hidden' }}>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={portfolio('dashboard')} />
+          <Route path="projects" element={portfolio('projects')} />
+          <Route path="projects/:projectId/*" element={<ProjectPage />} />
+          <Route path="timesheet" element={<PageBody><TimesheetModal inline onClose={noop} /></PageBody>} />
+          <Route path="admin" element={<AdminOnly />}>
+            <Route index element={<Navigate to="/admin/users" replace />} />
+            <Route path="users" element={<PageBody><ManageUsersModal inline onClose={noop} /></PageBody>} />
+            <Route path="settings" element={<SystemSettingsPage section="lookup" />} />
+            <Route path="settings/templates" element={<SystemSettingsPage section="templates" />} />
+            <Route path="email-logs" element={<div style={{ height: '100%', overflowY: 'auto' }}><EmailLogsPage /></div>} />
+            <Route path="system-notes" element={<PageBody><SystemNotesModal inline onClose={noop} /></PageBody>} />
+          </Route>
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
 
       {dataLoading && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 450, cursor: 'wait' }}>

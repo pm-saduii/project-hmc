@@ -20,13 +20,17 @@ type CopySourceMode = 'project' | 'template';
 
 interface Props {
   onClose: () => void;
+  /** Render as a page section instead of a popup. */
+  inline?: boolean;
+  /** Open on this view and hide the Copy/Templates switch. */
+  only?: 'copy' | 'templates';
 }
 
-export default function TaskTemplateModal({ onClose }: Props) {
+export default function TaskTemplateModal({ onClose, inline = false, only }: Props) {
   const { profile } = useAuth();
   const { activeProject, projects, fetchProjects, fetchTasks } = useStore();
 
-  const [activeView, setActiveView] = useState<'copy' | 'templates'>('copy');
+  const [activeView, setActiveView] = useState<'copy' | 'templates'>(only ?? 'copy');
   const [loading, setLoading] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [savingTemplateName, setSavingTemplateName] = useState(false);
@@ -325,16 +329,16 @@ export default function TaskTemplateModal({ onClose }: Props) {
   };
 
   return (
-    <Modal title="Task Copy & WBS Template" onClose={onClose} width={980} closeOnBackdrop={false}>
+    <Modal title={only === 'templates' ? 'Task Templates' : only === 'copy' ? 'Replace Tasks' : 'Task Copy & WBS Template'} onClose={onClose} width={980} closeOnBackdrop={false} inline={inline}>
       <div style={{ display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {!only && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Btn small variant={activeView === 'copy' ? 'primary' : 'ghost'} onClick={() => setActiveView('copy')}>
             <Copy size={14} /> Copy Tasks
           </Btn>
           <Btn small variant={activeView === 'templates' ? 'primary' : 'ghost'} onClick={() => setActiveView('templates')}>
             <Layers size={14} /> Templates
           </Btn>
-        </div>
+        </div>}
 
         {activeView === 'copy' && (
           <div style={{ display: 'grid', gap: 12 }}>

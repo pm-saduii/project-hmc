@@ -21,11 +21,14 @@ function emptyNote(): Partial<Note> {
   };
 }
 
-export default function SystemNotesModal({ onClose }: { onClose: () => void }) {
+export default function SystemNotesModal({ onClose, inline = false }: { onClose: () => void; inline?: boolean }) {
   const notes = useStore((s) => s.notes);
   const createNote = useStore((s) => s.createNote);
   const updateNote = useStore((s) => s.updateNote);
   const deleteNote = useStore((s) => s.deleteNote);
+  const fetchNotes = useStore((s) => s.fetchNotes);
+  // As a page there is no opener that loads the notes first.
+  useEffect(() => { if (inline) void fetchNotes(); }, [inline, fetchNotes]);
   const [editing, setEditing] = useState<Partial<Note> | null>(null);
   const [deleting, setDeleting] = useState<Note | null>(null);
 
@@ -76,7 +79,7 @@ export default function SystemNotesModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title="System Notes" onClose={onClose} width={1450} closeOnBackdrop={false}>
+    <Modal title="System Notes" onClose={onClose} width={1450} closeOnBackdrop={false} inline={inline}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: C.text2 }}>Admin-only records for system-level announcements and internal notes.</div>
         <Btn small onClick={openCreate}><Plus size={14} /> Add Note</Btn>

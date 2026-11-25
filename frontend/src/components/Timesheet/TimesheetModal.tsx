@@ -10,6 +10,8 @@ import { Btn, C, ConfirmModal, FormRow, Input, Modal, Textarea } from '../Common
 
 interface Props {
   onClose: () => void;
+  /** Render as a page section instead of a popup. */
+  inline?: boolean;
 }
 
 interface TimesheetDraft {
@@ -59,7 +61,7 @@ function sumDayHours(entries: TimesheetEntry[]): Map<string, number> {
   return totals;
 }
 
-export default function TimesheetModal({ onClose }: Props) {
+export default function TimesheetModal({ onClose, inline = false }: Props) {
   const projects = useStore((state) => state.projects);
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [entries, setEntries] = useState<TimesheetEntry[]>([]);
@@ -199,7 +201,7 @@ export default function TimesheetModal({ onClose }: Props) {
   const editedEntry = editing?.entry;
 
   return (
-    <Modal title="Personal Timesheet" onClose={onClose} width={1240} height="92vh" closeOnBackdrop={false}
+    <Modal title="Personal Timesheet" onClose={onClose} width={1240} height={inline ? undefined : "92vh"} closeOnBackdrop={false} inline={inline}
       contentStyle={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

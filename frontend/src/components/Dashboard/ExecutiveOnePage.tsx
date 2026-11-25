@@ -1,4 +1,6 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { projectPath } from '../../utils/projectRoutes';
 import { differenceInCalendarDays, differenceInCalendarMonths, endOfMonth, getDaysInMonth, isValid, parseISO, startOfDay, startOfMonth } from 'date-fns';
 import { C, Card, MILESTONE_STATUS } from '../Common';
 import { useStore } from '../../store';
@@ -351,9 +353,10 @@ export default function ExecutiveOnePage({ project }: Props) {
     [projectMembers],
   );
 
+  const navigate = useNavigate();
   const openTab = React.useCallback((tab: string) => {
-    window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } }));
-  }, []);
+    navigate(projectPath(project.id, tab));
+  }, [navigate, project.id]);
 
   const openIssueList = React.useMemo(
     () => openIssues.slice().sort((a, b) => (a.issueDate > b.issueDate ? -1 : 1)),

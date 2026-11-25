@@ -1,38 +1,23 @@
 import React, { useState } from 'react';
 import { parseISO, isValid } from 'date-fns';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, Home, Mail, ClipboardList, FileSearch, Settings, FlaskConical, Rocket, Headphones, CircleDot, FolderKanban } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, ClipboardList, FileSearch, Settings, FlaskConical, Rocket, Headphones, CircleDot, FolderKanban } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Swal from 'sweetalert2';
-import 'sweetalert2/dist/sweetalert2.min.css';
 import { useStore } from '../../store';
-import { supabase } from '../../services/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
-import { Card, Btn, Badge, ProgressBar, Modal, C, MILESTONE_STATUS } from '../Common';
-import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress } from '../../utils';
+import { Card, Btn, Badge, ProgressBar, Modal, C } from '../Common';
+import { fmtDate } from '../../utils';
+import { projectPath } from '../../utils/projectRoutes';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
 
 const STATUS_ACCENT_PALETTE = ['#B45309', '#0F766E', '#C2410C', '#2563EB', '#15803D', '#BE185D', '#6D28D9', '#4D7C0F', '#0369A1', '#A21CAF', '#B91C1C', '#475569'];
-const DASHBOARD_VIEW_STATE_KEY = 'dashboard-view-state';
 
 function getTodayDeletePassword(): string {
   const today = new Date();
   const day = String(today.getDate()).padStart(2, '0');
   const month = String(today.getMonth() + 1).padStart(2, '0');
   return `${day}${month}${today.getFullYear()}`;
-}
-
-function loadDashboardViewState(): { selectedProjectId: string | null } {
-  try {
-    const raw = window.sessionStorage.getItem(DASHBOARD_VIEW_STATE_KEY);
-    if (!raw) return { selectedProjectId: null };
-    const parsed = JSON.parse(raw) as { selectedProjectId?: unknown };
-    const selectedProjectId = typeof parsed.selectedProjectId === 'string' && parsed.selectedProjectId ? parsed.selectedProjectId : null;
-    return { selectedProjectId };
-  } catch {
-    return { selectedProjectId: null };
-  }
 }
 
 function getStatusIcon(status: string) {
@@ -46,15 +31,16 @@ function getStatusIcon(status: string) {
   return <CircleDot size={19} strokeWidth={2} />;
 }
 
-export default function Dashboard() {
-  const { projects, tasks, milestones, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
-  const { profile } = useAuth();
+/**
+ * Portfolio screens.
+ *  - mode "dashboard" (route /): status cards + project list + daily reminder toast
+ *  - mode "projects"  (route /projects): the project list only
+ */
+export default function Dashboard({ mode = 'dashboard' }: { mode?: 'dashboard' | 'projects' }) {
+  const { projects, tasks, milestones, deleteProject, fetchTasks, fetchMilestones, masterCodes } = useStore();
+  const navigate = useNavigate();
   const permissions = useRolePermissions();
   const canEditOverview = permissions.getScreenAccess('portfolio-overview') === 'full';
-  const savedView = React.useMemo(() => loadDashboardViewState(), []);
-  const restoreSelectedProjectIdRef = React.useRef<string | null>(savedView.selectedProjectId);
-  const [selected,   setSelected]   = useState<Project | null>(null);
-  const [restoreDone, setRestoreDone] = useState<boolean>(() => !restoreSelectedProjectIdRef.current);
   const [editing,    setEditing]    = useState<Project | null>(null);
   const [deleting,   setDeleting]   = useState<Project | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
@@ -62,8 +48,6 @@ export default function Dashboard() {
   const [showAdd,    setShowAdd]    = useState(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
-  const [sendingAll, setSendingAll] = useState(false);
-  const [showEmailLogs, setShowEmailLogs] = useState(false);
   const isMobile = windowWidth < 768;
 
   React.useEffect(() => {
@@ -72,26 +56,14 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Progress per project needs every accessible task; milestones feed the reminder toast.
   React.useEffect(() => {
-    const onHome = () => {
-      setSelected(null);
-      // Disable one-time restore after explicit Home navigation.
-      restoreSelectedProjectIdRef.current = null;
-      setRestoreDone(true);
-    };
-    window.addEventListener('app-home', onHome);
-    return () => window.removeEventListener('app-home', onHome);
-  }, []);
-
-  // Note: fetchProjects is called from App.tsx, not needed here
-
-  React.useEffect(() => {
-    // Load milestones for portfolio overview (tasks are loaded by the selection effect below).
+    fetchTasks();
     fetchMilestones();
-  }, [fetchMilestones]);
-  
+  }, [fetchTasks, fetchMilestones]);
+
   React.useEffect(() => {
-    if (notificationsShown) return;
+    if (mode !== 'dashboard' || notificationsShown) return;
     if (!tasks.length && !milestones.length) return;
 
     const now = new Date();
@@ -121,14 +93,14 @@ export default function Dashboard() {
     });
 
     const messages: string[] = [];
-    if (overdueTasks.length) messages.push(`มี ${overdueTasks.length} แผนงานเกินกำหนดที่ยังไม่เสร็จ`);
-    if (upcomingTasks.length) messages.push(`มี ${upcomingTasks.length} แผนงานที่ใกล้ครบใน 7 วัน`);
-    if (dueMilestones.length) messages.push(`มี ${dueMilestones.length} milestone ที่กำลังจะครบหรือเลย Due Date ภายใน 10 วัน`);
+    if (overdueTasks.length) messages.push(`${overdueTasks.length} task(s) are overdue`);
+    if (upcomingTasks.length) messages.push(`${upcomingTasks.length} task(s) are due within 7 days`);
+    if (dueMilestones.length) messages.push(`${dueMilestones.length} milestone(s) are due within 10 days`);
 
     const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const lastNotified = window.localStorage.getItem('projectNotificationsLastDate');
     if (messages.length > 0 && lastNotified !== todayKey) {
-      toast.custom((t) => (
+      toast.custom(() => (
         <div style={{
           padding: 14,
           background: C.white,
@@ -139,64 +111,20 @@ export default function Dashboard() {
           color: C.text,
           maxWidth: 360,
         }}>
-          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>แจ้งเตือนโปรเจกต์</div>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Project reminders</div>
           {messages.map((msg) => (
             <div key={msg} style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 4 }}>
               {msg}
             </div>
           ))}
-          <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>ตรวจสอบได้ในหน้า Portfolio Overview หรือ Milestones</div>
+          <div style={{ fontSize: 11, color: C.text2, marginTop: 6 }}>See the bell icon for details.</div>
         </div>
       ));
       window.localStorage.setItem('projectNotificationsLastDate', todayKey);
     }
     setNotificationsShown(true);
-  }, [tasks, milestones, notificationsShown]);
+  }, [mode, tasks, milestones, notificationsShown]);
 
-  React.useEffect(() => {
-    if (!selected?.id) {
-      if (!restoreDone) return;
-      fetchTasks();
-      return;
-    }
-    fetchTasks(selected.id);
-    fetchMembers(selected.id);
-    fetchIssues(selected.id);
-    fetchRisks(selected.id);
-    fetchCRs(selected.id);
-    fetchMilestones(selected.id);
-    fetchEfforts(selected.id);
-  }, [selected?.id, restoreDone, fetchTasks, fetchMembers, fetchIssues, fetchRisks, fetchCRs, fetchMilestones, fetchEfforts]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  React.useEffect(() => {
-    if (selected?.id) {
-      if (!restoreDone) setRestoreDone(true);
-      return;
-    }
-    const restoreId = restoreSelectedProjectIdRef.current;
-    if (!restoreId) {
-      if (!restoreDone) setRestoreDone(true);
-      return;
-    }
-    if (!projects.length) return;
-
-    const found = projects.find((p) => p.id === restoreId);
-    if (found) setSelected(found);
-    // Restore exactly once per mount.
-    restoreSelectedProjectIdRef.current = null;
-    setRestoreDone(true);
-  }, [projects, selected?.id, restoreDone]);
-
-  React.useEffect(() => {
-    window.sessionStorage.setItem(
-      DASHBOARD_VIEW_STATE_KEY,
-      JSON.stringify({
-        selectedProjectId: selected?.id || null,
-      })
-    );
-  }, [selected?.id]);
-
-  // Separate normal projects from Hypercare
   const statusOrder = masterCodes
     .filter((code) => code.codeType === 'project_status' && code.active)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -208,6 +136,7 @@ export default function Dashboard() {
   };
 
   const allProjects = [...projects].sort((a, b) => getStatusOrder(a.status) - getStatusOrder(b.status));
+  const openProject = (project: Project) => navigate(projectPath(project.id));
 
   const requestDelete = (project: Project) => {
     setDeletePassword('');
@@ -239,102 +168,44 @@ export default function Dashboard() {
     }
   };
 
-  return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', flexDirection: isMobile ? 'column' : 'row' }}>
-      {/* ── Main content panel ─────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflow: 'auto', background: C.bg }}>
-          <div style={{ width: '100%', minHeight: 0 }}>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '16px 14px 0' : '24px 32px 0' }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveProject(null);
-                    window.dispatchEvent(new CustomEvent('app-home'));
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '6px 12px',
-                    borderRadius: 10,
-                    border: `1px solid ${C.border}`,
-                    background: C.white,
-                    color: C.text,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: 12,
-                    fontFamily: 'Poppins, sans-serif',
-                  }}
-                ><Home size={14} /> Home</button>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {profile?.role === 'admin' && (
-                  <Btn variant="outline" onClick={async () => {
-                    setSendingAll(true);
-                    try {
-                      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-                      if (sessionError) throw sessionError;
-                      const accessToken = sessionData?.session?.access_token;
-                      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-                      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const addProjectButton = (
+    <Btn onClick={() => setShowAdd(true)} disabled={!canEditOverview} title={canEditOverview ? 'Add project' : 'Read-only access'} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
+      <Plus size={12} style={{ marginRight: 6 }} /> New Project
+    </Btn>
+  );
 
-                      const res = await fetch('/api/send-task-reminders', {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify({ force: true }),
-                      });
-                      const result = await res.json();
-                      if (!res.ok) throw new Error(result?.error || 'Send email failed');
-                      const results = Array.isArray(result.results) ? result.results : [];
-                      const sentCount = results.filter((r: any) => r.recipient && !r.error).length;
-                      const failedCount = results.filter((r: any) => r.recipient && r.error).length;
-                      if (failedCount) toast.error(`Failed to send to ${failedCount} recipient(s)`);
-                      toast.success(`Sent reminders to ${sentCount} recipient(s)`);
-                    } catch (error) {
-                      const msg = error instanceof Error ? error.message : 'Failed to send email reminders';
-                      toast.error(msg);
-                    }
-                    setSendingAll(false);
-                  }}
-                  small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }} disabled={sendingAll}>
-                    {sendingAll ? 'Sending…' : 'Send Email'}
-                  </Btn>
-                )}
-                {profile?.role === 'admin' && (
-                  <Btn variant="outline" onClick={() => setShowEmailLogs(true)} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Mail size={13} /> Email Logs
-                  </Btn>
-                )}
-                <Btn onClick={() => setShowAdd(true)} disabled={!canEditOverview} title={canEditOverview ? 'Add project' : 'Read-only access'} small style={{ padding: '8px 14px', height: 36, whiteSpace: 'nowrap' }}>
-                  <Plus size={12} style={{ marginRight: 6 }} /> Add Project
-                </Btn>
-              </div>
-            </div>
-            {!restoreDone ? (
-              <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', color: C.text2, fontSize: 13 }}>Loading dashboard…</div>
-            ) : selected ? (
-              <ProjectSummaryPanel project={selected} onOpen={() => setActiveProject(selected)} onEdit={() => setEditing(selected)} canEdit={permissions.getScreenAccess('summary') === 'full'} onViewMilestones={() => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab: 'ms' } })), 80); }} onOpenWithTab={(tab) => { setActiveProject(selected); setTimeout(() => window.dispatchEvent(new CustomEvent('app-set-tab', { detail: { tab } })), 80); }} isMobile={isMobile} />
-            ) : permissions.canViewPortfolioOverview ? (
-              <WelcomeSummary projects={allProjects} tasks={tasks} onOpen={setActiveProject} onEdit={setEditing} onDelete={requestDelete} canEdit={canEditOverview} isMobile={isMobile} />
-            ) : (
-              <div style={{ padding: isMobile ? '18px 14px' : '28px 32px' }}>
-                <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: '0 0 16px' }}>My Projects</h2>
-                <div style={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: C.white }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
-                    <thead><tr>{['Project ID', 'Project Name', 'Customer', 'Status'].map((label) => <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 11, color: C.text2 }}>{label}</th>)}</tr></thead>
-                    <tbody>{allProjects.map((project) => <tr key={project.id} onClick={() => setActiveProject(project)} style={{ cursor: 'pointer', borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>{project.code || project.id}</td>
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.name}</td>
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{project.client || '—'}</td>
-                      <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.status || '—'}</td>
-                    </tr>)}</tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+  return (
+    <div style={{ height: '100%', overflow: 'auto', background: C.bg }}>
+      {permissions.canViewPortfolioOverview ? (
+        <WelcomeSummary
+          projects={allProjects}
+          tasks={tasks}
+          onOpen={openProject}
+          onEdit={setEditing}
+          onDelete={requestDelete}
+          canEdit={canEditOverview}
+          isMobile={isMobile}
+          title={mode === 'dashboard' ? 'Dashboard' : 'Projects'}
+          subtitle={mode === 'dashboard' ? 'Portfolio overview of all projects you can access.' : 'Every project you can access. Open one to see its workspace.'}
+          showStatusCards={mode === 'dashboard'}
+          actions={canEditOverview ? addProjectButton : undefined}
+        />
+      ) : (
+        <div style={{ padding: isMobile ? '18px 14px' : '28px 32px' }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: '0 0 16px' }}>My Projects</h2>
+          <div style={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: 8, background: C.white }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+              <thead><tr>{['Project ID', 'Project Name', 'Customer', 'Status'].map((label) => <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 11, color: C.text2 }}>{label}</th>)}</tr></thead>
+              <tbody>{allProjects.map((project) => <tr key={project.id} onClick={() => openProject(project)} style={{ cursor: 'pointer', borderBottom: `1px solid ${C.border}` }}>
+                <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>{project.code || project.id}</td>
+                <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.name}</td>
+                <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{project.client || '—'}</td>
+                <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.status || '—'}</td>
+              </tr>)}</tbody>
+            </table>
           </div>
-      </div>
+        </div>
+      )}
 
       {showAdd  && <ProjectModal onClose={() => setShowAdd(false)} />}
       {editing  && <ProjectModal project={editing} onClose={() => setEditing(null)} />}
@@ -366,13 +237,12 @@ export default function Dashboard() {
           </div>
         </Modal>
       )}
-      {showEmailLogs && <EmailLogsModal onClose={() => setShowEmailLogs(false)} />}
     </div>
   );
 }
 
 // ── Welcome / global summary ──────────────────────────────────────────────────
-function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, isMobile }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; onEdit: (p: Project) => void; onDelete: (p: Project) => void; canEdit: boolean; isMobile: boolean }) {
+function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, isMobile, title, subtitle, showStatusCards, actions }: { projects: Project[]; tasks: any[]; onOpen: (p: Project) => void; onEdit: (p: Project) => void; onDelete: (p: Project) => void; canEdit: boolean; isMobile: boolean; title: string; subtitle: string; showStatusCards: boolean; actions?: React.ReactNode }) {
   const { masterCodes } = useStore();
   const [showHC, setShowHC] = useState(false);
   const [projectView, setProjectView] = useState<'card' | 'table'>('table');
@@ -474,10 +344,15 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
 
   return (
     <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', width: '100%' }}>
-      <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, marginBottom: 6 }}>Portfolio Overview</h2>
-      <p style={{ color: C.text2, fontSize: 13, marginBottom: 24 }}>Select a project from the list below to view its executive summary.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, margin: '0 0 6px' }}>{title}</h2>
+          <p style={{ color: C.text2, fontSize: 13, margin: 0 }}>{subtitle}</p>
+        </div>
+        {actions}
+      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 14, marginBottom: 28 }}>
+      {showStatusCards && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 14, marginBottom: 28 }}>
         {statusCards.map((s, index) => {
           const accent = STATUS_ACCENT_PALETTE[index] || `hsl(${((index - STATUS_ACCENT_PALETTE.length) * 360) / Math.max(statusCards.length - STATUS_ACCENT_PALETTE.length, 1)} 62% 38%)`;
           return (
@@ -487,7 +362,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
               <div style={{ fontSize: 11, color: C.text2 }}>{s.label}</div></div>
           </Card>
         );})}
-      </div>
+      </div>}
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -628,476 +503,6 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-// ── Per-project summary panel ─────────────────────────────────────────────────
-function ProjectSummaryPanel({ project, onOpen, onEdit, canEdit, onViewMilestones, onOpenWithTab, isMobile }: { project: Project; onOpen: () => void; onEdit: () => void; canEdit: boolean; onViewMilestones: () => void; onOpenWithTab: (tab: string) => void; isMobile: boolean }) {
-  const { tasks, milestones, efforts, changeRequests, issues, risks, masterCodes } = useStore();
-  const permissions = useRolePermissions();
-  const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
-  const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
-
-  const pt = tasks.filter((t) => t.projectId === project.id);
-  const ms = milestones.filter((m) => m.projectId === project.id);
-  const ef = efforts.filter((e) => e.projectId === project.id);
-  const crs = changeRequests.filter((c) => c.projectId === project.id);
-  const iss = issues.filter((i) => i.projectId === project.id);
-  const rks = risks.filter((r) => r.projectId === project.id);
-
-  const roots = pt.filter((t) => !t.parentId);
-  const rootTasksSorted = [...roots].sort((a, b) => compareWbs(a.wbs, b.wbs));
-  const prog = roots.length ? Math.round(roots.reduce((sum, t) => sum + t.percentComplete, 0) / roots.length) : 0;
-
-  const tBudMD = ef.reduce((sum, e) => sum + (e.budgetManday || 0), 0);
-  const tUsedMD = ef.reduce((sum, e) => sum + Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0), 0);
-
-  const openIssues = iss.filter((i) => i.status === 'Open' || i.status === 'In Progress').length;
-  const openRisks = rks.filter((r) => r.status === 'Monitoring' || r.status === 'Mitigating').length;
-  const pendingCRs = crs.filter((c) => c.status === 'Submitted' || c.status === 'Under Review');
-  const openCRs = pendingCRs.length;
-
-  const currentDate = new Date();
-  const todayIso = currentDate.toISOString().slice(0, 10);
-
-  const allMilestonesSorted = [...ms].sort((a, b) => Number(parseISO(a.dueDate || '')) - Number(parseISO(b.dueDate || '')));
-  const phaseBudgetByPhase = allMilestonesSorted.reduce((acc, m) => {
-    const phase = String(m.phase || '').trim() || 'Unspecified';
-    if (Number(m.phaseAmount || 0) > 0 && !acc[phase]) acc[phase] = Number(m.phaseAmount || 0);
-    return acc;
-  }, {} as Record<string, number>);
-  const groupedMilestonesByPhase = allMilestonesSorted.reduce((acc, m) => {
-    const phase = String(m.phase || '').trim() || 'Unspecified';
-    if (!acc[phase]) acc[phase] = [];
-    acc[phase].push(m);
-    return acc;
-  }, {} as Record<string, typeof allMilestonesSorted>);
-  const milestonePhases = Object.keys(groupedMilestonesByPhase);
-
-  const todayBaseline = computeBaselineProgress(pt, [todayIso]);
-  const plannedPercent = todayBaseline[0]?.baselinePercent ?? 0;
-  const scheduleGap = plannedPercent - prog;
-  const scheduleStatus = !todayBaseline.length ? 'Plan N/A'
-    : scheduleGap > 20 ? 'Stoper'
-    : scheduleGap > 3 ? 'Delay'
-    : 'On Track';
-  const scheduleColor = scheduleStatus === 'Stoper' ? C.red : scheduleStatus === 'Delay' ? C.amber : C.green;
-
-  const stageTasks = rootTasksSorted.map((t) => ({
-    id: t.id,
-    name: `${t.wbs || '-'} ${t.taskName}`.trim(),
-    progress: Math.round(Number(t.percentComplete || 0)),
-  }));
-
-  const overviewText = todayBaseline.length
-    ? `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้า ${prog}% และอยู่ในระดับ ${scheduleStatus.toLowerCase()} เมื่อเทียบกับแผนงาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`
-    : `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้าปัจจุบัน ${prog}% และมี ${openIssues} issue, ${openRisks} risk, ${openCRs} CR ที่ต้องติดตาม.`;
-
-  return (
-    <div style={{ padding: isMobile ? '16px 14px' : '24px 28px', width: '100%' }}>
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>Executive Project Dashboard Summary</div>
-          <div style={{ fontSize: 12, color: C.text2 }}>HR Solution Implementation · Steering Committee View</div>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          <Badge bg={scheduleStatus === 'Stoper' ? C.redBg : scheduleStatus === 'Delay' ? C.amberBg : C.greenBg} color={scheduleColor}>Project Health : {scheduleStatus}</Badge>
-          <span style={{ fontSize: 11, color: C.text2, padding: '8px 12px', borderRadius: 999, background: C.bg }}>Last Updated: {fmtDate(currentDate.toISOString().slice(0, 10))}</span>
-          <Btn small onClick={onOpen} style={{ padding: '8px 10px', minWidth: 0, width: 'auto' }}><Eye size={14} />Open Project</Btn>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 18 }}>
-        <Card style={{ padding: '14px 16px', minHeight: 120 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: 11, color: C.text2, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span>Project: {(project.code || project.id || '-').replace(/\s+/g, ' ').trim()}</span>
-                <span>Client: {project.client || '-'}</span>
-                <span>{fmtDate(project.startDate)} - {fmtDate(project.endDate)}</span>
-                {canEdit && <button
-                  type="button"
-                  onClick={onEdit}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 0, display: 'inline-flex', alignItems: 'center' }}
-                  title="Edit Project"
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.primary; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = C.text3; }}
-                >
-                  <Pencil size={11} />
-                </button>}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Executive Summary</div>
-              <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.45, marginTop: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{overviewText}</div>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-
-
-  {/* Row 1: Progress by Main Task + Effort Summary (50/50) */}
-  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
-  <Card style={{ padding: '16px 18px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Progress by Main Task</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Show main task completion sorted by WBS</div>
-          </div>
-          <button type="button" onClick={onOpen} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
-        </div>
-        <div style={{ display: 'grid', gap: 12 }}>
-          {stageTasks.map((stage) => (
-            <div key={stage.id} style={{ display: 'grid', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2 }}>
-                <span>{stage.name}</span>
-                <span style={{ fontWeight: 700, color: C.text }}>{stage.progress}%</span>
-              </div>
-              <ProgressBar value={stage.progress} height={8} color={stage.progress >= 100 ? C.green : C.primary} />
-            </div>
-          ))}
-          {!stageTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No main tasks found.</div>}
-        </div>
-      </Card>
-
-      <Card style={{ padding: '16px 18px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Budget vs. used mandays by module</div>
-          </div>
-          <button type="button" onClick={() => onOpenWithTab('effort')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Effort</button>
-        </div>
-        {ef.length === 0 ? (
-          <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No effort data found.</div>
-        ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-              {['Module / Task', 'Budget MD', 'Used MD', 'Remain MD'].map((h) => (
-                <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
-              ))}
-            </div>
-            {ef.map((e) => {
-              const usedMD = Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0);
-              const remainMD = (e.budgetManday || 0) - usedMD;
-              return (
-                <div key={e.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={e.module}>{e.module || '—'}</div>
-                  <div style={{ fontSize: 12, color: C.text2, fontWeight: 600 }}>{Number(e.budgetManday || 0).toFixed(1)}</div>
-                  <div style={{ fontSize: 12, color: usedMD > (e.budgetManday || 0) ? C.red : C.primary, fontWeight: 600 }}>{usedMD.toFixed(1)}</div>
-                  <div style={{ fontSize: 12, color: remainMD < 0 ? C.red : C.green, fontWeight: 600 }}>{remainMD.toFixed(1)}</div>
-                </div>
-              );
-            })}
-            <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 72px 72px', gap: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: C.text }}>TOTAL</div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: C.text }}>{ef.reduce((s, e) => s + (e.budgetManday || 0), 0).toFixed(1)}</div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: C.primary }}>{tUsedMD.toFixed(1)}</div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: tUsedMD > tBudMD ? C.red : C.green }}>{(tBudMD - tUsedMD).toFixed(1)}</div>
-            </div>
-          </>
-        )}
-      </Card>
-      </div>
-
-      {/* Row 2: Milestones */}
-      <Card style={{ padding: '16px 18px', marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Milestones</div>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All project milestones sorted by due date</div>
-          </div>
-          <button type="button" onClick={onViewMilestones} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Milestones Tab</button>
-        </div>
-        <div>
-          {milestonePhases.map((phase) => {
-            const phaseMilestones = groupedMilestonesByPhase[phase] || [];
-            const phaseTotal = phaseMilestones.reduce((sum, m) => sum + Number(m.amount || 0), 0);
-            return (
-              <div key={phase} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{phase}</span>
-                  <div style={{ height: 1, flex: 1, background: C.border }} />
-                  <span style={{ fontSize: 11, color: C.text2 }}>Phase Budget ฿{fmtMoney(permissions.getMaskedAmount(phaseBudgetByPhase[phase] || 0))}</span>
-                  <span style={{ fontSize: 11, color: C.text2 }}>Milestone Total ฿{fmtMoney(permissions.getMaskedAmount(phaseTotal))}</span>
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 11 }}>
-                    <colgroup>
-                      <col style={{ width: '26%' }} />
-                      <col style={{ width: '10%' }} />
-                      <col style={{ width: '16%' }} />
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '22%' }} />
-                    </colgroup>
-                    <thead>
-                      <tr style={{ background: C.bg }}>
-                        {['Milestone', '% Value', 'Amount', 'Due Date', 'Billing Date', 'Status'].map((h) => (
-                          <th key={h} style={{ padding: '7px 8px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {phaseMilestones.map((m, i) => {
-                        const ss = MILESTONE_STATUS[String(m.status || '').toLowerCase()] ?? MILESTONE_STATUS.pending;
-                        return (
-                          <tr key={m.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : C.bg }}>
-                            <td style={{ padding: '7px 8px', color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</td>
-                            <td style={{ padding: '7px 8px', color: C.primary, fontWeight: 700 }}>{Number(m.percent || 0)}%</td>
-                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: C.text, fontWeight: 600 }}>฿{fmtMoney(permissions.getMaskedAmount(m.amount || 0))}</td>
-                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: C.text2 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
-                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: C.text2 }}>{m.billingDate ? fmtDate(m.billingDate) : '—'}</td>
-                            <td style={{ padding: '7px 8px', whiteSpace: 'nowrap' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: ss.bg, color: ss.color, fontSize: 10, fontWeight: 700 }}>{ss.label}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
-          {!allMilestonesSorted.length && (
-            <div style={{ padding: '20px 12px', color: C.text3, textAlign: 'center', fontSize: 12 }}>No milestones found.</div>
-          )}
-        </div>
-      </Card>
-
-    </div>
-  );
-}
-
-// ── Email Logs Modal ──────────────────────────────────────────────────────────
-type EmailLog = {
-  id: string;
-  project_id: string | null;
-  project_name: string | null;
-  project_code: string | null;
-  type: 'auto' | 'manual';
-  scheduled_time: string | null;
-  sent_at: string | null;
-  status: 'sent' | 'skipped' | 'failed';
-  recipient: string | null;
-  tasks_count: number;
-  error_message: string | null;
-  created_at: string;
-};
-
-function EmailLogsModal({ onClose }: { onClose: () => void }) {
-  const [logs, setLogs] = React.useState<EmailLog[]>([]);
-  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [filterProject, setFilterProject] = React.useState('');
-  const [deleting, setDeleting] = React.useState(false);
-
-  React.useEffect(() => {
-    const loadLogs = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data, error } = await supabase
-          .from('email_reminder_logs')
-          .select('id,project_id,project_name,project_code,type,scheduled_time,sent_at,status,recipient,tasks_count,error_message,created_at')
-          .order('created_at', { ascending: false })
-          .limit(200);
-        if (error) throw new Error(error.message);
-        setLogs((data || []) as EmailLog[]);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load');
-      }
-      setLoading(false);
-    };
-    loadLogs();
-  }, []);
-
-  const reloadLogs = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error } = await supabase
-        .from('email_reminder_logs')
-        .select('id,project_id,project_name,project_code,type,scheduled_time,sent_at,status,recipient,tasks_count,error_message,created_at')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      if (error) throw new Error(error.message);
-      setLogs((data || []) as EmailLog[]);
-      setSelectedIds([]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load');
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!selectedIds.length) return;
-    const confirmation = await Swal.fire({
-      title: 'Delete selected email logs?',
-      text: `${selectedIds.length} log(s) will be permanently deleted.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Delete logs',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: C.red,
-      cancelButtonColor: C.text3,
-      reverseButtons: true,
-      focusCancel: true,
-    });
-    if (!confirmation.isConfirmed) return;
-    setDeleting(true);
-    try {
-      const { error } = await supabase.from('email_reminder_logs').delete().in('id', selectedIds);
-      if (error) throw new Error(error.message);
-      await reloadLogs();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to delete logs');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const filteredLogs = filterProject
-    ? logs.filter((l) =>
-        (l.project_name || '').toLowerCase().includes(filterProject.toLowerCase()) ||
-        (l.project_code || '').toLowerCase().includes(filterProject.toLowerCase())
-      )
-    : logs;
-
-  const statusColor = (s: string) => {
-    if (s === 'sent') return C.green;
-    if (s === 'failed') return C.red;
-    return C.text3;
-  };
-  const statusBg = (s: string) => {
-    if (s === 'sent') return C.greenBg;
-    if (s === 'failed') return '#FEE2E2';
-    return C.bg2;
-  };
-
-  const fmtTime = (iso: string | null) => {
-    if (!iso) return '-';
-    try {
-      return new Date(iso).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return iso;
-    }
-  };
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 960, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
-        {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Mail size={16} color={C.primary} />
-            <span style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: 'Poppins, sans-serif' }}>Email Send Logs</span>
-            <span style={{ fontSize: 12, color: C.text2 }}>({filteredLogs.length} records)</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Filter by project..."
-              value={filterProject}
-              onChange={(e) => setFilterProject(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, color: C.text, outline: 'none', width: 180 }}
-            />
-            <button
-              type="button"
-              disabled={!selectedIds.length || deleting}
-              onClick={handleDeleteSelected}
-              style={{
-                padding: '8px 12px',
-                borderRadius: 8,
-                border: `1px solid ${selectedIds.length ? C.red : C.border}`,
-                background: selectedIds.length ? C.redBg : C.bg2,
-                color: selectedIds.length ? C.red : C.text2,
-                cursor: selectedIds.length ? 'pointer' : 'not-allowed',
-                fontSize: 12,
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {deleting ? 'Deleting…' : `Delete ${selectedIds.length ? `(${selectedIds.length})` : ''}`}
-            </button>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div style={{ overflow: 'auto', flex: 1 }}>
-          {loading && (
-            <div style={{ padding: 40, textAlign: 'center', color: C.text2, fontSize: 13 }}>Loading…</div>
-          )}
-          {!loading && error && (
-            <div style={{ padding: 40, textAlign: 'center', color: C.red, fontSize: 13 }}>{error}</div>
-          )}
-          {!loading && !error && filteredLogs.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: C.text2, fontSize: 13 }}>No logs found.</div>
-          )}
-          {!loading && !error && filteredLogs.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
-                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>
-                <input
-                  type="checkbox"
-                  checked={filteredLogs.length > 0 && selectedIds.length === filteredLogs.length}
-                  onChange={(e) => {
-                    if (e.currentTarget.checked) setSelectedIds(filteredLogs.map((log) => log.id));
-                    else setSelectedIds([]);
-                  }}
-                />
-              </th>
-              {['Project ID', 'Project Name', 'Type', 'Scheduled', 'Sent At', 'Recipient', 'Tasks', 'Status', 'Error'].map((h) => (
-                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLogs.map((log) => (
-                  <tr key={log.id} style={{ borderBottom: `1px solid ${C.border}` }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#F8FAFF'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}>
-                    <td style={{ padding: '10px 12px' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(log.id)}
-                        onChange={(e) => {
-                          if (e.currentTarget.checked) {
-                            setSelectedIds((prev) => [...prev, log.id]);
-                          } else {
-                            setSelectedIds((prev) => prev.filter((id) => id !== log.id));
-                          }
-                        }}
-                      />
-                    </td>
-                    <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif', whiteSpace: 'nowrap' }}>{log.project_code || '-'}</td>
-                    <td style={{ padding: '9px 12px', color: C.text, maxWidth: 200 }}>{log.project_name || '-'}</td>
-                    <td style={{ padding: '9px 12px' }}>
-                      <span style={{ background: log.type === 'manual' ? C.primaryBg : C.bg2, color: log.type === 'manual' ? C.primary : C.text2, borderRadius: 6, padding: '2px 7px', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>
-                        {log.type === 'manual' ? 'Manual' : 'Auto'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{log.scheduled_time || '-'}</td>
-                    <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{fmtTime(log.sent_at)}</td>
-                    <td style={{ padding: '9px 12px', color: C.text, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.recipient || '-'}</td>
-                    <td style={{ padding: '9px 12px', color: C.text, textAlign: 'center' }}>{log.tasks_count}</td>
-                    <td style={{ padding: '9px 12px' }}>
-                      <span style={{ background: statusBg(log.status), color: statusColor(log.status), borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
-                        {log.status.charAt(0).toUpperCase() + log.status.slice(1)}
-                      </span>
-                    </td>
-                    <td style={{ padding: '9px 12px', color: C.red, fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.error_message || ''}>{log.error_message || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
