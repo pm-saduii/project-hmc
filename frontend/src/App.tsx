@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useStore } from './store';
 import { useAuth } from './contexts/AuthContext';
@@ -8,17 +8,25 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell      from './components/Layout/AppShell';
 import Dashboard     from './components/Dashboard/Dashboard';
 import AuthPage      from './components/Auth/AuthPage';
-import TimesheetModal from './components/Timesheet/TimesheetModal';
-import ManageUsersModal from './components/Users/ManageUsersModal';
-import SystemNotesModal from './components/SystemNotes/SystemNotesModal';
-import ProjectPage   from './pages/ProjectPage';
-import EmailLogsPage from './pages/EmailLogsPage';
-import MyTasksPage from './pages/MyTasksPage';
-import { AdminOnly, PageBody, SystemSettingsPage } from './pages/AdminPages';
+import { AdminOnly, PageBody } from './pages/AdminPages';
 import { NotFoundPage } from './pages/StatusPages';
 import { C } from './components/Common';
 
 const noop = () => undefined;
+
+// Everything except the dashboard is loaded on first visit, so the first screen opens faster.
+const ProjectPage = lazy(() => import('./pages/ProjectPage'));
+const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
+const EmailLogsPage = lazy(() => import('./pages/EmailLogsPage'));
+const SystemSettingsPage = lazy(() => import('./pages/SystemSettingsPage'));
+const TimesheetModal = lazy(() => import('./components/Timesheet/TimesheetModal'));
+const ManageUsersModal = lazy(() => import('./components/Users/ManageUsersModal'));
+const SystemNotesModal = lazy(() => import('./components/SystemNotes/SystemNotesModal'));
+
+const pageFallback = (
+  <div style={{ padding: 32, color: C.text2, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}>Loading…</div>
+);
+const page = (node: React.ReactNode) => <Suspense fallback={pageFallback}>{node}</Suspense>;
 
 export default function App() {
   const { user, loading: authLoading, configured } = useAuth();
@@ -99,16 +107,16 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={portfolio('dashboard')} />
           <Route path="projects" element={portfolio('projects')} />
-          <Route path="projects/:projectId/*" element={<ProjectPage />} />
-          <Route path="my-tasks" element={<MyTasksPage />} />
-          <Route path="timesheet" element={<PageBody><TimesheetModal inline onClose={noop} /></PageBody>} />
+          <Route path="projects/:projectId/*" element={page(<ProjectPage />)} />
+          <Route path="my-tasks" element={page(<MyTasksPage />)} />
+          <Route path="timesheet" element={page(<PageBody><TimesheetModal inline onClose={noop} /></PageBody>)} />
           <Route path="admin" element={<AdminOnly />}>
             <Route index element={<Navigate to="/admin/users" replace />} />
-            <Route path="users" element={<PageBody><ManageUsersModal inline onClose={noop} /></PageBody>} />
-            <Route path="settings" element={<SystemSettingsPage section="lookup" />} />
-            <Route path="settings/templates" element={<SystemSettingsPage section="templates" />} />
-            <Route path="email-logs" element={<div style={{ height: '100%', overflowY: 'auto' }}><EmailLogsPage /></div>} />
-            <Route path="system-notes" element={<PageBody><SystemNotesModal inline onClose={noop} /></PageBody>} />
+            <Route path="users" element={page(<PageBody><ManageUsersModal inline onClose={noop} /></PageBody>)} />
+            <Route path="settings" element={page(<SystemSettingsPage section="lookup" />)} />
+            <Route path="settings/templates" element={page(<SystemSettingsPage section="templates" />)} />
+            <Route path="email-logs" element={page(<div style={{ height: '100%', overflowY: 'auto' }}><EmailLogsPage /></div>)} />
+            <Route path="system-notes" element={page(<PageBody><SystemNotesModal inline onClose={noop} /></PageBody>)} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>

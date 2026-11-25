@@ -2,24 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Copy, Download, Home, Plus, Save, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar, Btn, Modal, FormRow, Select, Input } from '../Common';
 import { fmtDate, computeBaselineProgress } from '../../utils';
 import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Project } from '../../types';
-import TasksTab          from '../Table/TasksTab';
-import ProjectSummaryTab from './ProjectSummaryTab';
-import MembersTab        from '../Members/MembersTab';
-import MilestonesTab     from '../Milestones/MilestonesTab';
-import EffortTab         from '../Effort/EffortTab';
-import ChangeRequestTab  from '../ChangeRequest/ChangeRequestTab';
-import IssuesTab         from '../Issues/IssuesTab';
-import RiskRegisterTab   from '../RiskRegister/RiskRegisterTab';
-import ActivitiesTab     from '../Activities/ActivitiesTab';
-import ProjectEnvironmentTab from './ProjectEnvironmentTab';
-import ExecutiveOnePage  from './ExecutiveOnePage';
-import LessonsLearnedTab from './LessonsLearnedTab';
 import ProjectModal from './ProjectModal';
 import TaskTemplateModal from '../Setup/TaskTemplateModal';
 import Breadcrumb from '../Layout/Breadcrumb';
@@ -37,6 +23,20 @@ import {
   type ProjectChecklistStageId,
   type ProjectChecklistTopic,
 } from '../../utils/projectChecklist';
+
+// Each screen (and the PDF / Excel libraries it uses) is downloaded the first time it is opened.
+const TasksTab = React.lazy(() => import('../Table/TasksTab'));
+const ProjectSummaryTab = React.lazy(() => import('./ProjectSummaryTab'));
+const MembersTab = React.lazy(() => import('../Members/MembersTab'));
+const MilestonesTab = React.lazy(() => import('../Milestones/MilestonesTab'));
+const EffortTab = React.lazy(() => import('../Effort/EffortTab'));
+const ChangeRequestTab = React.lazy(() => import('../ChangeRequest/ChangeRequestTab'));
+const IssuesTab = React.lazy(() => import('../Issues/IssuesTab'));
+const RiskRegisterTab = React.lazy(() => import('../RiskRegister/RiskRegisterTab'));
+const ActivitiesTab = React.lazy(() => import('../Activities/ActivitiesTab'));
+const ProjectEnvironmentTab = React.lazy(() => import('./ProjectEnvironmentTab'));
+const ExecutiveOnePage = React.lazy(() => import('./ExecutiveOnePage'));
+const LessonsLearnedTab = React.lazy(() => import('./LessonsLearnedTab'));
 
 interface Props { project: Project; }
 type CopyScope = 'tasks' | 'members' | 'ms' | 'effort' | 'risks';
@@ -196,6 +196,8 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
       });
     }
 
+    // Loaded on demand so opening a project does not download the PDF library.
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const pdfFont = await ensureThaiFont(doc); // Thai-capable (Sarabun)
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -840,7 +842,7 @@ export default function ProjectDetail({ project }: Props) {
           <div style={{ display: 'grid', placeItems: 'center', height: '100%', padding: 24, color: C.text2, fontSize: 13, textAlign: 'center' }}>
             No project screens are enabled for your account. Contact an administrator.
           </div>
-        ) : <>
+        ) : <React.Suspense fallback={<div style={{ padding: 24, color: C.text2, fontSize: 13 }}>Loading…</div>}>
         {activeTab === 'tasks'   && <div style={{ height: '100%' }}><TasksTab         projectId={project.id} extraActions={<>
           {copyButton('tasks')}
           <Btn small variant="ghost" onClick={() => setReplaceTasksOpen(true)} title="Replace all tasks from another project or a template">Replace tasks</Btn>
@@ -867,7 +869,7 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
         {activeTab === 'onepage' && <div style={{ height: '100%', overflowY: 'auto' }}><ExecutiveOnePage project={project} /></div>}
         {activeTab === 'settings' && <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}><ProjectModal key={project.id} project={project} inline onClose={() => undefined} /></div>}
-        </>}
+        </React.Suspense>}
       </div>
 
       {replaceTasksOpen && <TaskTemplateModal only="copy" onClose={() => setReplaceTasksOpen(false)} />}
