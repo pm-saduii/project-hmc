@@ -2,13 +2,14 @@ import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { parseISO, isValid } from 'date-fns';
 import {
-  Bell, ChevronDown, Clock3, FolderKanban, LayoutDashboard, LogOut, Mail, Menu, Moon, PanelLeftClose,
-  PanelLeftOpen, Settings, StickyNote, Sun, Users, X,
+  Bell, ChevronDown, Clock3, FolderKanban, LayoutDashboard, ListChecks, LogOut, Mail, Menu, Moon, PanelLeftClose,
+  PanelLeftOpen, Search, Settings, StickyNote, Sun, Users, X,
 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
+import CommandPalette from './CommandPalette';
 
 const F = 'Poppins, sans-serif';
 const SIDEBAR_KEY = 'hmc-sidebar-collapsed';
@@ -18,6 +19,7 @@ type NavItem = { to: string; label: string; icon: React.ReactNode; end?: boolean
 const WORKSPACE_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
   { to: '/projects', label: 'Projects', icon: <FolderKanban size={18} /> },
+  { to: '/my-tasks', label: 'My Tasks', icon: <ListChecks size={18} /> },
   { to: '/timesheet', label: 'Timesheet', icon: <Clock3 size={18} /> },
 ];
 
@@ -52,14 +54,32 @@ export default function AppShell() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = React.useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [searchOpen, setSearchOpen] = React.useState(false);
   const isAdmin = profile?.role === 'admin';
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+  const searchPages = React.useMemo(
+    () => [...WORKSPACE_ITEMS, ...(isAdmin ? ADMIN_ITEMS : [])].map(({ to, label }) => ({ to, label })),
+    [isAdmin],
+  );
+
+  // Ctrl+K / ⌘K opens search from anywhere (also while typing in a field).
+  React.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen((value) => !value);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   React.useEffect(() => {
     try { window.localStorage.setItem(SIDEBAR_KEY, String(collapsed)); } catch { /* storage unavailable */ }
   }, [collapsed]);
 
-  // Close the phone drawer after navigating.
-  React.useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
+  // Close the phone drawer and search after navigating.
+  React.useEffect(() => { setDrawerOpen(false); setSearchOpen(false); }, [location.pathname]);
 
   const surface = isDark ? '#1E293B' : C.white;
   const border = isDark ? '#334155' : C.border;
@@ -131,6 +151,23 @@ export default function AppShell() {
         </button>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isMobile ? (
+            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search" title="Search" style={iconButton(isDark)}>
+              <Search size={17} />
+            </button>
+          ) : (
+            <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search projects and pages" title="Search"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, height: 34, width: 240, padding: '0 10px', borderRadius: 10, cursor: 'pointer', fontFamily: F,
+                background: isDark ? '#334155' : '#F8FAFC', border: `1px solid ${isDark ? '#475569' : '#E2E8F0'}`, color: textMuted, fontSize: 12,
+              }}>
+              <Search size={15} />
+              <span>Search…</span>
+              <kbd style={{ marginLeft: 'auto', fontFamily: F, fontSize: 10, padding: '1px 6px', borderRadius: 5, border: `1px solid ${isDark ? '#475569' : C.border}`, color: textMuted }}>
+                {isMac ? '⌘K' : 'Ctrl K'}
+              </kbd>
+            </button>
+          )}
           <NotificationBell isDark={isDark} isMobile={isMobile} />
           <button type="button" onClick={toggle} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title={isDark ? 'Light mode' : 'Dark mode'} style={iconButton(isDark)}>
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
@@ -168,6 +205,33 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {/* ── Phone bottom bar ──────────────────────────────────────────── */}
+      {isMobile && (
+        <nav aria-label="Quick menu" style={{
+          display: 'flex', flexShrink: 0, background: surface, borderTop: `1px solid ${border}`,
+          paddingBottom: 'env(safe-area-inset-bottom)', fontFamily: F,
+        }}>
+          {WORKSPACE_ITEMS.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end}
+              style={({ isActive }) => ({
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56,
+                textDecoration: 'none', fontSize: 10, fontWeight: isActive ? 600 : 500,
+                color: isActive ? (isDark ? '#C7D2FE' : C.primary) : textMuted,
+              })}>
+              <span style={{ display: 'inline-flex' }} aria-hidden="true">{item.icon}</span>
+              {item.label}
+            </NavLink>
+          ))}
+          <button type="button" onClick={() => setDrawerOpen(true)} aria-label="More menu"
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56, border: 0, background: 'transparent', cursor: 'pointer', fontSize: 10, fontWeight: 500, color: textMuted, fontFamily: F }}>
+            <Menu size={18} aria-hidden="true" />
+            More
+          </button>
+        </nav>
+      )}
+
+      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} pages={searchPages} />
 
       {/* ── Phone drawer ──────────────────────────────────────────────── */}
       {isMobile && drawerOpen && (

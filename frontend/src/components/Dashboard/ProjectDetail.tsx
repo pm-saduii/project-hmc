@@ -22,6 +22,7 @@ import ExecutiveOnePage  from './ExecutiveOnePage';
 import LessonsLearnedTab from './LessonsLearnedTab';
 import ProjectModal from './ProjectModal';
 import TaskTemplateModal from '../Setup/TaskTemplateModal';
+import Breadcrumb from '../Layout/Breadcrumb';
 import { PROJECT_GROUPS } from '../../utils/projectRoutes';
 import { useStore }      from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
@@ -766,6 +767,14 @@ export default function ProjectDetail({ project }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
         <div style={{ padding: isMobile ? '12px 16px 0' : '14px 24px 0' }}>
+          <div style={{ marginBottom: 10 }}>
+            <Breadcrumb items={[
+              { label: 'Projects', to: '/projects' },
+              { label: project.code || project.name, to: visibleGroups[0] ? pathFor(visibleGroups[0].key, visibleGroups[0].subs[0].key) : undefined },
+              ...(shownGroup ? [{ label: shownGroup.label, to: pathFor(shownGroup.key, shownGroup.subs[0].key) }] : []),
+              ...(shownSub ? [{ label: shownSub.label }] : []),
+            ]} />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
             <div style={{ width: 10, height: 42, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>

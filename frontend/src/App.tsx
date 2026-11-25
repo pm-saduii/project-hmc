@@ -13,6 +13,7 @@ import ManageUsersModal from './components/Users/ManageUsersModal';
 import SystemNotesModal from './components/SystemNotes/SystemNotesModal';
 import ProjectPage   from './pages/ProjectPage';
 import EmailLogsPage from './pages/EmailLogsPage';
+import MyTasksPage from './pages/MyTasksPage';
 import { AdminOnly, PageBody, SystemSettingsPage } from './pages/AdminPages';
 import { NotFoundPage } from './pages/StatusPages';
 import { C } from './components/Common';
@@ -99,6 +100,7 @@ export default function App() {
           <Route index element={portfolio('dashboard')} />
           <Route path="projects" element={portfolio('projects')} />
           <Route path="projects/:projectId/*" element={<ProjectPage />} />
+          <Route path="my-tasks" element={<MyTasksPage />} />
           <Route path="timesheet" element={<PageBody><TimesheetModal inline onClose={noop} /></PageBody>} />
           <Route path="admin" element={<AdminOnly />}>
             <Route index element={<Navigate to="/admin/users" replace />} />
