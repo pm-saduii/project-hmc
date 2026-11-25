@@ -260,3 +260,25 @@ export interface Profile {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Monthly executive report (One Page) ──────────────────────────────────────
+export type ReportStatus = 'on_track' | 'at_risk' | 'off_track';
+
+export interface MonthlyReport {
+  id: string;
+  projectId: string;
+  period: string;              // 'YYYY-MM'
+  state: 'draft' | 'published';
+  summary: string;
+  decisions: string;
+  overallStatus: ReportStatus | null;
+  scheduleStatus: ReportStatus | null;
+  budgetStatus: ReportStatus | null;
+  scopeStatus: ReportStatus | null;
+  paymentStatus: ReportStatus | null;
+  /** Frozen report numbers and lists, set when published (MonthlyReportData). */
+  snapshot: unknown | null;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  updatedAt: string;
+}

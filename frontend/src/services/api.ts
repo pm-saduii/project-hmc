@@ -146,7 +146,7 @@ import { compareWbs } from '../utils';
 
 import { supabase } from './supabase';
 import { parseISO, isValid } from 'date-fns';
-import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note, TimesheetEntry, ProjectLessonLearned } from '../types';
+import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, TaskTemplate, TaskTemplateItem, Activity, Note, TimesheetEntry, ProjectLessonLearned, MonthlyReport } from '../types';
 import type { ProjectChecklistCategoryId, ProjectChecklistProgress, ProjectChecklistProgressEntry, ProjectChecklistTopic } from '../utils/projectChecklist';
 
 const TASK_DEPENDENCY_TYPES = new Set(['FS', 'SS', 'FF', 'SF']);
@@ -2312,5 +2312,64 @@ export const riskApi = {
     const { data, error } = await supabase.from('risks').insert(rows).select();
     if (error) throw new Error(error.message);
     return { data: rowsToObjs<Risk>(data || []) };
+  },
+};
+
+// ── Monthly executive reports ───────────────────────────────────────────────
+type MonthlyReportPatch = Partial<Pick<MonthlyReport,
+  'summary' | 'decisions' | 'overallStatus' | 'scheduleStatus' | 'budgetStatus' | 'scopeStatus' | 'paymentStatus'>>;
+
+export const monthlyReportApi = {
+  /** One project's report for a month, or null when none was written yet. */
+  get: async (projectId: string, period: string): Promise<MonthlyReport | null> => {
+    const { data, error } = await supabase.from('monthly_reports').select('*')
+      .eq('project_id', projectId).eq('period', period).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? rowsToObjs<MonthlyReport>([data])[0] : null;
+  },
+
+  /** State of every readable project's report for a month (for the project list). */
+  listForPeriod: async (period: string): Promise<Pick<MonthlyReport, 'projectId' | 'state' | 'overallStatus'>[]> => {
+    const { data, error } = await supabase.from('monthly_reports').select('project_id,state,overall_status').eq('period', period);
+    if (error) throw new Error(error.message);
+    return rowsToObjs<Pick<MonthlyReport, 'projectId' | 'state' | 'overallStatus'>>(data || []);
+  },
+
+  /** Published months of a project, newest first. */
+  publishedPeriods: async (projectId: string): Promise<string[]> => {
+    const { data, error } = await supabase.from('monthly_reports').select('period')
+      .eq('project_id', projectId).eq('state', 'published').order('period', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data || []).map((row) => String(row.period));
+  },
+
+  /** Create or update the draft text and statuses. */
+  saveDraft: async (projectId: string, period: string, patch: MonthlyReportPatch): Promise<MonthlyReport> => {
+    const row = { project_id: projectId, period, ...objToRow(patch as Record<string, unknown>) };
+    const { data, error } = await supabase.from('monthly_reports')
+      .upsert(row, { onConflict: 'project_id,period' }).select('*').single();
+    if (error) throw new Error(error.message);
+    return rowsToObjs<MonthlyReport>([data])[0];
+  },
+
+  /** Freeze the month: store the computed report with the text and statuses. */
+  publish: async (projectId: string, period: string, patch: MonthlyReportPatch, snapshot: unknown, userId: string | null): Promise<MonthlyReport> => {
+    const row = {
+      project_id: projectId, period, ...objToRow(patch as Record<string, unknown>),
+      state: 'published', snapshot, published_at: new Date().toISOString(), published_by: userId,
+    };
+    const { data, error } = await supabase.from('monthly_reports')
+      .upsert(row, { onConflict: 'project_id,period' }).select('*').single();
+    if (error) throw new Error(error.message);
+    return rowsToObjs<MonthlyReport>([data])[0];
+  },
+
+  /** Back to draft: numbers become live again; the text is kept. */
+  unpublish: async (projectId: string, period: string): Promise<MonthlyReport> => {
+    const { data, error } = await supabase.from('monthly_reports')
+      .update({ state: 'draft', snapshot: null, published_at: null, published_by: null })
+      .eq('project_id', projectId).eq('period', period).select('*').single();
+    if (error) throw new Error(error.message);
+    return rowsToObjs<MonthlyReport>([data])[0];
   },
 };
