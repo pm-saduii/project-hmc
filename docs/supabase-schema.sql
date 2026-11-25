@@ -1,342 +1,359 @@
 -- ============================================================================
--- Project Management System - Supabase PostgreSQL Schema
--- Migration from Google Sheets to Supabase
--- ============================================================================
--- This schema includes 10 main tables with proper relationships, indexes, and RLS
--- Last Updated: 2024
+-- Project HMC — database schema REFERENCE (not a runnable migration)
+-- Source: information_schema of the live Supabase database, 2026-11-26.
+-- Shows columns, types, nullability and defaults. Foreign keys and most
+-- constraints are not listed; see migrations/ for the exact definitions.
+-- Apply changes with new files in migrations/, never by editing this file.
 -- ============================================================================
 
--- Drop existing tables if migration is being re-run (development only)
--- DROP TABLE IF EXISTS risks CASCADE;
--- DROP TABLE IF EXISTS issues CASCADE;
--- DROP TABLE IF EXISTS change_request_items CASCADE;
--- DROP TABLE IF EXISTS change_requests CASCADE;
--- DROP TABLE IF EXISTS efforts CASCADE;
--- DROP TABLE IF EXISTS milestones CASCADE;
--- DROP TABLE IF EXISTS tasks CASCADE;
--- DROP TABLE IF EXISTS members CASCADE;
--- DROP TABLE IF EXISTS projects CASCADE;
+-- Access model (RLS, after migrations/2026-11-26-secure-core-tables-rls.sql):
+--  * anon: no table access.
+--  * read project data  : can_read_project(project_id)  -> admin, 'all' scope, or project member
+--  * write project data : can_access_project_screen(project_id, <screen>, 'write')
+--  * checklist / lessons: can_access_project_checklist / can_access_project_lessons
+--  * masters_code, task templates, checklist topics: read = signed in, write = admin
+--  * notes, email_reminder_logs: admin only;  timesheet_entries: owner only
+--  * profiles: read own (admin all); privileged columns admin/service role only
 
--- ============================================================================
--- 1. PROJECTS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS projects (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  code VARCHAR(50) UNIQUE NOT NULL,
-  client VARCHAR(255),
-  status VARCHAR(50) DEFAULT 'Planning' CHECK (status IN ('Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care')),
-  color VARCHAR(20),
-  start_date DATE,
-  end_date DATE,
-  description TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  owner_id UUID,
-  email_notification_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-  email_notification_mode VARCHAR(20) NOT NULL DEFAULT 'task' CHECK (email_notification_mode IN ('task','custom')),
-  email_notification_recipients TEXT NOT NULL DEFAULT '',
-  email_notification_time TIME NOT NULL DEFAULT '08:00',
-  email_notification_last_sent_at TIMESTAMPTZ
+CREATE TABLE public.activities (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id                     uuid NOT NULL,
+  activity_date                  date NOT NULL,
+  activity_type                  text NOT NULL,
+  channel                        text NOT NULL,
+  title                          text NOT NULL,
+  description                    text DEFAULT ''::text,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_projects_status ON projects(status);
-CREATE INDEX idx_projects_code ON projects(code);
-CREATE INDEX idx_projects_owner ON projects(owner_id);
+CREATE TABLE public.change_requests (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  cr_id                          text NOT NULL DEFAULT ''::text,
+  title                          text NOT NULL DEFAULT ''::text,
+  requested_by                   text NOT NULL DEFAULT ''::text,
+  request_date                   text NOT NULL DEFAULT ''::text,
+  approved_by                    text NOT NULL DEFAULT ''::text,
+  approval_date                  text NOT NULL DEFAULT ''::text,
+  total_manday                   numeric NOT NULL DEFAULT 0,
+  discount                       numeric NOT NULL DEFAULT 0,
+  status                         text NOT NULL DEFAULT 'Draft'::text,
+  notes                          text NOT NULL DEFAULT ''::text,
+  created_at                     timestamptz NOT NULL DEFAULT now()
+);
+-- request_date / approval_date are TEXT.
 
--- ============================================================================
--- 2. MEMBERS (Team)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS members (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE,
-  role VARCHAR(100) DEFAULT 'team-member',
-  department VARCHAR(100),
-  phone VARCHAR(20),
-  avatar_url VARCHAR(500),
-  status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.cr_items (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  cr_id                          uuid NOT NULL,
+  detail                         text NOT NULL DEFAULT ''::text,
+  manday                         numeric NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_members_email ON members(email);
-CREATE INDEX idx_members_role ON members(role);
-CREATE INDEX idx_members_status ON members(status);
+CREATE TABLE public.effort_monthly (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  effort_id                      uuid NOT NULL,
+  month                          text NOT NULL DEFAULT ''::text,
+  manday                         numeric NOT NULL DEFAULT 0
+);
+-- month is 'YYYY-MM'; unique (effort_id, month) used by upsert.
 
--- ============================================================================
--- 3. TASKS (with hierarchical support)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS tasks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  parent_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
-  
-  wbs VARCHAR(100),
-  task_name VARCHAR(255) NOT NULL,
-  phase VARCHAR(100),
-  description TEXT,
-  
-  -- Dates
-  start_date DATE,
-  end_date DATE,
-  actual_finish DATE,
-  
-  -- Progress
-  percent_complete INTEGER DEFAULT 0 CHECK (percent_complete >= 0 AND percent_complete <= 100),
-  status VARCHAR(50) NOT NULL DEFAULT 'Todo' CHECK (status IN ('Todo', 'In Progress', 'Done')),
-  
-  -- Dependencies
-  related_task UUID REFERENCES tasks(id),
-  
-  -- Duration (calculated in days)
-  duration INTEGER DEFAULT 1,
-  
-  -- Assignments
-  assigned_to VARCHAR(255),
-  
-  -- Hierarchy and ordering
-  level INTEGER DEFAULT 0,
-  "order" INTEGER DEFAULT 0,
-  
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.efforts (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  module                         text NOT NULL DEFAULT ''::text,
+  budget_amount                  numeric NOT NULL DEFAULT 0,
+  budget_manday                  numeric NOT NULL DEFAULT 0,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  phase                          text NOT NULL DEFAULT ''::text
 );
 
-CREATE INDEX idx_tasks_project ON tasks(project_id);
-CREATE INDEX idx_tasks_parent ON tasks(parent_id);
-CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
-CREATE INDEX idx_tasks_start_date ON tasks(start_date);
-CREATE INDEX idx_tasks_related_task ON tasks(related_task);
-
--- ============================================================================
--- 4. MILESTONES
--- ============================================================================
-CREATE TABLE IF NOT EXISTS milestones (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  
-  phase VARCHAR(100),
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  
-  amount DECIMAL(15,2) DEFAULT 0,
-  phase_amount DECIMAL(15,2) DEFAULT 0,
-  due_date DATE,
-  
-  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'billed', 'paid')),
-  
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.email_reminder_logs (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id                     uuid,
+  project_name                   text,
+  project_code                   text,
+  type                           text NOT NULL,
+  scheduled_time                 text,
+  sent_at                        timestamptz,
+  status                         text NOT NULL,
+  recipient                      text,
+  tasks_count                    integer DEFAULT 0,
+  error_message                  text,
+  created_at                     timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_milestones_project ON milestones(project_id);
-CREATE INDEX idx_milestones_status ON milestones(status);
-CREATE INDEX idx_milestones_due_date ON milestones(due_date);
+CREATE TABLE public.issues (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  issue_date                     text NOT NULL DEFAULT ''::text,
+  title                          text NOT NULL DEFAULT ''::text,
+  description                    text NOT NULL DEFAULT ''::text,
+  reported_by                    text NOT NULL DEFAULT ''::text,
+  assigned_to                    text NOT NULL DEFAULT ''::text,
+  status                         text NOT NULL DEFAULT 'Open'::text,
+  resolved_date                  text NOT NULL DEFAULT ''::text,
+  notes                          text NOT NULL DEFAULT ''::text,
+  created_at                     timestamptz NOT NULL DEFAULT now()
+);
+-- issue_date / resolved_date are TEXT. status: Open | In Progress | Resolved | Blocked.
 
--- ============================================================================
--- 5. EFFORTS (Manday tracking)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS efforts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  
-  role VARCHAR(100) NOT NULL,
-  budget_manday INTEGER DEFAULT 0,
-  
-  -- Monthly tracking as JSONB: { "2024-01": 10, "2024-02": 12, ... }
-  monthly JSONB DEFAULT '{}'::jsonb,
-  
-  notes TEXT,
-  
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.masters_code (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  code_type                      text NOT NULL,
+  code_key                       text NOT NULL,
+  code_value                     text NOT NULL,
+  label                          text NOT NULL,
+  sort_order                     integer NOT NULL DEFAULT 100,
+  active                         boolean NOT NULL DEFAULT true,
+  created_at                     timestamptz DEFAULT now(),
+  updated_at                     timestamptz DEFAULT now(),
+  text_color                     text NOT NULL DEFAULT '#0F172A'::text,
+  bg_color                       text NOT NULL DEFAULT '#EEF2FF'::text
 );
 
-CREATE INDEX idx_efforts_project ON efforts(project_id);
-CREATE INDEX idx_efforts_role ON efforts(role);
-
--- ============================================================================
--- 6. CHANGE REQUESTS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS change_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  
-  cr_id VARCHAR(50) UNIQUE NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  
-  requested_by VARCHAR(255),
-  request_date DATE,
-  
-  approved_by VARCHAR(255),
-  approval_date DATE,
-  
-  status VARCHAR(50) DEFAULT 'Draft' CHECK (status IN (
-    'Draft', 'Submitted', 'Under Review', 'Approved', 'Rejected', 'Implemented', 'Close'
-  )),
-  
-  total_manday INTEGER DEFAULT 0,
-  discount DECIMAL(15,2) DEFAULT 0,
-  
-  notes TEXT,
-  
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.members (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  name                           text NOT NULL DEFAULT ''::text,
+  nickname                       text NOT NULL DEFAULT ''::text,
+  role                           text NOT NULL DEFAULT ''::text,
+  position                       text NOT NULL DEFAULT ''::text,
+  email                          text NOT NULL DEFAULT ''::text,
+  tel                            text NOT NULL DEFAULT ''::text,
+  type                           text NOT NULL DEFAULT 'internal'::text,
+  notes                          text NOT NULL DEFAULT ''::text,
+  user_id                        uuid,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  ext                            text NOT NULL DEFAULT ''::text,
+  thai_name                      text NOT NULL DEFAULT ''::text
 );
 
-CREATE INDEX idx_change_requests_project ON change_requests(project_id);
-CREATE INDEX idx_change_requests_status ON change_requests(status);
-CREATE INDEX idx_change_requests_cr_id ON change_requests(cr_id);
-CREATE INDEX idx_change_requests_requested_by ON change_requests(requested_by);
+CREATE TABLE public.milestones (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  phase                          text NOT NULL DEFAULT ''::text,
+  name                           text NOT NULL DEFAULT ''::text,
+  percent                        numeric NOT NULL DEFAULT 0,
+  amount                         numeric NOT NULL DEFAULT 0,
+  due_date                       text NOT NULL DEFAULT ''::text,
+  billing_date                   text NOT NULL DEFAULT ''::text,
+  notes                          text NOT NULL DEFAULT ''::text,
+  status                         text NOT NULL DEFAULT 'pending'::text,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  phase_amount                   numeric NOT NULL DEFAULT 0
+);
+-- due_date / billing_date are TEXT. status: pending | billed | paid.
 
--- ============================================================================
--- 7. CHANGE REQUEST ITEMS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS change_request_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  change_request_id UUID NOT NULL REFERENCES change_requests(id) ON DELETE CASCADE,
-  
-  detail TEXT NOT NULL,
-  manday INTEGER DEFAULT 0,
-  
-  sequence_num INTEGER DEFAULT 0,
-  
-  created_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE public.notes (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  title                          text NOT NULL,
+  details                        text NOT NULL DEFAULT ''::text,
+  start_date                     date,
+  end_date                       date,
+  status                         text NOT NULL DEFAULT 'active'::text,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_cr_items_cr ON change_request_items(change_request_id);
-CREATE INDEX idx_cr_items_sequence ON change_request_items(sequence_num);
+CREATE TABLE public.profiles (
+  id                             uuid NOT NULL,
+  email                          text,
+  full_name                      text,
+  avatar_url                     text,
+  role                           text NOT NULL DEFAULT 'member'::text,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now(),
+  is_active                      boolean NOT NULL DEFAULT true,
+  screen_permissions             jsonb,
+  project_access_scope           text NOT NULL DEFAULT 'member'::text
+);
+-- id = auth.users.id. role: admin | pm | member | client.
+-- screen_permissions: {screenId: hidden|read|full} (legacy: array of screen ids).
+-- role / is_active / screen_permissions / project_access_scope are guarded by trg_guard_profile_privileges.
 
--- ============================================================================
--- 8. ISSUES
--- ============================================================================
-CREATE TABLE IF NOT EXISTS issues (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  
-  issue_date DATE,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  
-  reported_by VARCHAR(255),
-  assigned_to VARCHAR(255),
-  
-  status VARCHAR(50) DEFAULT 'Open' CHECK (status IN (
-    'Open', 'In Progress', 'Resolved', 'Blocked'
-  )),
-  
-  resolved_date DATE,
-  notes TEXT,
-  
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.project_checklist_progress (
+  project_id                     uuid NOT NULL,
+  topic_id                       uuid NOT NULL,
+  done                           boolean NOT NULL DEFAULT false,
+  completion_date                date,
+  completed_by                   text NOT NULL DEFAULT ''::text,
+  jira_id                        text NOT NULL DEFAULT ''::text,
+  notes                          text NOT NULL DEFAULT ''::text,
+  updated_by                     uuid,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now(),
+  not_required                   boolean NOT NULL DEFAULT false,
+  uat_customer                   numeric,
+  uat_hmc                        numeric,
+  production_customer            numeric,
+  production_hmc                 numeric
+);
+-- PRIMARY KEY (project_id, topic_id); topic delete cascades.
+
+CREATE TABLE public.project_checklist_topics (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  category                       text NOT NULL,
+  work_system                    text NOT NULL DEFAULT ''::text,
+  stage                          text NOT NULL DEFAULT ''::text,
+  order_no                       integer NOT NULL DEFAULT 10,
+  title                          text NOT NULL,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_issues_project ON issues(project_id);
-CREATE INDEX idx_issues_status ON issues(status);
-CREATE INDEX idx_issues_assigned_to ON issues(assigned_to);
-CREATE INDEX idx_issues_reported_by ON issues(reported_by);
-CREATE INDEX idx_issues_issue_date ON issues(issue_date);
+CREATE TABLE public.project_environments (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id                     uuid NOT NULL,
+  environment                    text NOT NULL,
+  url                            text NOT NULL DEFAULT ''::text,
+  username                       text NOT NULL DEFAULT ''::text,
+  password                       text NOT NULL DEFAULT ''::text,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
+);
+-- Stores customer system credentials in plain text (see security notes).
 
--- ============================================================================
--- 9. RISKS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS risks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  
-  risk_date DATE,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  
-  probability VARCHAR(50) DEFAULT 'Medium' CHECK (probability IN ('Low', 'Medium', 'High')),
-  impact VARCHAR(50) DEFAULT 'Medium' CHECK (impact IN ('Low', 'Medium', 'High')),
-  
-  status VARCHAR(50) DEFAULT 'Monitoring' CHECK (status IN (
-    'Monitoring', 'Mitigating', 'Closed'
-  )),
-  
-  owner VARCHAR(255),
-  mitigation TEXT,
-  
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.project_lessons_learned (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id                     uuid NOT NULL,
+  title                          text NOT NULL,
+  category                       text NOT NULL,
+  phase                          text NOT NULL DEFAULT 'Planning'::text,
+  occurred_at                    date NOT NULL DEFAULT CURRENT_DATE,
+  context                        text NOT NULL DEFAULT ''::text,
+  impact                         text NOT NULL DEFAULT ''::text,
+  root_cause                     text NOT NULL DEFAULT ''::text,
+  lesson                         text NOT NULL DEFAULT ''::text,
+  recommendation                 text NOT NULL DEFAULT ''::text,
+  follow_up                      text NOT NULL DEFAULT ''::text,
+  owner                          text NOT NULL DEFAULT ''::text,
+  due_date                       date,
+  status                         text NOT NULL DEFAULT 'Open'::text,
+  reference_url                  text NOT NULL DEFAULT ''::text,
+  created_by                     uuid,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_risks_project ON risks(project_id);
-CREATE INDEX idx_risks_status ON risks(status);
-CREATE INDEX idx_risks_owner ON risks(owner);
-CREATE INDEX idx_risks_probability ON risks(probability);
-CREATE INDEX idx_risks_impact ON risks(impact);
+CREATE TABLE public.project_members (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  user_id                        uuid NOT NULL,
+  created_at                     timestamptz NOT NULL DEFAULT now()
+);
+-- Links auth users to projects; written only by the server API (service role).
 
--- ============================================================================
--- 10. ACCESS CONTROL & AUDIT
--- ============================================================================
-
--- User/Auth table (optional - link to Supabase Auth)
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email VARCHAR(255) UNIQUE,
-  full_name VARCHAR(255),
-  role VARCHAR(50) DEFAULT 'viewer' CHECK (role IN ('admin', 'manager', 'viewer')),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.project_progress_snapshots (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id                     uuid NOT NULL,
+  snapshot_date                  date NOT NULL,
+  baseline_percent               integer NOT NULL DEFAULT 0,
+  actual_percent                 integer NOT NULL DEFAULT 0,
+  note                           text NOT NULL DEFAULT ''::text,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
 );
 
--- Audit log (optional)
-CREATE TABLE IF NOT EXISTS audit_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id),
-  table_name VARCHAR(100),
-  action VARCHAR(50) CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
-  record_id UUID,
-  changes JSONB,
-  created_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE public.projects (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name                           text NOT NULL,
+  code                           text NOT NULL DEFAULT ''::text,
+  client                         text NOT NULL DEFAULT ''::text,
+  status                         text NOT NULL DEFAULT 'Planning'::text,
+  start_date                     text NOT NULL DEFAULT ''::text,
+  end_date                       text NOT NULL DEFAULT ''::text,
+  description                    text NOT NULL DEFAULT ''::text,
+  color                          text NOT NULL DEFAULT '#4F46E5'::text,
+  created_by                     uuid,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now(),
+  software_version               text NOT NULL DEFAULT ''::text,
+  email_notification_enabled     boolean NOT NULL DEFAULT false,
+  email_notification_mode        text NOT NULL DEFAULT 'task'::text,
+  email_notification_recipients  text NOT NULL DEFAULT ''::text,
+  email_notification_time        time NOT NULL DEFAULT '08:00:00'::time without time zone,
+  email_notification_last_sent_at timestamptz,
+  customer_abbreviation          text NOT NULL DEFAULT ''::text,
+  customer_id                    text NOT NULL DEFAULT ''::text
+);
+-- start_date / end_date are TEXT 'YYYY-MM-DD' or ''. Status values come from masters_code (project_status).
+
+CREATE TABLE public.risks (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  risk_date                      text NOT NULL DEFAULT ''::text,
+  title                          text NOT NULL DEFAULT ''::text,
+  description                    text NOT NULL DEFAULT ''::text,
+  probability                    text NOT NULL DEFAULT 'Medium'::text,
+  impact                         text NOT NULL DEFAULT 'Medium'::text,
+  mitigation                     text NOT NULL DEFAULT ''::text,
+  owner                          text NOT NULL DEFAULT ''::text,
+  status                         text NOT NULL DEFAULT 'Monitoring'::text,
+  created_at                     timestamptz NOT NULL DEFAULT now()
+);
+-- risk_date is TEXT. status: Monitoring | Mitigating | Closed.
+
+CREATE TABLE public.task_template_items (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  template_id                    uuid NOT NULL,
+  wbs                            text NOT NULL,
+  parent_wbs                     text NOT NULL DEFAULT ''::text,
+  level                          integer NOT NULL DEFAULT 0,
+  sort_order                     numeric NOT NULL DEFAULT 0,
+  task_name                      text NOT NULL,
+  duration                       integer NOT NULL DEFAULT 0,
+  effort_manday                  numeric NOT NULL DEFAULT 0,
+  created_at                     timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_audit_log_user ON audit_log(user_id);
-CREATE INDEX idx_audit_log_table ON audit_log(table_name);
-CREATE INDEX idx_audit_log_created ON audit_log(created_at);
+CREATE TABLE public.task_templates (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  template_no                    bigint NOT NULL,
+  name                           text NOT NULL,
+  created_by                     uuid,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
+);
 
--- ============================================================================
--- ROW LEVEL SECURITY (RLS) - Enable after testing
--- ============================================================================
--- Uncomment to enable RLS in production
+CREATE TABLE public.tasks (
+  id                             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  project_id                     uuid NOT NULL,
+  wbs                            text NOT NULL DEFAULT ''::text,
+  task_name                      text NOT NULL DEFAULT ''::text,
+  start_date                     text DEFAULT ''::text,
+  end_date                       text DEFAULT ''::text,
+  actual_finish                  text DEFAULT ''::text,
+  duration                       integer NOT NULL DEFAULT 0,
+  percent_complete               integer NOT NULL DEFAULT 0,
+  resource                       text NOT NULL DEFAULT ''::text,
+  related_task                   text NOT NULL DEFAULT ''::text,
+  parent_id                      text NOT NULL DEFAULT ''::text,
+  level                          integer NOT NULL DEFAULT 0,
+  "order"                        integer NOT NULL DEFAULT 0,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  phase                          varchar DEFAULT ''::character varying,
+  status                         varchar NOT NULL DEFAULT 'Todo'::character varying,
+  effort_manday                  numeric NOT NULL DEFAULT 0,
+  sort_order                     numeric NOT NULL DEFAULT 0,
+  related_task_type              text NOT NULL DEFAULT 'FS'::text,
+  related_task_lag_days          integer NOT NULL DEFAULT 0,
+  baseline_start_date            date,
+  baseline_end_date              date
+);
+-- parent_id / related_task are TEXT holding a task id or '' (no FK).
+-- start_date / end_date / actual_finish are TEXT 'YYYY-MM-DD' or ''.
+-- status CHECK (Todo | In Progress | Block/Delay | Done); synced by trg_tasks_sync_status.
+-- related_task_type CHECK (FS | SS | FF | SF). Legacy column "order" is kept; ordering uses sort_order.
 
--- ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE members ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE milestones ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE efforts ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE change_requests ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE issues ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE risks ENABLE ROW LEVEL SECURITY;
-
--- Example RLS policy: Users can only see projects they own
--- CREATE POLICY "Users can view their own projects"
--- ON projects FOR SELECT
--- USING (owner_id = auth.uid() OR role = 'admin');
-
--- ============================================================================
--- SAMPLE DATA (Optional - for testing)
--- ============================================================================
--- INSERT INTO projects (name, code, client, status, color, start_date, end_date)
--- VALUES 
---   ('Project Alpha', 'PA-001', 'Acme Corp', 'active', '#4F46E5', '2024-01-01', '2024-06-30'),
---   ('Project Beta', 'PB-001', 'Beta Inc', 'planning', '#10B981', '2024-03-01', '2024-12-31');
-
--- ============================================================================
--- MIGRATION NOTES
--- ============================================================================
--- 1. Ensure Supabase PostgreSQL version >= 13
--- 2. Run this script in the SQL Editor in Supabase Dashboard
--- 3. After schema creation, migrate data from Google Sheets API
--- 4. Enable RLS policies for production security
--- 5. Test foreign key constraints and cascades
--- 6. Create appropriate database roles and permissions
--- 7. Set up automated backups and point-in-time recovery
-
--- Created: 2024
--- Author: ProjectMS Team
+CREATE TABLE public.timesheet_entries (
+  id                             uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id                        uuid NOT NULL,
+  work_date                      date NOT NULL,
+  project_key                    text NOT NULL,
+  description                    text NOT NULL,
+  hours                          numeric NOT NULL,
+  created_at                     timestamptz NOT NULL DEFAULT now(),
+  updated_at                     timestamptz NOT NULL DEFAULT now()
+);
