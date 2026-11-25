@@ -15,6 +15,14 @@ export const C = {
   shadow2: '0 4px 16px rgba(0,0,0,0.10)',
 };
 
+/**
+ * Type scale used by every screen (px). Pick one of these for any new UI text:
+ * caption = meta text, badges, table headers · body = text, cells, inputs, buttons, menus ·
+ * section = card / modal titles · title = page titles · stat = big numbers on stat cards.
+ * (PDF exports and SVG chart labels use their own sizes.)
+ */
+export const FONT_SIZE = { caption: 11, body: 13, section: 16, title: 20, stat: 24 } as const;
+
 export const Card: React.FC<{
   children: React.ReactNode; style?: React.CSSProperties;
   onClick?: () => void; onMouseEnter?: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -35,7 +43,7 @@ export const Btn: React.FC<{
     fontFamily: 'Poppins, sans-serif', fontWeight: 600, borderRadius: 8,
     cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
     display: 'inline-flex', alignItems: 'center', gap: 6, opacity: disabled ? 0.55 : 1,
-    padding: small ? '6px 14px' : '9px 18px', fontSize: small ? 12 : 13,
+    padding: small ? '6px 14px' : '9px 18px', fontSize: 13,
   };
   const v: Record<BtnVariant, React.CSSProperties> = {
     primary: { background: C.primary, color: '#fff', border: 'none' },
@@ -238,11 +246,11 @@ export const Tabs: React.FC<{
     <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, overflowX: 'auto' }}>
       {tabs.map(t => (
         <button key={t.id} onClick={() => onChange(t.id)}
-          style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: active === t.id ? 600 : 500, padding: '10px 8px', border: 'none', background: 'none', cursor: 'pointer', color: active === t.id ? C.primary : C.text2, borderBottom: active === t.id ? `2px solid ${C.primary}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+          style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: active === t.id ? 600 : 500, padding: '10px 8px', border: 'none', background: 'none', cursor: 'pointer', color: active === t.id ? C.primary : C.text2, borderBottom: active === t.id ? `2px solid ${C.primary}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
           {t.icon && <span>{t.icon}</span>}
           {t.label}
           {t.count != null && (
-            <span style={{ background: active === t.id ? C.primaryBg : C.bg2, color: active === t.id ? C.primary : C.text3, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>
+            <span style={{ background: active === t.id ? C.primaryBg : C.bg2, color: active === t.id ? C.primary : C.text3, fontSize: 11, fontWeight: 700, padding: '1px 6px', borderRadius: 10 }}>
               {t.count}
             </span>
           )}
@@ -339,7 +347,7 @@ export const EditableCell: React.FC<{
               setDateDraft(toDmyDateInputValue(isoValue));
             }
           }}
-          style={{ flex: 1, minWidth: 0, border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, ...style }}
+          style={{ flex: 1, minWidth: 0, border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 13, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, ...style }}
         />
         <button ref={calendarButtonRef} type="button" aria-label="Choose task date" title="Choose date" onClick={openDatePicker} onBlur={commit}
           style={{ width: 28, height: 28, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${C.border}`, borderRadius: 6, background: C.white, color: C.text2, cursor: 'pointer' }}>
@@ -360,20 +368,20 @@ export const EditableCell: React.FC<{
         onChange={e => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setDraft(value); } }}
-        style={{ width: '100%', border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, ...style }}
+        style={{ width: '100%', border: `1.5px solid ${C.primary}`, borderRadius: 4, padding: '2px 6px', fontSize: 13, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg, ...style }}
       />
     );
   }
   return (
     <span onClick={() => setEditing(true)} title="Click to edit"
-      style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', fontSize: 12, fontFamily: 'Poppins, sans-serif', color: value ? C.text : C.text3, fontStyle: value ? 'normal' : 'italic', ...style }}>
+      style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', fontSize: 13, fontFamily: 'Poppins, sans-serif', color: value ? C.text : C.text3, fontStyle: value ? 'normal' : 'italic', ...style }}>
       {value || placeholder}
     </span>
   );
 };
 
 export const TH: React.CSSProperties = {
-  padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.text2,
+  padding: '9px 12px', fontSize: 11, fontWeight: 700, color: C.text2,
   textAlign: 'left', textTransform: 'uppercase', letterSpacing: '0.05em',
   borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontFamily: 'Poppins, sans-serif',
 };
@@ -399,7 +407,7 @@ export const MILESTONE_STATUS: Record<string, { bg: string; color: string; label
 
 export const ConfirmModal: React.FC<{ message: string; onConfirm: () => void; onCancel: () => void }> = ({ message, onConfirm, onCancel }) => (
   <Modal title="Confirm Delete" onClose={onCancel} width={400}>
-    <p style={{ fontSize: 14, color: C.text2, marginBottom: 24 }}>{message}</p>
+    <p style={{ fontSize: 13, color: C.text2, marginBottom: 24 }}>{message}</p>
     <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
       <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
       <Btn variant="danger" onClick={onConfirm}>Delete</Btn>

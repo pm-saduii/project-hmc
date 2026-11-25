@@ -35,7 +35,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
   const [pendingRemove, setPendingRemove] = useState<ProjectChecklistTopic | null>(null);
   const needsWorkSystem = category !== 'project';
   const needsStage = category === 'project';
-  const compactFieldStyle: React.CSSProperties = { fontSize: 10, padding: '4px 8px', lineHeight: 1.3 };
+  const compactFieldStyle: React.CSSProperties = { fontSize: 11, padding: '4px 8px', lineHeight: 1.3 };
   const compactSelectStyle: React.CSSProperties = { ...compactFieldStyle, paddingRight: 24 };
   const topicRowHeight = 36;
 
@@ -179,14 +179,14 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: 15, color: C.text }}>{PROJECT_CHECKLIST_CATEGORIES.find((item) => item.id === category)?.label} Checklist Topics</h3>
-          <p style={{ margin: '5px 0 0', color: C.text3, fontSize: 12 }}>Configure checklist topics and systems.</p>
+          <h3 style={{ margin: 0, fontSize: 16, color: C.text }}>{PROJECT_CHECKLIST_CATEGORIES.find((item) => item.id === category)?.label} Checklist Topics</h3>
+          <p style={{ margin: '5px 0 0', color: C.text3, fontSize: 13 }}>Configure checklist topics and systems.</p>
         </div>
         {savingTopics && <span role="status" style={{ color: C.text3, fontSize: 11 }}>Saving…</span>}
       </div>
 
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14, fontSize: 10, width: '100%', minWidth: 0 }}>
-        <table style={{ width: '100%', minWidth: 0, tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 10 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14, fontSize: 11, width: '100%', minWidth: 0 }}>
+        <table style={{ width: '100%', minWidth: 0, tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 11 }}>
           <colgroup>
             {needsWorkSystem && <col style={{ width: '18%' }} />}
             {needsStage && <col style={{ width: '22%' }} />}
@@ -195,7 +195,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
             <col style={{ width: 72 }} />
           </colgroup>
           <thead>
-            <tr style={{ background: C.bg2, color: C.text2, textAlign: 'left', fontWeight: 700, fontSize: 10 }}>
+            <tr style={{ background: C.bg2, color: C.text2, textAlign: 'left', fontWeight: 700, fontSize: 11 }}>
               {needsWorkSystem && <th style={{ padding: '8px 9px', overflowWrap: 'anywhere' }}>Work System</th>}
               {needsStage && <th style={{ padding: '8px 9px', overflowWrap: 'anywhere' }}>Stage</th>}
               <th style={{ padding: '8px 9px', overflowWrap: 'anywhere' }}>Order No.</th>
@@ -207,7 +207,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
             {categoryTopics.map((topic) => {
               const draft = editing[topic.id];
               return (
-                <tr key={topic.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10, minHeight: topicRowHeight }}>
+                <tr key={topic.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 11, minHeight: topicRowHeight }}>
                   {needsWorkSystem && (
                     <td style={{ padding: '4px 7px', verticalAlign: 'middle', overflowWrap: 'anywhere' }}>
                       {draft ? <Select value={draft.workSystem || ''} onChange={(value) => setEditing((current) => ({ ...current, [topic.id]: { ...current[topic.id], workSystem: value } }))} options={workSystems.map((value) => ({ value, label: value }))} style={{ ...compactSelectStyle, width: '100%', minWidth: 0 }} /> : <span style={{ color: C.text, overflowWrap: 'anywhere' }}>{topic.workSystem || '—'}</span>}
@@ -226,7 +226,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
                   </td>
                   <td style={{ padding: '4px 5px', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {draft ? (
-                      <span title="Changes save automatically" style={{ color: C.text3, fontSize: 9 }}>Auto</span>
+                      <span title="Changes save automatically" style={{ color: C.text3, fontSize: 11 }}>Auto</span>
                     ) : (
                       <>
                         <button type="button" aria-label={`Edit ${topic.title}`} onClick={() => startEdit(topic)} style={{ ...rowActionStyle, marginRight: 5 }}><Edit3 size={14} /></button>
@@ -291,7 +291,7 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
   const [addingCode, setAddingCode] = useState(false);
   const addingCodeRef = useRef(false);
   const ROW_HEIGHT = 36;
-  const SMALL_INPUT_STYLE: React.CSSProperties = { fontSize: 10, padding: '4px 8px', lineHeight: 1.3 };
+  const SMALL_INPUT_STYLE: React.CSSProperties = { fontSize: 11, padding: '4px 8px', lineHeight: 1.3 };
   const ICON_BUTTON_STYLE: React.CSSProperties = { width: 28, height: 28, borderRadius: 8, border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: C.bg2, color: C.text2 };
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -454,7 +454,7 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '190px minmax(0, 1fr)', gridTemplateRows: isMobile ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)', gap: 18, height: '100%', minHeight: 0, overflow: 'hidden' }}>
         <nav aria-label="Setup sections" style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'stretch', gap: 4, paddingRight: isMobile ? 0 : 14, borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none', paddingBottom: isMobile ? 12 : 0 }}>
           <button type="button" aria-current={!checklistSetupOpen ? 'page' : undefined} onClick={() => setChecklistSetupOpen(false)}
-            style={{ padding: '9px 12px', border: `1px solid ${!checklistSetupOpen ? C.primary : 'transparent'}`, borderRadius: 8, background: !checklistSetupOpen ? C.primaryBg : 'transparent', color: !checklistSetupOpen ? C.primary : C.text2, cursor: 'pointer', fontSize: 12, fontWeight: 700, textAlign: 'left', whiteSpace: 'nowrap' }}>
+            style={{ padding: '9px 12px', border: `1px solid ${!checklistSetupOpen ? C.primary : 'transparent'}`, borderRadius: 8, background: !checklistSetupOpen ? C.primaryBg : 'transparent', color: !checklistSetupOpen ? C.primary : C.text2, cursor: 'pointer', fontSize: 13, fontWeight: 700, textAlign: 'left', whiteSpace: 'nowrap' }}>
             Lookup Values
           </button>
           {!checklistSetupOpen && (
@@ -468,7 +468,7 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
             </div>
           )}
           <button type="button" aria-current={checklistSetupOpen ? 'page' : undefined} onClick={() => setChecklistSetupOpen(true)}
-            style={{ padding: '9px 12px', border: `1px solid ${checklistSetupOpen ? C.primary : 'transparent'}`, borderRadius: 8, background: checklistSetupOpen ? C.primaryBg : 'transparent', color: checklistSetupOpen ? C.primary : C.text2, cursor: 'pointer', fontSize: 12, fontWeight: 700, textAlign: 'left', whiteSpace: 'nowrap' }}>
+            style={{ padding: '9px 12px', border: `1px solid ${checklistSetupOpen ? C.primary : 'transparent'}`, borderRadius: 8, background: checklistSetupOpen ? C.primaryBg : 'transparent', color: checklistSetupOpen ? C.primary : C.text2, cursor: 'pointer', fontSize: 13, fontWeight: 700, textAlign: 'left', whiteSpace: 'nowrap' }}>
             Checklist Topics
           </button>
           {checklistSetupOpen && (
@@ -485,9 +485,9 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
         <div style={{ minWidth: 0, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: isMobile ? 0 : 6 }}>
           {checklistSetupOpen ? <ChecklistTopicsManager category={activeChecklistCategory} workSystems={workSystemOptions} /> : <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 15, color: C.text }}>{TYPE_LABELS[activeType] ?? activeType}</h3>
+              <h3 style={{ margin: 0, fontSize: 16, color: C.text }}>{TYPE_LABELS[activeType] ?? activeType}</h3>
               <button type="button" onClick={refreshMasterCodes}
-                style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.text, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.text, cursor: 'pointer', fontSize: 13 }}>
                 {loading ? 'Reloading…' : 'Refresh'}
               </button>
             </div>
@@ -504,10 +504,10 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
           Failed to load lookup values. <button type="button" onClick={refreshMasterCodes} style={{ border: 'none', background: 'transparent', color: C.primary, textDecoration: 'underline', cursor: 'pointer' }}>Try again</button>
         </div>
       )}
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 14, fontSize: 10 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 14, fontSize: 11 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
-            <tr style={{ background: C.bg2, color: C.text2, fontWeight: 700, fontSize: 10 }}>
+            <tr style={{ background: C.bg2, color: C.text2, fontWeight: 700, fontSize: 11 }}>
               <th style={{ padding: '10px 12px', textAlign: 'left' }}>Code Key</th>
               <th style={{ padding: '10px 12px', textAlign: 'left' }}>Code Value</th>
               <th style={{ padding: '10px 12px', textAlign: 'left' }}>Label</th>
@@ -522,7 +522,7 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
             {codes.map((code) => {
               const draft = editing[code.id];
               return (
-                <tr key={code.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 10, height: ROW_HEIGHT }}>
+                <tr key={code.id} style={{ borderTop: `1px solid ${C.border}`, background: C.white, fontSize: 11, height: ROW_HEIGHT }}>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle' }}>
                     {draft ? <Input value={draft.codeKey} onChange={(v) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], codeKey: v } }))} style={SMALL_INPUT_STYLE} /> : <span style={{ color: C.text }}>{code.codeKey}</span>}
                   </td>
@@ -545,7 +545,7 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
                     {draft ? <input type="checkbox" checked={draft.active} onChange={(e) => setEditing((prev) => ({ ...prev, [code.id]: { ...prev[code.id], active: e.target.checked } }))} /> : <span>{code.active ? 'Yes' : 'No'}</span>}
                   </td>
                   <td style={{ padding: '4px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-                    {draft ? <span title="Changes save automatically" style={{ color: C.text3, fontSize: 9 }}>Auto</span> : <>
+                    {draft ? <span title="Changes save automatically" style={{ color: C.text3, fontSize: 11 }}>Auto</span> : <>
                       <button type="button" onClick={() => startEdit(code)} style={{ ...ICON_BUTTON_STYLE, marginRight: 6, padding: 0 }}><Edit3 size={14} /></button>
                       <button type="button" onClick={() => handleDelete(code.id)} style={{ ...ICON_BUTTON_STYLE, background: C.redBg, color: C.red, padding: 0 }}><Trash2 size={14} /></button>
                     </>}
@@ -573,7 +573,7 @@ export default function SetupModal({ onClose, inline = false }: { onClose: () =>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <input type="checkbox" checked={newCode.active ?? true} onChange={(e) => setNewCode((prev) => ({ ...prev, active: e.target.checked }))} />
           </div>
-          <div role="status" style={{ color: C.text3, fontSize: 10, textAlign: 'center' }}>{addingCode ? 'Adding…' : 'Auto Save'}</div>
+          <div role="status" style={{ color: C.text3, fontSize: 11, textAlign: 'center' }}>{addingCode ? 'Adding…' : 'Auto Save'}</div>
         </div>
       </div>
           </>}

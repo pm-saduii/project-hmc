@@ -153,8 +153,8 @@ export default function EmailLogsPage() {
         <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Mail size={16} color={C.primary} />
-            <span style={{ fontSize: 15, fontWeight: 700, color: C.text, fontFamily: 'Poppins, sans-serif' }}>Email Logs</span>
-            <span style={{ fontSize: 12, color: C.text2 }}>({filteredLogs.length} records)</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: C.text, fontFamily: 'Poppins, sans-serif' }}>Email Logs</span>
+            <span style={{ fontSize: 13, color: C.text2 }}>({filteredLogs.length} records)</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <input
@@ -162,7 +162,7 @@ export default function EmailLogsPage() {
               placeholder="Filter by project..."
               value={filterProject}
               onChange={(e) => setFilterProject(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, color: C.text, outline: 'none', width: 180 }}
+              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.text, outline: 'none', width: 180 }}
             />
             <button
               type="button"
@@ -175,7 +175,7 @@ export default function EmailLogsPage() {
                 background: selectedIds.length ? C.redBg : C.bg2,
                 color: selectedIds.length ? C.red : C.text2,
                 cursor: selectedIds.length ? 'pointer' : 'not-allowed',
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 700,
                 whiteSpace: 'nowrap',
               }}
@@ -198,7 +198,7 @@ export default function EmailLogsPage() {
             <div style={{ padding: 40, textAlign: 'center', color: C.text2, fontSize: 13 }}>No logs found.</div>
           )}
           {!loading && !error && filteredLogs.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
                   <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>

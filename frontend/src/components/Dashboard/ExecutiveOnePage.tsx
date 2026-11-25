@@ -158,21 +158,21 @@ function EffortRows({ efforts }: { efforts: Effort[] }) {
               borderBottom: `1px solid ${C.border}`,
             }}
           >
-            <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={effort.module}>
+            <div style={{ fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={effort.module}>
               {effort.module || '-'}
             </div>
-            <div style={{ fontSize: 12, color: C.text2, textAlign: 'right' }}>{Number(effort.budgetManday || 0).toFixed(1)}</div>
-            <div style={{ fontSize: 12, color: used > Number(effort.budgetManday || 0) ? C.red : C.primary, textAlign: 'right', fontWeight: 700 }}>
+            <div style={{ fontSize: 13, color: C.text2, textAlign: 'right' }}>{Number(effort.budgetManday || 0).toFixed(1)}</div>
+            <div style={{ fontSize: 13, color: used > Number(effort.budgetManday || 0) ? C.red : C.primary, textAlign: 'right', fontWeight: 700 }}>
               {used.toFixed(1)}
             </div>
-            <div style={{ fontSize: 12, color: remain < 0 ? C.red : C.green, textAlign: 'right', fontWeight: 700 }}>
+            <div style={{ fontSize: 13, color: remain < 0 ? C.red : C.green, textAlign: 'right', fontWeight: 700 }}>
               {remain.toFixed(1)}
             </div>
           </div>
         );
       })}
 
-      {efforts.length === 0 && <div style={{ fontSize: 12, color: C.text3, padding: '12px 0' }}>No effort data.</div>}
+      {efforts.length === 0 && <div style={{ fontSize: 13, color: C.text3, padding: '12px 0' }}>No effort data.</div>}
 
       {efforts.length > 0 && (
         <div
@@ -186,10 +186,10 @@ function EffortRows({ efforts }: { efforts: Effort[] }) {
             borderTop: `1px solid ${C.border2}`,
           }}
         >
-          <div style={{ fontSize: 12, color: C.text, fontWeight: 800 }}>TOTAL</div>
-          <div style={{ fontSize: 12, color: C.text2, textAlign: 'right', fontWeight: 800 }}>{totalBudget.toFixed(1)}</div>
-          <div style={{ fontSize: 12, color: C.primary, textAlign: 'right', fontWeight: 800 }}>{totalUsed.toFixed(1)}</div>
-          <div style={{ fontSize: 12, color: totalBudget - totalUsed < 0 ? C.red : C.green, textAlign: 'right', fontWeight: 800 }}>
+          <div style={{ fontSize: 13, color: C.text, fontWeight: 800 }}>TOTAL</div>
+          <div style={{ fontSize: 13, color: C.text2, textAlign: 'right', fontWeight: 800 }}>{totalBudget.toFixed(1)}</div>
+          <div style={{ fontSize: 13, color: C.primary, textAlign: 'right', fontWeight: 800 }}>{totalUsed.toFixed(1)}</div>
+          <div style={{ fontSize: 13, color: totalBudget - totalUsed < 0 ? C.red : C.green, textAlign: 'right', fontWeight: 800 }}>
             {(totalBudget - totalUsed).toFixed(1)}
           </div>
         </div>
@@ -461,7 +461,7 @@ export default function ExecutiveOnePage({ project }: Props) {
         <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, letterSpacing: 0.4 }}>EXECUTIVE REPORT - ONE PAGE</div>
         <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{project.name}</div>
-          <div style={{ fontSize: 12, color: C.text2 }}>
+          <div style={{ fontSize: 13, color: C.text2 }}>
             {fmtDate(project.startDate)} - {fmtDate(project.endDate)}
           </div>
         </div>
@@ -470,8 +470,8 @@ export default function ExecutiveOnePage({ project }: Props) {
       <Card style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', borderBottom: `1px solid ${C.border}` }}>
           <div style={{ padding: '12px 16px', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none' }}>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Overall Progress</div>
-            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: C.primary, marginTop: 4 }}>{overallProgress}%</div>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Overall Progress</div>
+            <div style={{ fontSize: 24, lineHeight: 1.1, fontWeight: 900, color: C.primary, marginTop: 4 }}>{overallProgress}%</div>
             <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{doneRootTasks} done / {inProgressRootTasks} in progress</div>
             <div style={{ marginTop: 6, height: 6, background: C.bg2, borderRadius: 999, overflow: 'hidden' }}>
               <div style={{ width: `${Math.min(overallProgress, 100)}%`, height: '100%', background: C.primary }} />
@@ -482,8 +482,8 @@ export default function ExecutiveOnePage({ project }: Props) {
           </div>
 
           <div style={{ padding: '12px 16px', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none' }}>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Payment</div>
-            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: C.green, marginTop: 4 }}>{paymentPct}%</div>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Payment</div>
+            <div style={{ fontSize: 24, lineHeight: 1.1, fontWeight: 900, color: C.green, marginTop: 4 }}>{paymentPct}%</div>
             <div style={{ fontSize: 11, color: C.text2, marginTop: 3 }}>{money(collectedAmount)} THB collected / {projectMilestones.length} milestones</div>
             <div style={{ marginTop: 6, height: 6, background: C.bg2, borderRadius: 999, overflow: 'hidden' }}>
               <div style={{ width: `${Math.min(paymentPct, 100)}%`, height: '100%', background: C.green }} />
@@ -491,8 +491,8 @@ export default function ExecutiveOnePage({ project }: Props) {
           </div>
 
           <div style={{ padding: '12px 16px', borderRight: isMobile ? 'none' : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : 'none' }}>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Manday Used</div>
-            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: mandayPct > 90 ? C.red : C.amber, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Manday Used</div>
+            <div style={{ fontSize: 24, lineHeight: 1.1, fontWeight: 900, color: mandayPct > 90 ? C.red : C.amber, marginTop: 4 }}>
               {totalMandayUsed.toFixed(1)}
               <span style={{ fontSize: 13, color: C.text3, fontWeight: 700 }}>/{totalMandayBudget.toFixed(1)}</span>
             </div>
@@ -503,8 +503,8 @@ export default function ExecutiveOnePage({ project }: Props) {
           </div>
 
           <div style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Issues / Risks</div>
-            <div style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 900, color: openIssues.length > 0 ? C.red : C.green, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, textTransform: 'uppercase' }}>Issues / Risks</div>
+            <div style={{ fontSize: 24, lineHeight: 1.1, fontWeight: 900, color: openIssues.length > 0 ? C.red : C.green, marginTop: 4 }}>
               {openIssues.length}
               <span style={{ fontSize: 13, color: C.text3, fontWeight: 700 }}> issues</span>
             </div>
@@ -518,7 +518,7 @@ export default function ExecutiveOnePage({ project }: Props) {
 
       <Card style={{ padding: isMobile ? 12 : 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: C.text }}>Project Plan (Plan vs Actual)</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>Project Plan (Plan vs Actual)</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
               onClick={() => setShowTodayLine(!showTodayLine)}
@@ -559,7 +559,7 @@ export default function ExecutiveOnePage({ project }: Props) {
                 background: '#0EA5B7',
                 color: '#FFFFFF',
                 fontWeight: 700,
-                fontSize: 12,
+                fontSize: 13,
               }}
             >
             <div style={{ padding: '9px 8px', borderRight: '1px solid rgba(255,255,255,0.3)', textAlign: 'center' }}>WBS</div>
@@ -571,7 +571,7 @@ export default function ExecutiveOnePage({ project }: Props) {
             <div style={{ padding: '9px 6px', borderRight: '1px solid rgba(255,255,255,0.3)' }}>Status</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
               {months.map((month) => (
-                <div key={month.toISOString()} style={{ padding: compactMonthHeaders ? '9px 2px' : '9px 6px', borderLeft: '1px solid rgba(255,255,255,0.3)', textAlign: 'center', fontSize: compactMonthHeaders ? 10 : 12, whiteSpace: 'nowrap' }}>
+                <div key={month.toISOString()} style={{ padding: compactMonthHeaders ? '9px 2px' : '9px 6px', borderLeft: '1px solid rgba(255,255,255,0.3)', textAlign: 'center', fontSize: compactMonthHeaders ? 11 : 13, whiteSpace: 'nowrap' }}>
                   {compactMonthHeaders ? monthCompactLabel(month) : monthLabel(month)}
                 </div>
               ))}
@@ -606,15 +606,15 @@ export default function ExecutiveOnePage({ project }: Props) {
                   alignItems: 'center',
                 }}
               >
-                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text2, textAlign: 'center' }}>{task.wbs || '-'}</div>
-                <div style={{ padding: '6px 8px', fontSize: 12, color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
+                <div style={{ padding: '6px 8px', fontSize: 13, color: C.text2, textAlign: 'center' }}>{task.wbs || '-'}</div>
+                <div style={{ padding: '6px 8px', fontSize: 13, color: C.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
                   {task.taskName}
                 </div>
                 <div style={{ padding: '6px 6px', fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtDate(task.startDate)}</div>
                 <div style={{ padding: '6px 6px', fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtDate(task.endDate)}</div>
                 <div style={{ padding: '6px 6px', fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 <div style={{ padding: '6px 6px', fontSize: 11, color: C.text, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{Number(task.percentComplete || 0)}%</div>
-                <div style={{ padding: '6px 6px', fontSize: 10, color: state.color, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{state.label}</div>
+                <div style={{ padding: '6px 6px', fontSize: 11, color: state.color, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{state.label}</div>
                 <div style={{ position: 'relative', minHeight: 36, borderLeft: `1px solid ${C.border}` }}>
                   <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
                     {months.map((month) => (
@@ -666,7 +666,7 @@ export default function ExecutiveOnePage({ project }: Props) {
             })}
 
             {mainTasks.length === 0 && (
-              <div style={{ padding: '16px 12px', textAlign: 'center', color: C.text3, fontSize: 12 }}>No main tasks with plan dates.</div>
+              <div style={{ padding: '16px 12px', textAlign: 'center', color: C.text3, fontSize: 13 }}>No main tasks with plan dates.</div>
             )}
           </div>
         </div>
@@ -679,18 +679,18 @@ export default function ExecutiveOnePage({ project }: Props) {
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Accomplished Task</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Completed tasks sorted by WBS</div>
             </div>
-            <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Task Detail</button>
+            <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>View Task Detail</button>
           </div>
           <div style={{ display: 'grid', gap: 8, maxHeight: isMobile ? 230 : 285, overflow: 'auto' }}>
             {accomplishedTasks.map((task, index) => (
               <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 10, background: C.bg }}>
-                <div style={{ minWidth: 0, fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
+                <div style={{ minWidth: 0, fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.taskName}>
                   {`${index + 1}. ${task.taskName}`}
                 </div>
                 <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{task.actualFinish ? fmtDate(task.actualFinish) : '-'}</div>
               </div>
             ))}
-            {!accomplishedTasks.length && <div style={{ fontSize: 12, color: C.text3 }}>No accomplished tasks found.</div>}
+            {!accomplishedTasks.length && <div style={{ fontSize: 13, color: C.text3 }}>No accomplished tasks found.</div>}
           </div>
         </Card>
 
@@ -698,25 +698,25 @@ export default function ExecutiveOnePage({ project }: Props) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Upcoming Activities</div>
-              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>งานที่กำลังดำเนินการ งานถัดไป และงานที่เลยกำหนด</div>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>In progress, upcoming and overdue tasks</div>
             </div>
-            <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Tasks Tab</button>
+            <button type="button" onClick={() => openTab('tasks')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>View Tasks Tab</button>
           </div>
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>IN PROGRESS TASKS</div>
               <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                {['No.', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 11, color: C.text2, fontWeight: 800 }}>{h}</div>
                 ))}
               </div>
               {inProgressTasks.slice(0, 4).map((task, index) => (
                 <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
                   <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
                   <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
+                  <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{task.endDate ? fmtDate(task.endDate) : '-'}</div>
+                  <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 </div>
               ))}
               {!inProgressTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No in-progress tasks</div>}
@@ -732,17 +732,17 @@ export default function ExecutiveOnePage({ project }: Props) {
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>UPCOMING TASKS</div>
               <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                {['No.', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 11, color: C.text2, fontWeight: 800 }}>{h}</div>
                 ))}
               </div>
               {upcomingTasks.slice(0, 4).map((task, index) => (
                 <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
                   <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
                   <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
+                  <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
+                  <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 </div>
               ))}
               {!upcomingTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No upcoming tasks</div>}
@@ -758,17 +758,17 @@ export default function ExecutiveOnePage({ project }: Props) {
             <div style={{ padding: '12px 14px', borderRadius: 12, background: C.bg }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: C.text2, marginBottom: 8 }}>OVERDUE TASKS</div>
               <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
-                {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                {['No.', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                  <div key={h} style={{ fontSize: 11, color: C.text2, fontWeight: 800 }}>{h}</div>
                 ))}
               </div>
               {overdueTasks.slice(0, 4).map((task, index) => (
                 <div key={task.id} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0,1fr) 70px 86px 90px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
                   <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
+                  <div style={{ fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.taskName}</div>
                   <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{Math.round(Number(task.percentComplete || 0))}%</div>
-                  <div style={{ fontSize: 10, color: C.red, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
-                  <div style={{ fontSize: 10, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
+                  <div style={{ fontSize: 11, color: C.red, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</div>
+                  <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.resource || '-'}</div>
                 </div>
               ))}
               {!overdueTasks.length && <div style={{ fontSize: 11, color: C.text3 }}>No overdue tasks</div>}
@@ -789,10 +789,10 @@ export default function ExecutiveOnePage({ project }: Props) {
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Milestones</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All project milestones sorted by due date</div>
             </div>
-            <button type="button" onClick={() => openTab('ms')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View Milestones Tab</button>
+            <button type="button" onClick={() => openTab('ms')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>View Milestones Tab</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: C.bg }}>
                   {['Milestone', 'Due Date', 'Status'].map((h) => (
@@ -820,7 +820,7 @@ export default function ExecutiveOnePage({ project }: Props) {
                           <td style={{ padding: '9px 12px 9px 20px', whiteSpace: 'nowrap', color: isDelayed ? C.red : C.text2, fontWeight: isDelayed ? 700 : 400 }}>{m.dueDate ? fmtDate(m.dueDate) : '—'}</td>
                           <td style={{ padding: '9px 12px 9px 20px', whiteSpace: 'nowrap' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 999, background: msState.bg, color: msState.color, fontSize: 11, fontWeight: 700 }}>{msState.label}</span>
-                            {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 10, fontWeight: 700 }}>Delayed</span>}
+                            {isDelayed && <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: C.redBg, color: C.red, fontSize: 11, fontWeight: 700 }}>Delayed</span>}
                           </td>
                         </tr>
                       );
@@ -841,15 +841,15 @@ export default function ExecutiveOnePage({ project }: Props) {
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Open Issues</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{openIssueList.length} open issue{openIssueList.length !== 1 ? 's' : ''}</div>
             </div>
-            <button type="button" onClick={() => openTab('issues')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Issues</button>
+            <button type="button" onClick={() => openTab('issues')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>View All Issues</button>
           </div>
           {openIssueList.length === 0 ? (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No open issues</div>
+            <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 13 }}>No open issues</div>
           ) : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '32px minmax(0,1fr) 76px 132px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
                 {['#', 'Issue', 'Status', 'Assignee'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                  <div key={h} style={{ fontSize: 11, color: C.text2, fontWeight: 800 }}>{h}</div>
                 ))}
               </div>
               {openIssueList.slice(0, 6).map((issue: Issue, index) => {
@@ -858,7 +858,7 @@ export default function ExecutiveOnePage({ project }: Props) {
                   <div key={issue.id} style={{ display: 'grid', gridTemplateColumns: '32px minmax(0,1fr) 76px 132px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
                     <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{index + 1}</div>
                     <div style={{ fontSize: 11, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={issue.title}>{issue.title}</div>
-                    <div style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: tag.bg, color: tag.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{issue.status}</div>
+                    <div style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999, background: tag.bg, color: tag.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{issue.status}</div>
                     <div style={{ fontSize: 11, color: C.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>{issue.assignedTo || '—'}</div>
                   </div>
                 );
@@ -873,13 +873,13 @@ export default function ExecutiveOnePage({ project }: Props) {
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Effort Summary</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>Budget vs. used mandays by module</div>
             </div>
-            <button type="button" onClick={() => openTab('effort')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View All Effort</button>
+            <button type="button" onClick={() => openTab('effort')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>View All Effort</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 88px 88px 88px', gap: 8, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700 }}>Module</div>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Budget</div>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Used</div>
-            <div style={{ fontSize: 10, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Remain</div>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>Module</div>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Budget</div>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Used</div>
+            <div style={{ fontSize: 11, color: C.text2, fontWeight: 700, textAlign: 'right' }}>Remain</div>
           </div>
           <EffortRows efforts={projectEfforts} />
         </Card>
@@ -890,23 +890,23 @@ export default function ExecutiveOnePage({ project }: Props) {
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Change Requests</div>
               <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>All CRs (including closed)</div>
             </div>
-            <button type="button" onClick={() => openTab('cr')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>View CR Tab</button>
+            <button type="button" onClick={() => openTab('cr')} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>View CR Tab</button>
           </div>
           {allCRs.length === 0 ? (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 12 }}>No change requests.</div>
+            <div style={{ padding: '24px 0', textAlign: 'center', color: C.text3, fontSize: 13 }}>No change requests.</div>
           ) : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '88px minmax(0,1fr) 96px 96px', gap: 8, alignItems: 'center', paddingBottom: 6, borderBottom: `1px solid ${C.border}` }}>
                 {['CR ID', 'Title', 'Date', 'Status'].map((h) => (
-                  <div key={h} style={{ fontSize: 10, color: C.text2, fontWeight: 800 }}>{h}</div>
+                  <div key={h} style={{ fontSize: 11, color: C.text2, fontWeight: 800 }}>{h}</div>
                 ))}
               </div>
               {allCRs.slice(0, 6).map((cr: ChangeRequest) => (
                 <div key={cr.id} style={{ display: 'grid', gridTemplateColumns: '88px minmax(0,1fr) 96px 96px', gap: 8, alignItems: 'center', paddingTop: 8 }}>
                   <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>{cr.crId || '-'}</div>
-                  <div style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={cr.title}>{cr.title || '-'}</div>
+                  <div style={{ fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={cr.title}>{cr.title || '-'}</div>
                   <div style={{ fontSize: 11, color: C.text2 }}>{cr.requestDate ? fmtDate(cr.requestDate) : '-'}</div>
-                  <div style={{ fontSize: 10, color: C.text2, fontWeight: 700 }}>{cr.status || '-'}</div>
+                  <div style={{ fontSize: 11, color: C.text2, fontWeight: 700 }}>{cr.status || '-'}</div>
                 </div>
               ))}
             </>
@@ -919,17 +919,17 @@ export default function ExecutiveOnePage({ project }: Props) {
           <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 980, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
             <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{activityModalTitle}</div>
-                <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>ทั้งหมด {activityModalRows.length} รายการ</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{activityModalTitle}</div>
+                <div style={{ fontSize: 13, color: C.text2, marginTop: 4 }}>{activityModalRows.length} items in total</div>
               </div>
               <button onClick={() => setShowActivitiesModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
             </div>
 
             <div style={{ overflow: 'auto', flex: 1 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
-                    {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
+                    {['No.', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -954,7 +954,7 @@ export default function ExecutiveOnePage({ project }: Props) {
             </div>
 
             <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setShowActivitiesModal(null)} style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer', padding: '6px 14px', background: 'transparent', color: C.text2, border: `1px solid ${C.border}` }}>Close</button>
+              <button type="button" onClick={() => setShowActivitiesModal(null)} style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer', padding: '6px 14px', background: 'transparent', color: C.text2, border: `1px solid ${C.border}` }}>Close</button>
             </div>
           </div>
         </div>

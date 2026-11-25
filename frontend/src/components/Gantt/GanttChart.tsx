@@ -159,7 +159,7 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
         style={{ flex: 1, overflowY: 'scroll', overflowX: 'auto', userSelect: 'none', background: C.white, position: 'relative' }}>
         {/* Mobile scroll hint */}
         {showScrollHint && window.innerWidth < 768 && (
-          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '6px 12px', borderRadius: 20, fontSize: 10, fontFamily: 'Poppins, sans-serif', whiteSpace: 'nowrap', zIndex: 50, pointerEvents: 'none', animation: 'fadeInOut 3s forwards' }}>
+          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '6px 12px', borderRadius: 20, fontSize: 11, fontFamily: 'Poppins, sans-serif', whiteSpace: 'nowrap', zIndex: 50, pointerEvents: 'none', animation: 'fadeInOut 3s forwards' }}>
             ← Scroll horizontally
           </div>
         )}
@@ -250,7 +250,7 @@ export default function GanttChart({ tasks, visibleTasks, selectedId, onSelect, 
         {tooltip && (
           <div style={{ position: 'sticky', left: tooltip.x + 14, top: tooltip.y, pointerEvents: 'none', zIndex: 50,
             background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 14px',
-            boxShadow: C.shadow2, fontSize: 12, minWidth: 180, display: 'inline-block' }}>
+            boxShadow: C.shadow2, fontSize: 13, minWidth: 180, display: 'inline-block' }}>
             <div style={{ fontWeight: 700, color: C.text, marginBottom: 5 }}>{tooltip.task.taskName}</div>
             <div style={{ color: C.text2 }}>WBS: {tooltip.task.wbs}</div>
             <div style={{ color: C.text2 }}>{fmtDate(tooltip.task.startDate)} → {fmtDate(tooltip.task.endDate)}</div>

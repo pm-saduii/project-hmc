@@ -219,8 +219,8 @@ export default function MembersTab({ projectId, extraActions }: Props) {
         ].map(s => (
           <Card key={s.label} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ fontSize: 24 }}>{s.icon}</div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.count}</div>
-              <div style={{ fontSize: 12, color: C.text2 }}>{s.label}</div></div>
+            <div><div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.count}</div>
+              <div style={{ fontSize: 13, color: C.text2 }}>{s.label}</div></div>
           </Card>
         ))}
       </div>
@@ -229,7 +229,7 @@ export default function MembersTab({ projectId, extraActions }: Props) {
         <div style={{ display: 'flex', gap: 6 }}>
           {(['all', 'internal', 'client'] as const).map(v => (
             <button key={v} onClick={() => setFilter(v)}
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 20, border: `1.5px solid ${filter === v ? C.primary : C.border}`, background: filter === v ? C.primaryBg : C.white, color: filter === v ? C.primary : C.text2, cursor: 'pointer' }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20, border: `1.5px solid ${filter === v ? C.primary : C.border}`, background: filter === v ? C.primaryBg : C.white, color: filter === v ? C.primary : C.text2, cursor: 'pointer' }}>
               {v.charAt(0).toUpperCase() + v.slice(1)} ({v === 'all' ? members.length : v === 'internal' ? internal.length : client.length})
             </button>
           ))}
@@ -255,17 +255,17 @@ export default function MembersTab({ projectId, extraActions }: Props) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: '1 1 120px' }}>
                       <Avatar name={mb.name} size={30} />
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mb.name}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mb.name}</div>
                         {mb.thaiName ? <div style={{ fontSize: 11, color: C.text3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mb.thaiName}</div> : null}
-                        <div style={{ fontSize: 10, color: C.text2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mb.email}</div>
+                        <div style={{ fontSize: 11, color: C.text2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mb.email}</div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', minWidth: 90 }}>
-                      <div style={{ fontSize: 9, color: C.text2 }}>Type</div>
+                      <div style={{ fontSize: 11, color: C.text2 }}>Type</div>
                       <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>{mb.type === 'internal' ? 'Internal' : 'Client'}</Badge>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gap: 6, marginTop: 10, fontSize: 10, color: C.text2 }}>
+                  <div style={{ display: 'grid', gap: 6, marginTop: 10, fontSize: 11, color: C.text2 }}>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Role:</strong> <span style={{ color: roleColor(role) }}>{role}</span></div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Position:</strong> {mb.position || '—'}</div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Tel:</strong> {mb.tel || '—'}</div>
@@ -331,8 +331,8 @@ export default function MembersTab({ projectId, extraActions }: Props) {
                   </td>
                   <td style={{ ...TD, color: C.text2, fontSize: 11 }}>{mb.position || '—'}</td>
                   <td style={{ ...TD, color: C.blue }}>{mb.email}</td>
-                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 12 }}>{mb.tel}</td>
-                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 12 }}>{mb.ext || '—'}</td>
+                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 13 }}>{mb.tel}</td>
+                  <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', fontSize: 13 }}>{mb.ext || '—'}</td>
                   <td style={TD}>
                     <Badge bg={mb.type === 'internal' ? C.primaryBg : C.amberBg} color={mb.type === 'internal' ? C.primary : C.amber}>
                       {mb.type === 'internal' ? 'Internal' : 'Client'}
@@ -369,7 +369,7 @@ function MemberModal({ data, currentUserRole, onClose, onSave }: { data: Partial
           <Input autoFocus value={form.name ?? ''} onChange={v => up('name', v)} placeholder="e.g. John Smith" />
         </FormRow>
         <FormRow label="Thai Name">
-          <Input value={form.thaiName ?? ''} onChange={v => up('thaiName', v)} placeholder="ชื่อไทย" />
+          <Input value={form.thaiName ?? ''} onChange={v => up('thaiName', v)} placeholder="Thai name" />
         </FormRow>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

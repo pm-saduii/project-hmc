@@ -240,7 +240,7 @@ export default function ProjectModal({ project, onClose, inline = false }: Props
           placeholder="somchai@domain.com, apichart@domain.com"
         />
       </FormRow>
-      <div style={{ fontSize: 12, color: '#475569', marginBottom: 10 }}>
+      <div style={{ fontSize: 13, color: '#475569', marginBottom: 10 }}>
         If task assignee email is not available, fallback recipients from Custom Recipients will be used.
       </div>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>

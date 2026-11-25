@@ -120,7 +120,7 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
   const saveEntry = async (draft: TimesheetDraft, entry: TimesheetEntry | null) => {
     const hours = Number(draft.hours);
     if (!draft.projectKey.trim() || !draft.description.trim() || !draft.workDate || !Number.isFinite(hours) || hours <= 0 || hours > 24) {
-      toast.error('กรุณากรอก Project, รายละเอียด และชั่วโมงให้ถูกต้อง (0–24 ชั่วโมง)');
+      toast.error('Please enter a project, a description and valid hours (0–24)');
       return;
     }
 
@@ -128,7 +128,7 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
       .filter((item) => item.workDate === draft.workDate && item.id !== entry?.id)
       .reduce((total, item) => total + Number(item.hours), 0);
     if (existingHours + hours > 24) {
-      toast.error('จำนวนชั่วโมงรวมของวันต้องไม่เกิน 24 ชั่วโมง');
+      toast.error('Total hours for a day cannot exceed 24');
       return;
     }
 
@@ -147,7 +147,7 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
         ? current.map((item) => item.id === data.id ? data : item)
         : [...current, data]);
       setEditing(null);
-      toast.success(entry ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่ม Timesheet แล้ว');
+      toast.success(entry ? 'Timesheet entry updated' : 'Timesheet entry added');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to save timesheet');
     } finally {
@@ -160,7 +160,7 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
       await timesheetApi.remove(entry.id);
       setEntries((current) => current.filter((item) => item.id !== entry.id));
       setEditing(null);
-      toast.success('ลบ Timesheet แล้ว');
+      toast.success('Timesheet entry deleted');
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to delete timesheet');
@@ -176,7 +176,7 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
     const addHalfMonthSheet = (name: string, rows: ProjectSummaryRow[], firstDay: number, lastDay: number) => {
       const dayNumbers = Array.from({ length: lastDay - firstDay + 1 }, (_, index) => firstDay + index);
       const data = [
-        ['Project', 'รายละเอียด', ...dayNumbers.map(String), 'รวมชั่วโมง'],
+        ['Project', 'Description', ...dayNumbers.map(String), 'Total Hours'],
         ...rows.map((row) => [
           row.projectKey,
           row.description,
@@ -189,8 +189,8 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
       XLSX.utils.book_append_sheet(workbook, sheet, name);
     };
 
-    addHalfMonthSheet('วันที่ 1-15', firstHalfRows, 1, Math.min(15, daysInMonth));
-    addHalfMonthSheet('วันที่ 16-สิ้นเดือน', secondHalfRows, 16, daysInMonth);
+    addHalfMonthSheet('Days 1-15', firstHalfRows, 1, Math.min(15, daysInMonth));
+    addHalfMonthSheet('Days 16-End', secondHalfRows, 16, daysInMonth);
     XLSX.writeFile(workbook, `timesheet-${monthKey}.xlsx`);
   };
 
@@ -214,7 +214,7 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
 
       {loadError && (
         <div role="alert" style={{ padding: 12, borderRadius: 8, color: C.red, background: C.redBg, fontSize: 13 }}>
-          โหลด Timesheet ไม่สำเร็จ: {loadError}
+          Unable to load timesheet: {loadError}
         </div>
       )}
 
@@ -225,7 +225,7 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
           ))}
         </div>
         {loading ? (
-          <div style={{ padding: 36, textAlign: 'center', color: C.text2 }}>กำลังโหลด Timesheet...</div>
+          <div style={{ padding: 36, textAlign: 'center', color: C.text2 }}>Loading timesheet…</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gridAutoRows: 'minmax(112px, auto)' }}>
             {calendarDays.map((day, index) => {
@@ -253,12 +253,12 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
                     minHeight: 112, padding: 6, borderTop: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
                     background: weekend ? C.bg : C.white, cursor: 'pointer', overflow: 'hidden',
                   }}
-                  title="กดเพื่อเพิ่มรายการ"
+                  title="Click to add an entry"
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, marginBottom: 5 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{day}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: incomplete ? C.red : weekend ? C.text3 : C.green }}>
-                      {weekend ? `${displayHours(hours)} ชม. · วันหยุด` : `${displayHours(hours)} / 8 ชม.`}
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{day}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: incomplete ? C.red : weekend ? C.text3 : C.green }}>
+                      {weekend ? `${displayHours(hours)} h · Weekend` : `${displayHours(hours)} / 8 h`}
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -270,18 +270,18 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
                           event.stopPropagation();
                           setEditing({ entry, date: entry.workDate });
                         }}
-                        title={`${projectLabel(entry.projectKey)} · ${entry.description} · ${displayHours(Number(entry.hours))} ชม. · กดเพื่อแก้ไข`}
+                        title={`${projectLabel(entry.projectKey)} · ${entry.description} · ${displayHours(Number(entry.hours))} h · Click to edit`}
                         style={{
                           width: '100%', overflow: 'hidden', textAlign: 'left', cursor: 'pointer', border: '1px solid #D9E2FF',
-                          borderRadius: 5, padding: '3px 5px', background: '#EEF2FF', color: C.primary, fontSize: 10,
+                          borderRadius: 5, padding: '3px 5px', background: '#EEF2FF', color: C.primary, fontSize: 11,
                           whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                         }}
                       >
-                        {entry.projectKey} · {displayHours(Number(entry.hours))} ชม. · {entry.description}
+                        {entry.projectKey} · {displayHours(Number(entry.hours))} h · {entry.description}
                       </button>
                     ))}
                     {dayEntries.length === 0 && !weekend && (
-                      <span style={{ color: C.text3, fontSize: 10, padding: '4px 2px' }}>+ เพิ่มรายการ</span>
+                      <span style={{ color: C.text3, fontSize: 11, padding: '4px 2px' }}>+ Add entry</span>
                     )}
                   </div>
                 </div>
@@ -293,24 +293,24 @@ export default function TimesheetModal({ onClose, inline = false }: Props) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: C.text2 }}>
         <span style={{ width: 12, height: 12, borderRadius: 3, background: '#FFF1F2', border: '1px solid #FECDD3' }} />
-        วันทำงานที่บันทึกไม่ครบ 8 ชั่วโมง (ไม่นับวันเสาร์–อาทิตย์)
+        Working days with less than 8 hours logged (weekends excluded)
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, color: C.text, fontSize: 15 }}>
-          <CalendarDays size={17} /> สรุปประจำเดือน
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, color: C.text, fontSize: 16 }}>
+          <CalendarDays size={17} /> Monthly Summary
         </h3>
-        <span style={{ fontSize: 11, color: C.text2 }}>ชั่วโมงรายวันแยกตาม Project</span>
+        <span style={{ fontSize: 11, color: C.text2 }}>Daily hours by project</span>
       </div>
 
       <HalfMonthSummary
-        title={`วันที่ 1–15 ${format(month, 'MMMM')}`}
+        title={`Days 1–15 ${format(month, 'MMMM')}`}
         rows={firstHalfRows}
         firstDay={1}
         lastDay={Math.min(15, daysInMonth)}
       />
       <HalfMonthSummary
-        title={`วันที่ 16–${daysInMonth} ${format(month, 'MMMM')}`}
+        title={`Days 16–${daysInMonth} ${format(month, 'MMMM')}`}
         rows={secondHalfRows}
         firstDay={16}
         lastDay={daysInMonth}
@@ -345,15 +345,15 @@ function HalfMonthSummary({
   const dayNumbers = Array.from({ length: Math.max(0, lastDay - firstDay + 1) }, (_, index) => firstDay + index);
   return (
     <section style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', flex: '0 0 auto' }}>
-      <div style={{ padding: '10px 12px', background: C.bg, color: C.text, fontWeight: 700, fontSize: 12 }}>{title}</div>
+      <div style={{ padding: '10px 12px', background: C.bg, color: C.text, fontWeight: 700, fontSize: 13 }}>{title}</div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: 600, borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
             <tr>
               <th style={summaryHeaderStyle}>Project</th>
-              <th style={{ ...summaryHeaderStyle, minWidth: 220 }}>รายละเอียด</th>
+              <th style={{ ...summaryHeaderStyle, minWidth: 220 }}>Description</th>
               {dayNumbers.map((day) => <th key={day} style={{ ...summaryHeaderStyle, minWidth: 34, textAlign: 'center' }}>{day}</th>)}
-              <th style={{ ...summaryHeaderStyle, minWidth: 58, textAlign: 'center' }}>รวม</th>
+              <th style={{ ...summaryHeaderStyle, minWidth: 58, textAlign: 'center' }}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -375,7 +375,7 @@ function HalfMonthSummary({
               );
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={dayNumbers.length + 3} style={{ ...summaryCellStyle, textAlign: 'center', color: C.text3 }}>ยังไม่มีข้อมูลในช่วงนี้</td></tr>
+              <tr><td colSpan={dayNumbers.length + 3} style={{ ...summaryCellStyle, textAlign: 'center', color: C.text3 }}>No entries in this period</td></tr>
             )}
           </tbody>
         </table>
@@ -432,47 +432,47 @@ function TimesheetEntryModal({
   };
 
   return (
-    <Modal title={entry ? 'แก้ไข Timesheet' : 'เพิ่ม Timesheet'} onClose={onClose} width={560} closeOnBackdrop={false}>
-      <FormRow label="วันที่" required>
+    <Modal title={entry ? 'Edit Timesheet Entry' : 'Add Timesheet Entry'} onClose={onClose} width={560} closeOnBackdrop={false}>
+      <FormRow label="Date" required>
         <Input type="date" value={draft.workDate} onChange={(value) => update('workDate', value)} />
       </FormRow>
       <FormRow label="Project Key (Customer Abbreviation)" required>
         <Input
           value={draft.projectKey}
           onChange={(value) => update('projectKey', value)}
-          placeholder="เลือกหรือกรอก Customer Abbreviation"
+          placeholder="Select or type a customer abbreviation"
           list="timesheet-project-keys"
         />
         <datalist id="timesheet-project-keys">
           {projectKeys.map((key) => <option key={key} value={key} />)}
         </datalist>
       </FormRow>
-      <FormRow label="รายละเอียด" required>
-        <Textarea value={draft.description} onChange={(value) => update('description', value)} rows={3} placeholder="รายละเอียดงานที่ทำ" />
+      <FormRow label="Description" required>
+        <Textarea value={draft.description} onChange={(value) => update('description', value)} rows={3} placeholder="What did you work on?" />
       </FormRow>
-      <FormRow label="จำนวนชั่วโมง" required>
+      <FormRow label="Hours" required>
         <Input
           type="number"
           value={draft.hours}
           onChange={(value) => update('hours', value)}
-          placeholder="เช่น 2 หรือ 7.5"
+          placeholder="e.g. 2 or 7.5"
           style={{ maxWidth: 180 }}
         />
       </FormRow>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 18 }}>
         {onDelete ? (
-          <Btn variant="danger" disabled={saving || deleting} onClick={() => setConfirmDelete(true)}><Trash2 size={14} /> ลบรายการ</Btn>
+          <Btn variant="danger" disabled={saving || deleting} onClick={() => setConfirmDelete(true)}><Trash2 size={14} /> Delete</Btn>
         ) : <span />}
         <div style={{ display: 'flex', gap: 8 }}>
-          <Btn variant="ghost" onClick={onClose}>ยกเลิก</Btn>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
           <Btn disabled={saving || deleting} onClick={() => onSave(draft)}>
-            <Plus size={14} /> {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+            <Plus size={14} /> {saving ? 'Saving…' : 'Save'}
           </Btn>
         </div>
       </div>
       {confirmDelete && (
         <ConfirmModal
-          message={`ลบ Timesheet ของวันที่ ${entry?.workDate} หรือไม่?`}
+          message={`Delete the timesheet entry for ${entry?.workDate}?`}
           onConfirm={() => { void handleDelete(); }}
           onCancel={() => setConfirmDelete(false)}
         />

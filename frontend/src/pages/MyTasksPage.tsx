@@ -112,7 +112,7 @@ export default function MyTasksPage() {
           <p style={{ margin: 0, fontSize: 13, color: C.text2 }}>Tasks whose Resource is you, across all your projects.</p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.text2, fontSize: 12, fontWeight: 600, cursor: loading ? 'wait' : 'pointer', fontFamily: 'Poppins, sans-serif' }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.text2, fontSize: 13, fontWeight: 600, cursor: loading ? 'wait' : 'pointer', fontFamily: 'Poppins, sans-serif' }}>
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
@@ -125,12 +125,12 @@ export default function MyTasksPage() {
             return (
               <button key={item.key} type="button" aria-pressed={active} onClick={() => setFilter(item.key)}
                 style={{
-                  height: 30, padding: '0 12px', borderRadius: 999, fontSize: 12, fontWeight: active ? 600 : 500, cursor: 'pointer', fontFamily: 'Poppins, sans-serif',
+                  height: 30, padding: '0 12px', borderRadius: 999, fontSize: 13, fontWeight: active ? 600 : 500, cursor: 'pointer', fontFamily: 'Poppins, sans-serif',
                   border: `1px solid ${active ? '#C7D2FE' : C.border}`, background: active ? C.primaryBg : C.white, color: active ? C.primary : C.text2,
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}>
                 {item.label}
-                <span style={{ minWidth: 18, padding: '0 5px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: danger ? C.redBg : C.bg2, color: danger ? C.red : C.text2 }}>{counts[item.key]}</span>
+                <span style={{ minWidth: 18, padding: '0 5px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: danger ? C.redBg : C.bg2, color: danger ? C.red : C.text2 }}>{counts[item.key]}</span>
               </button>
             );
           })}
@@ -185,10 +185,10 @@ export default function MyTasksPage() {
                     <td style={td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1 }}><ProgressBar value={Number(t.percentComplete) || 0} /></div>
-                        <span style={{ fontSize: 12, color: C.text2, width: 36, textAlign: 'right' }}>{Number(t.percentComplete) || 0}%</span>
+                        <span style={{ fontSize: 13, color: C.text2, width: 36, textAlign: 'right' }}>{Number(t.percentComplete) || 0}%</span>
                       </div>
                     </td>
-                    <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 12, color: C.text2 }}>{t.status}</td>
+                    <td style={{ ...td, whiteSpace: 'nowrap', fontSize: 13, color: C.text2 }}>{t.status}</td>
                   </tr>
                 );
               })}

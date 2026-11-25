@@ -170,8 +170,8 @@ export default function ProjectEnvironmentTab({ project }: Props) {
                 <Card key={row.id} style={{ padding: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
                     <div style={{ minWidth: 0, flex: '1 1 180px' }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 8 }}>{row.environment}</div>
-                      <div style={{ fontSize: 12, color: C.text2, marginBottom: 12, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{row.url || '—'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>{row.environment}</div>
+                      <div style={{ fontSize: 13, color: C.text2, marginBottom: 12, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{row.url || '—'}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                       {row.password ? (
@@ -190,7 +190,7 @@ export default function ProjectEnvironmentTab({ project }: Props) {
                       </button>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, color: C.text2, fontSize: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14, color: C.text2, fontSize: 13 }}>
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 6 }}>User</div>
                       <div>{row.username || '—'}</div>

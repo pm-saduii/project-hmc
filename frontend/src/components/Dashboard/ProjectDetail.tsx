@@ -36,7 +36,6 @@ const IssuesTab = React.lazy(() => import('../Issues/IssuesTab'));
 const RiskRegisterTab = React.lazy(() => import('../RiskRegister/RiskRegisterTab'));
 const ActivitiesTab = React.lazy(() => import('../Activities/ActivitiesTab'));
 const ProjectEnvironmentTab = React.lazy(() => import('./ProjectEnvironmentTab'));
-const ExecutiveOnePage = React.lazy(() => import('./ExecutiveOnePage'));
 const LessonsLearnedTab = React.lazy(() => import('./LessonsLearnedTab'));
 
 interface Props { project: Project; }
@@ -330,7 +329,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     background: C.bg2,
     borderBottom: `1px solid ${C.border}`,
     color: C.text2,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 700,
     textAlign: 'left',
     whiteSpace: 'nowrap',
@@ -339,7 +338,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     padding: category === 'migrate-data' ? '3px 4px' : '4px 8px',
     borderBottom: `1px solid ${C.border}`,
     color: C.text,
-    fontSize: 10,
+    fontSize: 11,
     verticalAlign: 'middle',
   };
   const inputStyle: React.CSSProperties = {
@@ -353,7 +352,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     background: C.white,
     color: C.text,
     fontFamily: 'Poppins, sans-serif',
-    fontSize: 10,
+    fontSize: 11,
   };
   const disabledInputStyle: React.CSSProperties = {
     background: C.bg2,
@@ -434,7 +433,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {hasUnsavedChanges && <span style={{ color: C.amber, fontSize: 12, fontWeight: 600 }}>Unsaved changes</span>}
+            {hasUnsavedChanges && <span style={{ color: C.amber, fontSize: 13, fontWeight: 600 }}>Unsaved changes</span>}
             <Btn onClick={exportChecklistPdf} disabled={!isLoaded || !currentTopics.length} small><Download size={14} /> Export PDF</Btn>
             <Btn onClick={saveItems} disabled={!isLoaded || !hasUnsavedChanges || !currentTopics.length} small>
               <Save size={14} /> Save Progress
@@ -442,12 +441,12 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
           </div>
         </div>
         {loadError && (
-          <div style={{ marginBottom: 12, padding: '9px 12px', border: `1px solid ${C.red}`, background: C.redBg, color: C.red, fontSize: 12 }}>
+          <div style={{ marginBottom: 12, padding: '9px 12px', border: `1px solid ${C.red}`, background: C.redBg, color: C.red, fontSize: 13 }}>
             Unable to load checklist data. Apply the project checklist database migration and verify project access. {loadError}
           </div>
         )}
         <div style={{ overflowX: 'hidden', border: `1px solid ${C.border}`, borderRadius: 12, background: C.white, width: '100%', minWidth: 0 }}>
-          <table style={{ width: '100%', minWidth: 0, borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10 }}>
+          <table style={{ width: '100%', minWidth: 0, borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 11 }}>
             <colgroup>
               {category === 'migrate-data' ? <>
                 <col style={{ width: '4%' }} /><col style={{ width: '13%' }} />
@@ -499,13 +498,13 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
               return (
                 <tbody key={stage.id}>
                   <tr>
-                    <td colSpan={checklistColumnCount} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 10, fontWeight: 700, textAlign: 'left' }}>
+                    <td colSpan={checklistColumnCount} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 11, fontWeight: 700, textAlign: 'left' }}>
                       Stage: {stage.label}
                     </td>
                   </tr>
                   {stageTopics.map((topic, index) => renderTopicRow(topic, index))}
                   {stageTopics.length === 0 && (
-                    <tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>No topics configured for this stage.</td></tr>
+                    <tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 11 }}>No topics configured for this stage.</td></tr>
                   )}
                 </tbody>
               );
@@ -516,7 +515,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
                   return (
                     <tbody key={moduleName}>
                       <tr>
-                        <td colSpan={checklistColumnCount} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 10, fontWeight: 700, textAlign: 'left' }}>
+                        <td colSpan={checklistColumnCount} style={{ padding: '10px 12px', background: C.bg2, borderBottom: `1px solid ${C.border}`, color: C.text, fontSize: 11, fontWeight: 700, textAlign: 'left' }}>
                           Module: {moduleName || '—'}
                         </td>
                       </tr>
@@ -525,7 +524,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
                   );
                 })}
                 {currentTopics.length === 0 && (
-                  <tbody><tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 10 }}>{`No ${categoryLabel.toLowerCase()} topics configured in Setup.`}</td></tr></tbody>
+                  <tbody><tr><td colSpan={checklistColumnCount} style={{ padding: '10px 12px', color: C.text3, fontSize: 11 }}>{`No ${categoryLabel.toLowerCase()} topics configured in Setup.`}</td></tr></tbody>
                 )}
               </>
             )}
@@ -771,17 +770,17 @@ export default function ProjectDetail({ project }: Props) {
             <div style={{ width: 10, height: 42, borderRadius: 5, background: project.color || C.primary, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: 19, fontWeight: 800, color: C.text, margin: 0 }}>{project.name}</h2>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: C.text, margin: 0 }}>{project.name}</h2>
                 <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
               </div>
-              <div style={{ fontSize: 12, color: C.text3, marginTop: 3 }}>
+              <div style={{ fontSize: 13, color: C.text3, marginTop: 3 }}>
                 {project.code} · {project.client} · {fmtDate(project.startDate)} – {fmtDate(project.endDate)}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 10 }}>
                 <Badge bg={scheduleBg} color={scheduleColor}>
                   {scheduleLabel}
                 </Badge>
-                <span style={{ fontSize: 12, color: C.text3, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 13, color: C.text3, whiteSpace: 'nowrap' }}>
                   Overall Progress : {overallProgress}% - Target : {plannedPercent}%
                 </span>
               </div>
@@ -811,7 +810,7 @@ export default function ProjectDetail({ project }: Props) {
                       navigate(pathFor(shownGroup.key, sub.key));
                     }}
                     style={{
-                      height: 30, padding: '0 14px', borderRadius: 999, fontSize: 12, fontWeight: selected ? 600 : 500,
+                      height: 30, padding: '0 14px', borderRadius: 999, fontSize: 13, fontWeight: selected ? 600 : 500,
                       fontFamily: 'Poppins, sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
                       border: `1px solid ${selected ? '#C7D2FE' : C.border}`,
                       background: selected ? C.primaryBg : C.white,
@@ -857,7 +856,6 @@ export default function ProjectDetail({ project }: Props) {
         {activeTab === 'risks'   && <div style={{ height: '100%', overflowY: 'auto' }}><RiskRegisterTab   projectId={project.id} extraActions={copyButton('risks')} /></div>}
         {activeTab === 'activities' && <div style={{ height: '100%', overflowY: 'auto' }}><ActivitiesTab projectId={project.id} /></div>}
         {activeTab === 'env'     && <div style={{ height: '100%', overflowY: 'auto' }}><ProjectEnvironmentTab project={project} /></div>}
-        {activeTab === 'onepage' && <div style={{ height: '100%', overflowY: 'auto' }}><ExecutiveOnePage project={project} /></div>}
         {activeTab === 'settings' && <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}><ProjectModal key={project.id} project={project} inline onClose={() => undefined} /></div>}
         </React.Suspense>}
       </div>
@@ -879,7 +877,7 @@ export default function ProjectDetail({ project }: Props) {
               <Input value={copyPassword} onChange={setCopyPassword} placeholder="*********" />
             </FormRow>
 
-            <div style={{ padding: '10px 12px', borderRadius: 10, background: C.amberBg, fontSize: 12, color: C.text2 }}>
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: C.amberBg, fontSize: 13, color: C.text2 }}>
               Copy will append data from source project into this tab of current project.
             </div>
 

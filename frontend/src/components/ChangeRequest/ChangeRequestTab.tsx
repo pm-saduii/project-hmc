@@ -63,7 +63,7 @@ export default function ChangeRequestTab({ projectId }: Props) {
         ].map(s => (
           <Card key={s.label} style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{s.label}</div>
           </Card>
         ))}
@@ -111,10 +111,10 @@ export default function ChangeRequestTab({ projectId }: Props) {
             {/* CR Items — expanded */}
             {isExp && (
               <div style={{ borderTop: `1px solid ${C.border}`, padding: '0 16px 12px' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.text2, padding: '10px 0 6px' }}>CR Items</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.text2, padding: '10px 0 6px' }}>CR Items</div>
                 {cr.items?.length === 0 && <div style={{ fontSize: 11, color: C.text3 }}>No items</div>}
                 {cr.items?.map((item, j) => (
-                  <div key={item.id} style={{ display: 'flex', gap: 12, padding: '6px 10px', background: j % 2 === 0 ? C.bg : C.white, borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
+                  <div key={item.id} style={{ display: 'flex', gap: 12, padding: '6px 10px', background: j % 2 === 0 ? C.bg : C.white, borderRadius: 6, marginBottom: 4, fontSize: 13 }}>
                     <span style={{ fontWeight: 600, color: C.text2, minWidth: 20 }}>{j + 1}.</span>
                     <span style={{ flex: 1, color: C.text }}>{item.detail}</span>
                     <span style={{ fontWeight: 600, color: C.amber, flexShrink: 0 }}>{item.manday} MD</span>
@@ -193,7 +193,7 @@ function CRModal({ data, onClose, onSave }: { data: Partial<CRWithItems>; onClos
             <Input value={item.detail ?? ''} onChange={v => updateItem(i, 'detail', v)} placeholder={`Item ${i + 1} detail…`} />
             <Input type="number" value={item.manday ?? 0} onChange={v => updateItem(i, 'manday', Number(v))} />
             <button onClick={() => removeItem(i)}
-              style={{ height: 34, background: C.redBg, border: 'none', borderRadius: 8, color: C.red, cursor: 'pointer', fontSize: 14 }}>✕</button>
+              style={{ height: 34, background: C.redBg, border: 'none', borderRadius: 8, color: C.red, cursor: 'pointer', fontSize: 13 }}>✕</button>
           </div>
         ))}
         <input type="hidden" value={totalMD} onChange={() => up('totalManday', totalMD)} />

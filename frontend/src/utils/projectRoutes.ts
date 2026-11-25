@@ -22,8 +22,8 @@ export const PROJECT_GROUPS: ProjectGroup[] = [
   {
     key: 'overview',
     label: 'Overview',
+    // One Page has its own menu (/one-page/:projectId), next to Dashboard.
     subs: [
-      { key: 'one-page', label: 'One Page', screen: 'onepage' },
       { key: 'summary', label: 'Summary', screen: 'summary' },
     ],
   },
@@ -77,6 +77,7 @@ export function locateScreen(screen: string): { group: string; sub: string } | n
 
 /** URL of a project, optionally opened on a screen id ('tasks', 'ms', 'issues', …). */
 export function projectPath(projectId: string, screen?: string): string {
+  if (screen === 'onepage') return `/one-page/${encodeURIComponent(projectId)}`;
   const base = `/projects/${encodeURIComponent(projectId)}`;
   if (!screen) return base;
   const place = locateScreen(screen);

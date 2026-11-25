@@ -119,7 +119,7 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
         ].map(s => (
           <Card key={s.label} style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: 20, marginBottom: 5 }}>{s.icon}</div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{s.label}</div>
           </Card>
         ))}
@@ -173,7 +173,7 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
               <div style={{ height: 1, flex: 1, background: C.border, minWidth: 80 }} />
               {editingPhaseBudget === phase ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: C.text2 }}>Phase Budget</span>
+                  <span style={{ fontSize: 13, color: C.text2 }}>Phase Budget</span>
                   <input
                     type="number"
                     value={phaseBudgetDraft}
@@ -184,7 +184,7 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
                       border: `1px solid ${C.border}`,
                       borderRadius: 6,
                       padding: '0 8px',
-                      fontSize: 12,
+                      fontSize: 13,
                       color: C.text,
                       background: C.white,
                     }}
@@ -224,7 +224,7 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: C.text2 }}>Phase Budget ฿{fmtMoney(phaseBudget)}</span>
+                  <span style={{ fontSize: 13, color: C.text2 }}>Phase Budget ฿{fmtMoney(phaseBudget)}</span>
                   <button
                     onClick={() => startEditPhaseBudget(phase, phaseBudget)}
                     aria-label={`Edit ${phase} budget`}
@@ -245,7 +245,7 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
                   </button>
                 </div>
               )}
-              <span style={{ fontSize: 12, color: C.text2 }}>Milestone Total ฿{fmtMoney(pTotal)}</span>
+              <span style={{ fontSize: 13, color: C.text2 }}>Milestone Total ฿{fmtMoney(pTotal)}</span>
             </div>
             {isMobile ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
@@ -256,18 +256,18 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10, alignItems: 'flex-start' }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ms.name}</div>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: C.text2, fontSize: 12 }}>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: C.text2, fontSize: 13 }}>
                             <span>{ms.percent}%</span>
                             <span>฿{fmtMoney(ms.amount)}</span>
                           </div>
                         </div>
                         <Badge bg={ss.bg} color={ss.color}>{ss.label}</Badge>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10, fontSize: 12, color: C.text2 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10, fontSize: 13, color: C.text2 }}>
                         <div><strong>Due</strong><br />{fmtDate(ms.dueDate)}</div>
                         <div><strong>Billing</strong><br />{fmtDate(ms.billingDate)}</div>
                       </div>
-                      <div style={{ fontSize: 12, color: C.text3, marginBottom: 10, minHeight: 36 }}>{ms.notes || 'No notes'}</div>
+                      <div style={{ fontSize: 13, color: C.text3, marginBottom: 10, minHeight: 36 }}>{ms.notes || 'No notes'}</div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <button onClick={() => setModal(ms)} aria-label="Edit milestone" style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.primaryBg, border: 'none', borderRadius: 8, color: C.primary, cursor: 'pointer' }}>
                           <Pencil size={16} />
@@ -282,7 +282,7 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
               </div>
             ) : (
               <Card>
-                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 12, lineHeight: 1.35 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 13, lineHeight: 1.35 }}>
                   <colgroup>
                     <col style={{ width: '26%' }} />
                     <col style={{ width: '10%' }} />
@@ -389,8 +389,8 @@ function MilestoneModal({ data, phaseBudgetByPhase, isMobile, onClose, onSave }:
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
         {phaseBudgetByPhase[form.phase ?? ''] ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: C.text2 }}>Phase Budget (฿)</label>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fmtMoney(phaseBudgetByPhase[form.phase ?? ''] ?? 0)}</div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: C.text2 }}>Phase Budget (฿)</label>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{fmtMoney(phaseBudgetByPhase[form.phase ?? ''] ?? 0)}</div>
           </div>
         ) : (
           <FormRow label="Phase Budget (฿)">

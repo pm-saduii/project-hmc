@@ -403,7 +403,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
               <Input value={password} onChange={setPassword} placeholder="*********" />
             </FormRow>
 
-            <div style={{ padding: '10px 12px', borderRadius: 10, background: C.amberBg, fontSize: 12, color: C.text2 }}>
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: C.amberBg, fontSize: 13, color: C.text2 }}>
               This action replaces all tasks in the target project.
             </div>
 
@@ -467,7 +467,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                     <div style={{ flex: 1, minWidth: 160 }}>
                       <Input value={templateNameDraft} onChange={setTemplateNameDraft} placeholder="Template name" />
                     </div>
-                    {savingTemplateName && <span role="status" style={{ color: C.text3, fontSize: 10 }}>Saving…</span>}
+                    {savingTemplateName && <span role="status" style={{ color: C.text3, fontSize: 11 }}>Saving…</span>}
                     <Btn small variant="danger" onClick={handleDeleteTemplate} disabled={!isAdmin || loading}>
                       <Trash2 size={13} />
                     </Btn>
@@ -488,7 +488,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                       borderBottom: `1px solid ${C.border}`,
                     }}>
                       {['WBS', 'Parent WBS', 'Task Name', 'Duration', 'Effort (MD)', ''].map((label) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0 6px', fontSize: 10, fontWeight: 700, color: C.text2 }}>
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0 6px', fontSize: 11, fontWeight: 700, color: C.text2 }}>
                           {label}
                         </div>
                       ))}
@@ -537,7 +537,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                     <Btn small variant="ghost" onClick={addItem} disabled={!isAdmin}>
                       <Plus size={13} /> Add Row
                     </Btn>
-                    {savingItems && <span role="status" style={{ color: C.text3, fontSize: 10 }}>Saving…</span>}
+                    {savingItems && <span role="status" style={{ color: C.text3, fontSize: 11 }}>Saving…</span>}
                   </div>
                 </>
               )}

@@ -382,8 +382,8 @@ export default function ProjectSummaryTab({ project }: Props) {
   return (
     <div style={{ padding: 24, background: C.bg2, minHeight: '100%', fontFamily: 'Poppins, sans-serif' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 18, alignItems: 'center', padding: 18, borderRadius: 18, background: '#EFF6FF' }}>
-        <h3 style={{ margin: 0, fontSize: 18, color: C.text }}>Project Summary</h3>
-        <span style={{ color: C.text2, fontSize: 12 }}>15-day baseline progress with actual tracking and snapshot persistence.</span>
+        <h3 style={{ margin: 0, fontSize: 16, color: C.text }}>Project Summary</h3>
+        <span style={{ color: C.text2, fontSize: 13 }}>15-day baseline progress with actual tracking and snapshot persistence.</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Btn variant="outline" onClick={refreshBaseline} small disabled={refreshing || savingSnapshot !== null}>
             {refreshing ? 'Recalculating…' : 'Recalculate baseline'}
@@ -397,7 +397,7 @@ export default function ProjectSummaryTab({ project }: Props) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
         <Card style={{ padding: 18 }}>
-          <div style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>Baseline snapshots</div>
+          <div style={{ fontSize: 13, color: C.text2, marginBottom: 10 }}>Baseline snapshots</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 160 }}>
               <div style={{ color: C.text3, fontSize: 11 }}>Snapshots</div>
@@ -410,7 +410,7 @@ export default function ProjectSummaryTab({ project }: Props) {
           </div>
         </Card>
         <Card style={{ padding: 18 }}>
-          <div style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>Latest actual progress</div>
+          <div style={{ fontSize: 13, color: C.text2, marginBottom: 10 }}>Latest actual progress</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 160 }}>
               <div style={{ color: C.text3, fontSize: 11 }}>Last actual</div>
@@ -427,14 +427,14 @@ export default function ProjectSummaryTab({ project }: Props) {
       <Card style={{ padding: 18, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
           <div>
-            <div style={{ fontSize: 12, color: C.text2 }}>Progress graph</div>
+            <div style={{ fontSize: 13, color: C.text2 }}>Progress graph</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Baseline vs Actual</div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text2 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: C.text2 }}>
               <span style={{ width: 12, height: 12, borderRadius: 999, background: C.primary, display: 'inline-block' }} /> Baseline
             </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text2 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: C.text2 }}>
               <span style={{ width: 12, height: 12, borderRadius: 999, background: C.green, display: 'inline-block' }} /> Actual
             </div>
           </div>
@@ -487,13 +487,13 @@ export default function ProjectSummaryTab({ project }: Props) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8, minHeight: ROW_H, alignItems: 'center' }}>
                   <div style={{ minWidth: 0, flex: '1 1 120px' }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.text }}>{fmtDate(row.snapshotDate)}</div>
-                    <div style={{ marginTop: 4, fontSize: 9, color: C.text2, lineHeight: 1.3, maxWidth: 160, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.note || 'No notes yet'}</div>
+                    <div style={{ marginTop: 4, fontSize: 11, color: C.text2, lineHeight: 1.3, maxWidth: 160, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.note || 'No notes yet'}</div>
                   </div>
                   <div style={{ display: 'grid', gap: 4, minWidth: 80, textAlign: 'right' }}>
-                    <div style={{ fontSize: 9, color: C.text2 }}>Baseline</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
-                    <div style={{ fontSize: 9, color: C.text2 }}>Actual</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
+                    <div style={{ fontSize: 11, color: C.text2 }}>Baseline</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.primary }}>{row.baselinePercent}%</div>
+                    <div style={{ fontSize: 11, color: C.text2 }}>Actual</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.green }}>{row.actualPercent}%</div>
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
@@ -504,13 +504,13 @@ export default function ProjectSummaryTab({ project }: Props) {
                     value={row.actualInput}
                     onChange={(e) => handleActualChange(row.snapshotDate, e.target.value)}
                     placeholder="0-100"
-                    style={{ width: '100%', height: 32, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif' }}
+                    style={{ width: '100%', height: 32, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}
                   />
                   <textarea
                     rows={1}
                     value={row.note}
                     onChange={(e) => handleNoteChange(row.snapshotDate, e.target.value)}
-                    style={{ width: '100%', minWidth: 0, height: 32, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.3, overflow: 'hidden' }}
+                    style={{ width: '100%', minWidth: 0, height: 32, padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontFamily: 'Poppins, sans-serif', resize: 'none', lineHeight: 1.3, overflow: 'hidden' }}
                   />
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -532,7 +532,7 @@ export default function ProjectSummaryTab({ project }: Props) {
                       flexShrink: 0,
                     }}
                   >
-                    {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 10 }}>…</span> : <Check size={12} />}
+                    {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 11 }}>…</span> : <Check size={12} />}
                   </button>
                   {row.id && (
                     <button
@@ -616,7 +616,7 @@ export default function ProjectSummaryTab({ project }: Props) {
                             flexShrink: 0,
                           }}
                         >
-                          {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 10 }}>…</span> : <Check size={12} />}
+                          {savingSnapshot === row.snapshotDate ? <span style={{ fontSize: 11 }}>…</span> : <Check size={12} />}
                         </button>
                         {row.id && (
                           <button

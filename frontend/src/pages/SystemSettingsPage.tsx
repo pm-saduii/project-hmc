@@ -14,7 +14,7 @@ export default function SystemSettingsPage({ section }: { section: 'lookup' | 't
       to={to}
       end
       style={({ isActive }) => ({
-        height: 30, padding: '0 14px', borderRadius: 999, fontSize: 12, fontWeight: isActive ? 600 : 500,
+        height: 30, padding: '0 14px', borderRadius: 999, fontSize: 13, fontWeight: isActive ? 600 : 500,
         display: 'inline-flex', alignItems: 'center', textDecoration: 'none', fontFamily: 'Poppins, sans-serif',
         border: `1px solid ${isActive ? '#C7D2FE' : C.border}`, background: isActive ? C.primaryBg : C.white,
         color: isActive ? C.primary : C.text2,

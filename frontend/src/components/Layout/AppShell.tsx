@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { parseISO, isValid } from 'date-fns';
 import {
-  Bell, ChevronDown, Clock3, FolderKanban, LayoutDashboard, ListChecks, LogOut, Mail, Menu, Moon, PanelLeftClose,
+  Bell, ChevronDown, Clock3, FileText, FolderKanban, LayoutDashboard, ListChecks, LogOut, Mail, Menu, Moon, PanelLeftClose,
   PanelLeftOpen, Search, Settings, StickyNote, Sun, Users, X,
 } from 'lucide-react';
 import { useStore } from '../../store';
@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { C } from '../Common';
 import CommandPalette from './CommandPalette';
+import { useRolePermissions } from '../../hooks/useRolePermissions';
 
 const F = 'Poppins, sans-serif';
 const SIDEBAR_KEY = 'hmc-sidebar-collapsed';
@@ -18,6 +19,7 @@ type NavItem = { to: string; label: string; icon: React.ReactNode; end?: boolean
 
 const WORKSPACE_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
+  { to: '/one-page', label: 'One Page', icon: <FileText size={18} /> },
   { to: '/projects', label: 'Projects', icon: <FolderKanban size={18} /> },
   { to: '/my-tasks', label: 'My Tasks', icon: <ListChecks size={18} /> },
   { to: '/timesheet', label: 'Timesheet', icon: <Clock3 size={18} /> },
@@ -56,10 +58,13 @@ export default function AppShell() {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const isAdmin = profile?.role === 'admin';
+  const permissions = useRolePermissions();
+  // One Page follows the project "onepage" screen permission.
+  const workspaceItems = WORKSPACE_ITEMS.filter((item) => item.to !== '/one-page' || permissions.isTabVisible('onepage'));
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   const searchPages = React.useMemo(
-    () => [...WORKSPACE_ITEMS, ...(isAdmin ? ADMIN_ITEMS : [])].map(({ to, label }) => ({ to, label })),
-    [isAdmin],
+    () => [...workspaceItems, ...(isAdmin ? ADMIN_ITEMS : [])].map(({ to, label }) => ({ to, label })),
+    [isAdmin, workspaceItems.length], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // Ctrl+K / ⌘K opens search from anywhere (also while typing in a field).
@@ -107,13 +112,13 @@ export default function AppShell() {
       </NavLink>
     );
     const heading = (label: string) => showLabels
-      ? <div style={{ padding: '0 12px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: isDark ? '#64748B' : C.text3 }}>{label}</div>
+      ? <div style={{ padding: '0 12px 4px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: isDark ? '#64748B' : C.text3 }}>{label}</div>
       : <hr style={{ border: 0, borderTop: `1px solid ${border}`, margin: '4px 8px' }} />;
     return (
       <nav aria-label="Main menu" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {heading('Workspace')}
-          {WORKSPACE_ITEMS.map(link)}
+          {workspaceItems.map(link)}
         </div>
         {isAdmin && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -159,11 +164,11 @@ export default function AppShell() {
             <button type="button" onClick={() => setSearchOpen(true)} aria-label="Search projects and pages" title="Search"
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, height: 34, width: 240, padding: '0 10px', borderRadius: 10, cursor: 'pointer', fontFamily: F,
-                background: isDark ? '#334155' : '#F8FAFC', border: `1px solid ${isDark ? '#475569' : '#E2E8F0'}`, color: textMuted, fontSize: 12,
+                background: isDark ? '#334155' : '#F8FAFC', border: `1px solid ${isDark ? '#475569' : '#E2E8F0'}`, color: textMuted, fontSize: 13,
               }}>
               <Search size={15} />
               <span>Search…</span>
-              <kbd style={{ marginLeft: 'auto', fontFamily: F, fontSize: 10, padding: '1px 6px', borderRadius: 5, border: `1px solid ${isDark ? '#475569' : C.border}`, color: textMuted }}>
+              <kbd style={{ marginLeft: 'auto', fontFamily: F, fontSize: 11, padding: '1px 6px', borderRadius: 5, border: `1px solid ${isDark ? '#475569' : C.border}`, color: textMuted }}>
                 {isMac ? '⌘K' : 'Ctrl K'}
               </kbd>
             </button>
@@ -194,7 +199,7 @@ export default function AppShell() {
             background: surface, borderRight: `1px solid ${border}`, padding: '14px 10px', overflowY: 'auto', transition: 'width 0.15s',
           }}>
             {renderNav(!collapsed)}
-            <div style={{ fontSize: 10, color: isDark ? '#64748B' : C.text3, textAlign: collapsed ? 'center' : 'left', padding: '8px 12px 0', fontFamily: F }} title={`Build ${commitId}`}>
+            <div style={{ fontSize: 11, color: isDark ? '#64748B' : C.text3, textAlign: collapsed ? 'center' : 'left', padding: '8px 12px 0', fontFamily: F }} title={`Build ${commitId}`}>
               {collapsed ? commitId.slice(0, 4) : `Build ${commitId}`}
             </div>
           </aside>
@@ -212,11 +217,11 @@ export default function AppShell() {
           display: 'flex', flexShrink: 0, background: surface, borderTop: `1px solid ${border}`,
           paddingBottom: 'env(safe-area-inset-bottom)', fontFamily: F,
         }}>
-          {WORKSPACE_ITEMS.map((item) => (
+          {workspaceItems.filter((item) => item.to !== '/one-page').map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end}
               style={({ isActive }) => ({
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56,
-                textDecoration: 'none', fontSize: 10, fontWeight: isActive ? 600 : 500,
+                textDecoration: 'none', fontSize: 11, fontWeight: isActive ? 600 : 500,
                 color: isActive ? (isDark ? '#C7D2FE' : C.primary) : textMuted,
               })}>
               <span style={{ display: 'inline-flex' }} aria-hidden="true">{item.icon}</span>
@@ -224,7 +229,7 @@ export default function AppShell() {
             </NavLink>
           ))}
           <button type="button" onClick={() => setDrawerOpen(true)} aria-label="More menu"
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56, border: 0, background: 'transparent', cursor: 'pointer', fontSize: 10, fontWeight: 500, color: textMuted, fontFamily: F }}>
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56, border: 0, background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 500, color: textMuted, fontFamily: F }}>
             <Menu size={18} aria-hidden="true" />
             More
           </button>
@@ -239,11 +244,11 @@ export default function AppShell() {
           <div onClick={() => setDrawerOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)' }} />
           <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 260, maxWidth: '85%', background: surface, padding: 12, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: C.shadow2 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: textColor, fontFamily: F }}>Menu</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: textColor, fontFamily: F }}>Menu</span>
               <button type="button" onClick={() => setDrawerOpen(false)} aria-label="Close menu" style={iconButton(isDark)}><X size={18} /></button>
             </div>
             {renderNav(true)}
-            <div style={{ marginTop: 'auto', fontSize: 10, color: C.text3, fontFamily: F }}>Build {commitId}</div>
+            <div style={{ marginTop: 'auto', fontSize: 11, color: C.text3, fontFamily: F }}>Build {commitId}</div>
           </div>
         </div>
       )}
@@ -307,7 +312,7 @@ function NotificationBell({ isDark, isMobile }: { isDark: boolean; isMobile: boo
       <button type="button" onClick={() => setOpen((value) => !value)} aria-label={`Notifications, ${items.length}`} title="Notifications" style={{ ...iconButton(isDark), position: 'relative' }}>
         <Bell size={17} />
         {items.length > 0 && (
-          <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: C.red, color: '#fff', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center' }}>
+          <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: C.red, color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center' }}>
             {items.length > 99 ? '99+' : items.length}
           </span>
         )}
@@ -323,13 +328,13 @@ function NotificationBell({ isDark, isMobile }: { isDark: boolean; isMobile: boo
             <span style={{ fontSize: 11, color: C.text3 }}>{items.length} items</span>
           </div>
           {items.length === 0 ? (
-            <div style={{ color: C.text2, fontSize: 12 }}>No new notifications.</div>
+            <div style={{ color: C.text2, fontSize: 13 }}>No new notifications.</div>
           ) : items.map((item) => (
             <div key={item.id} style={{
               padding: '10px 12px', borderRadius: 12, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 4,
               border: `1px solid ${item.overdue ? C.red : C.green}`, background: item.overdue ? '#FEF2F2' : '#ECFDF5',
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{item.title}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{item.title}</div>
               <div style={{ fontSize: 11, color: C.text2 }}>{item.subtitle}</div>
             </div>
           ))}
@@ -366,7 +371,7 @@ function UserMenu({ name, email, role, isDark, isMobile, onTimesheet, onSignOut 
         {!isMobile && (
           <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: isDark ? '#F1F5F9' : C.text }}>{name}</span>
-            <span style={{ fontSize: 9, color: isDark ? '#94A3B8' : C.text3 }}>{roleLabel}</span>
+            <span style={{ fontSize: 11, color: isDark ? '#94A3B8' : C.text3 }}>{roleLabel}</span>
           </span>
         )}
         <ChevronDown size={14} color={isDark ? '#94A3B8' : C.text3} />
@@ -374,7 +379,7 @@ function UserMenu({ name, email, role, isDark, isMobile, onTimesheet, onSignOut 
       {open && (
         <div style={{ position: 'absolute', right: 0, top: 44, width: 230, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow2, overflow: 'hidden', zIndex: 300 }}>
           <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, fontFamily: F }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
             <div style={{ fontSize: 11, color: C.text2, overflow: 'hidden', textOverflow: 'ellipsis' }}>{email}</div>
             <div style={{ fontSize: 11, color: C.text2 }}>Role: {roleLabel}</div>
           </div>

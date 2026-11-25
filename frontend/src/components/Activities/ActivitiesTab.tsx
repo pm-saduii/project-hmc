@@ -173,7 +173,7 @@ export default function ActivitiesTab({ projectId }: Props) {
   return (
     <div style={{ padding: isMobile ? 16 : 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 12, color: C.text2 }}>
+        <div style={{ fontSize: 13, color: C.text2 }}>
           Sorted by latest date first. PDF report exports oldest to latest.
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -191,10 +191,10 @@ export default function ActivitiesTab({ projectId }: Props) {
               <Card key={row.id} style={{ padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{row.title}</div>
-                    <div style={{ fontSize: 10, color: C.text2, marginTop: 4 }}>{fmtDate(row.activityDate)} · {row.activityType}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{row.title}</div>
+                    <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{fmtDate(row.activityDate)} · {row.activityType}</div>
                   </div>
-                  <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: C.primaryBg, color: C.primary, fontWeight: 700 }}>{row.channel}</span>
+                  <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, background: C.primaryBg, color: C.primary, fontWeight: 700 }}>{row.channel}</span>
                 </div>
                 <div style={{ marginTop: 8, fontSize: 11, color: C.text2 }}>{row.description || '-'}</div>
                 {canEdit && (
@@ -219,7 +219,7 @@ export default function ActivitiesTab({ projectId }: Props) {
                   <td style={{ ...TD, whiteSpace: 'nowrap', fontSize: 11 }}>{fmtDate(row.activityDate)}</td>
                   <td style={{ ...TD, fontSize: 11 }}>{row.activityType}</td>
                   <td style={{ ...TD, fontSize: 11 }}>
-                    <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: C.primaryBg, color: C.primary, fontWeight: 700 }}>{row.channel}</span>
+                    <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, background: C.primaryBg, color: C.primary, fontWeight: 700 }}>{row.channel}</span>
                   </td>
                   <td style={{ ...TD, fontSize: 11, fontWeight: 600 }}>{row.title}</td>
                   <td style={{ ...TD, fontSize: 11, color: C.text2 }}>{row.description || '-'}</td>

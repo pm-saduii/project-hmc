@@ -118,10 +118,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) {
       const msg = String(error.message || '').toLowerCase();
       if (msg.includes('invalid login credentials')) {
-        throw new Error('Email หรือ Password ไม่ถูกต้อง หรือบัญชียังไม่ยืนยันอีเมล');
+        throw new Error('Incorrect email or password, or the account email is not verified yet');
       }
       if (msg.includes('email not confirmed')) {
-        throw new Error('บัญชียังไม่ยืนยันอีเมล กรุณาเปิดอีเมลแล้วกดยืนยันก่อนเข้าสู่ระบบ');
+        throw new Error('Your email is not verified yet. Open the verification email and confirm before signing in.');
       }
       throw new Error(error.message);
     }

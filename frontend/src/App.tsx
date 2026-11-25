@@ -9,7 +9,8 @@ import AppShell      from './components/Layout/AppShell';
 import Dashboard     from './components/Dashboard/Dashboard';
 import AuthPage      from './components/Auth/AuthPage';
 import { AdminOnly, PageBody } from './pages/AdminPages';
-import { NotFoundPage } from './pages/StatusPages';
+import { ForbiddenPage, NotFoundPage } from './pages/StatusPages';
+import { useRolePermissions } from './hooks/useRolePermissions';
 import { C } from './components/Common';
 
 const noop = () => undefined;
@@ -17,11 +18,17 @@ const noop = () => undefined;
 // Everything except the dashboard is loaded on first visit, so the first screen opens faster.
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
+const OnePagePage = lazy(() => import('./pages/OnePagePage'));
 const EmailLogsPage = lazy(() => import('./pages/EmailLogsPage'));
 const SystemSettingsPage = lazy(() => import('./pages/SystemSettingsPage'));
 const TimesheetModal = lazy(() => import('./components/Timesheet/TimesheetModal'));
 const ManageUsersModal = lazy(() => import('./components/Users/ManageUsersModal'));
 const SystemNotesModal = lazy(() => import('./components/SystemNotes/SystemNotesModal'));
+
+function OnePageGuard({ children }: { children: React.ReactNode }) {
+  const permissions = useRolePermissions();
+  return permissions.isTabVisible('onepage') ? <>{children}</> : <ForbiddenPage />;
+}
 
 const pageFallback = (
   <div style={{ padding: 32, color: C.text2, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}>Loading…</div>
@@ -65,7 +72,7 @@ export default function App() {
           border: `3px solid ${C.primary}`, borderTopColor: 'transparent',
           borderRadius: '50%', animation: 'spin 0.8s linear infinite',
         }} />
-        <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 14, fontFamily: 'Poppins, sans-serif' }}>
+        <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 13, fontFamily: 'Poppins, sans-serif' }}>
           Loading…
         </p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -82,13 +89,13 @@ export default function App() {
   const portfolio = (mode: 'dashboard' | 'projects') => (projectsLoading && !error ? (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
       <div style={{ width: 36, height: 36, border: `3px solid ${C.primary}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 14 }}>Loading projects…</p>
+      <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 13 }}>Loading projects…</p>
     </div>
   ) : error && !projects.length ? (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 8 }}>
-      <p style={{ color: C.red, fontWeight: 600, fontSize: 15 }}>Connection Error</p>
+      <p style={{ color: C.red, fontWeight: 600, fontSize: 16 }}>Connection Error</p>
       <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 13 }}>{error}</p>
-      <p style={{ color: isDark ? '#64748B' : C.text3, fontSize: 12 }}>
+      <p style={{ color: isDark ? '#64748B' : C.text3, fontSize: 13 }}>
         {configured ? 'Check your Supabase configuration.' : 'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local'}
       </p>
     </div>
@@ -106,6 +113,8 @@ export default function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={portfolio('dashboard')} />
+          <Route path="one-page" element={<OnePageGuard>{page(<OnePagePage />)}</OnePageGuard>} />
+          <Route path="one-page/:projectId" element={<OnePageGuard>{page(<OnePagePage />)}</OnePageGuard>} />
           <Route path="projects" element={portfolio('projects')} />
           <Route path="projects/:projectId/*" element={page(<ProjectPage />)} />
           <Route path="my-tasks" element={page(<MyTasksPage />)} />
@@ -148,7 +157,7 @@ export default function App() {
               animation: 'spin 0.8s linear infinite',
             }} />
             <span style={{
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: 600,
               color: isDark ? '#E2E8F0' : C.text2,
               fontFamily: 'Poppins, sans-serif',

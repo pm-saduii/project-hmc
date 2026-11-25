@@ -114,7 +114,7 @@ export default function Dashboard({ mode = 'dashboard' }: { mode?: 'dashboard' |
         }}>
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Project reminders</div>
           {messages.map((msg) => (
-            <div key={msg} style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 4 }}>
+            <div key={msg} style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>
               {msg}
             </div>
           ))}
@@ -200,10 +200,10 @@ export default function Dashboard({ mode = 'dashboard' }: { mode?: 'dashboard' |
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
               <thead><tr>{['Project ID', 'Project Name', 'Customer', 'Status'].map((label) => <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 11, color: C.text2 }}>{label}</th>)}</tr></thead>
               <tbody>{allProjects.map((project) => <tr key={project.id} onClick={() => openProject(project)} style={{ cursor: 'pointer', borderBottom: `1px solid ${C.border}` }}>
-                <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>{project.code || project.id}</td>
-                <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.name}</td>
-                <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{project.client || '—'}</td>
-                <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{project.status || '—'}</td>
+                <td style={{ padding: '12px 14px', fontSize: 13, color: C.primary, fontWeight: 700 }}>{project.code || project.id}</td>
+                <td style={{ padding: '12px 14px', fontSize: 13, color: C.text }}>{project.name}</td>
+                <td style={{ padding: '12px 14px', fontSize: 13, color: C.text2 }}>{project.client || '—'}</td>
+                <td style={{ padding: '12px 14px', fontSize: 13, color: C.text }}>{project.status || '—'}</td>
               </tr>)}</tbody>
             </table>
           </div>
@@ -230,7 +230,7 @@ export default function Dashboard({ mode = 'dashboard' }: { mode?: 'dashboard' |
             value={deletePassword}
             onChange={(event) => setDeletePassword(event.currentTarget.value.replace(/\D/g, '').slice(0, 8))}
             onKeyDown={(event) => { if (event.key === 'Enter' && deletePassword.length === 8) void handleDelete(); }}
-            style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 14, letterSpacing: 2, outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 13, letterSpacing: 2, outline: 'none' }}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
             <Btn variant="ghost" onClick={cancelDelete} disabled={deletingProject}>Cancel</Btn>
@@ -300,7 +300,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
         onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFF'; }}
         onMouseLeave={e => { e.currentTarget.style.background = C.white; }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <FolderKanban size={14} color={fallbackColor} />
               <span><span style={{ color: C.text2 }}>Project ID : </span><span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span></span>
@@ -325,22 +325,22 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.35, marginBottom: 4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
           <span style={{ color: C.text2 }}>Project Name : </span>
           <span style={{ fontWeight: 700 }}>{p.name || '-'}</span>
         </div>
 
-        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 5, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.35, marginBottom: 5, whiteSpace: 'normal', wordBreak: 'break-word' }}>
           <span style={{ color: C.text2 }}>Client : </span>
           <span>{p.client || '-'}</span>
         </div>
 
-        <div style={{ fontSize: 12, color: C.text2, marginBottom: 6, whiteSpace: 'normal', wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 13, color: C.text2, marginBottom: 6, whiteSpace: 'normal', wordBreak: 'break-word' }}>
           {fmtDate(p.startDate)} - {fmtDate(p.endDate)}
         </div>
 
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text2, marginBottom: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.text2, marginBottom: 4 }}>
             <span>% Progress</span>
             <span style={{ fontWeight: 700, color: prog >= 100 ? C.green : C.primary }}>{prog}%</span>
           </div>
@@ -354,7 +354,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
     <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', width: '100%' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, margin: '0 0 6px' }}>{title}</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: '0 0 6px' }}>{title}</h2>
           <p style={{ color: C.text2, fontSize: 13, margin: 0 }}>{subtitle}</p>
         </div>
         {actions}
@@ -389,17 +389,17 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
                 background: projectView === mode ? C.primaryBg : C.white,
                 color: projectView === mode ? C.primary : C.text,
                 cursor: 'pointer',
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 700,
               }}>
               {mode === 'card' ? 'Card' : 'Table'}
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: C.text2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: C.text2 }}>
           {statusFilter && (
             <button type="button" onClick={() => setStatusFilter(null)}
-              style={{ border: 0, background: 'transparent', color: C.primary, fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'Poppins, sans-serif' }}>
+              style={{ border: 0, background: 'transparent', color: C.primary, fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'Poppins, sans-serif' }}>
               Clear filter
             </button>
           )}
@@ -417,7 +417,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
             <thead>
               <tr>
                 {['Project ID', 'Project Name', 'Customer', 'Start Date', 'End Date', 'Stage', '% Progress', ''].map((label) => (
-                  <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 12, color: C.text2 }}>{label}</th>
+                  <th key={label} style={{ textAlign: 'left', padding: '12px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text2 }}>{label}</th>
                 ))}
               </tr>
             </thead>
@@ -431,16 +431,16 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
                   <tr key={p.id} onClick={() => onOpen(p)} style={{ cursor: 'pointer', background: C.white, transition: 'background 0.15s' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#F8FAFF'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.primary, fontWeight: 700 }}>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.primary, fontWeight: 700 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><FolderKanban size={15} color={p.color || C.primary} />{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span>
                     </td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{p.name || '-'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{p.client || '-'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{fmtDate(p.startDate)}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text2 }}>{fmtDate(p.endDate)}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{stage}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text }}>{prog}%</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: C.text, width: 72, whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.text }}>{p.name || '-'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.text2 }}>{p.client || '-'}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.text2 }}>{fmtDate(p.startDate)}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.text2 }}>{fmtDate(p.endDate)}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.text }}>{stage}</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.text }}>{prog}%</td>
+                    <td style={{ padding: '12px 14px', fontSize: 13, color: C.text, width: 72, whiteSpace: 'nowrap' }}>
                       {canEdit && (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
                           <button
@@ -502,14 +502,14 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
                       <tr key={project.id} onClick={() => onOpen(project)} style={{ cursor: 'pointer', borderBottom: `1px solid ${C.border}`, transition: 'background 0.15s' }}
                         onMouseEnter={(event) => { event.currentTarget.style.background = C.amberBg; }}
                         onMouseLeave={(event) => { event.currentTarget.style.background = C.white; }}>
-                        <td style={{ padding: '11px 14px', fontSize: 12, fontWeight: 700, color: C.primary, whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '11px 14px', fontSize: 13, fontWeight: 700, color: C.primary, whiteSpace: 'nowrap' }}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><FolderKanban size={15} color={C.amber} />{project.code || project.id}</span>
                         </td>
-                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text, fontWeight: 600 }}>{project.name || '—'}</td>
-                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text2 }}>{project.client || '—'}</td>
-                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap' }}>{fmtDate(project.startDate)}</td>
-                        <td style={{ padding: '11px 14px', fontSize: 12, color: C.text2, whiteSpace: 'nowrap' }}>{fmtDate(project.endDate)}</td>
-                        <td style={{ padding: '11px 14px', fontSize: 12, color: progress >= 100 ? C.green : C.amber, fontWeight: 700 }}>{progress}%</td>
+                        <td style={{ padding: '11px 14px', fontSize: 13, color: C.text, fontWeight: 600 }}>{project.name || '—'}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 13, color: C.text2 }}>{project.client || '—'}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 13, color: C.text2, whiteSpace: 'nowrap' }}>{fmtDate(project.startDate)}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 13, color: C.text2, whiteSpace: 'nowrap' }}>{fmtDate(project.endDate)}</td>
+                        <td style={{ padding: '11px 14px', fontSize: 13, color: progress >= 100 ? C.green : C.amber, fontWeight: 700 }}>{progress}%</td>
                         <td style={{ padding: '8px 12px', width: 72, whiteSpace: 'nowrap' }}>
                           {canEdit && <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
                             <button type="button" aria-label={`Edit ${project.name}`} onClick={(event) => { event.stopPropagation(); onEdit(project); }} style={{ border: 0, background: 'transparent', color: C.text3, padding: 5, cursor: 'pointer' }}><Pencil size={14} /></button>

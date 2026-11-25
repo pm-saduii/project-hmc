@@ -11,7 +11,7 @@ export interface Crumb {
 /** "Projects › ABC-01 › Plan › Tasks" — every crumb except the last is a link. */
 export default function Breadcrumb({ items }: { items: Crumb[] }) {
   return (
-    <nav aria-label="Breadcrumb" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, minWidth: 0 }}>
+    <nav aria-label="Breadcrumb" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, minWidth: 0 }}>
       <ol style={{ display: 'flex', alignItems: 'center', gap: 4, listStyle: 'none', margin: 0, padding: 0, flexWrap: 'wrap' }}>
         {items.map((item, index) => {
           const last = index === items.length - 1;

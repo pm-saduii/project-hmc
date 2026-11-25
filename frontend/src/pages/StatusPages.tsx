@@ -5,7 +5,7 @@ import { C } from '../components/Common';
 function StatusPage({ title, message }: { title: string; message: string }) {
   return (
     <div style={{ padding: 32, fontFamily: 'Poppins, sans-serif' }}>
-      <h2 style={{ margin: '0 0 6px', fontSize: 18, color: C.text }}>{title}</h2>
+      <h2 style={{ margin: '0 0 6px', fontSize: 16, color: C.text }}>{title}</h2>
       <p style={{ margin: '0 0 16px', fontSize: 13, color: C.text2 }}>{message}</p>
       <Link to="/" style={{ fontSize: 13, color: C.primary, fontWeight: 600 }}>Back to Dashboard</Link>
     </div>

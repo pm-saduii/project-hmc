@@ -62,7 +62,7 @@ export default function IssuesTab({ projectId }: Props) {
         ].map(s => (
           <Card key={s.label} style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{s.label}</div>
           </Card>
         ))}
@@ -91,12 +91,12 @@ export default function IssuesTab({ projectId }: Props) {
                 <Card key={issue.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <div style={{ minWidth: 0, flex: '1 1 160px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{issue.title}</div>
-                      <div style={{ fontSize: 10, color: C.text2, marginTop: 4 }}>{fmtDate(issue.issueDate)} · {issue.reportedBy || '—'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{issue.title}</div>
+                      <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{fmtDate(issue.issueDate)} · {issue.reportedBy || '—'}</div>
                     </div>
                     <Badge bg={ss.bg} color={ss.color}>{issue.status}</Badge>
                   </div>
-                  <div style={{ display: 'grid', gap: 6, marginTop: 8, fontSize: 10, color: C.text2 }}>
+                  <div style={{ display: 'grid', gap: 6, marginTop: 8, fontSize: 11, color: C.text2 }}>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Assigned</strong>: {issue.assignedTo || '—'}</div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Resolved</strong>: {issue.resolvedDate ? fmtDate(issue.resolvedDate) : '—'}</div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Description</strong>: {issue.description || '—'}</div>

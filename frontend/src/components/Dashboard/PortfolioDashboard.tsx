@@ -30,6 +30,8 @@ interface ProjectRow {
   blockedIssues: number;
   highRisks: number;
   overdueMilestones: number;
+  unpaidMilestones: number;
+  finished: boolean;
 }
 
 const HEALTH_STYLE: Record<ProjectHealth['status'], { color: string; bg: string; rank: number }> = {
@@ -100,6 +102,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
   const pendingMilestones = (showMs ? milestones : []).filter((m) => String(m.status).toLowerCase() === 'pending');
   const overdueMilestones = pendingMilestones.filter((m) => { const d = toDate(m.dueDate); return !!d && d < today; });
 
+  const unpaidMilestones = (showMs ? milestones : []).filter((m) => String(m.status).toLowerCase() !== 'paid');
   const count = <T extends { projectId: string }>(list: T[], id: string) => list.filter((x) => x.projectId === id).length;
   const rows: ProjectRow[] = projects.map((project) => ({
     project,
@@ -109,20 +112,27 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
     blockedIssues: openIssues.filter((i) => i.projectId === project.id && i.status === 'Blocked').length,
     highRisks: count(highRisks, project.id),
     overdueMilestones: count(overdueMilestones, project.id),
+    unpaidMilestones: count(unpaidMilestones, project.id),
+    finished: false,
   }));
   const activeRows = rows.filter((r) => !isHyperCare(r.project));
   const behind = activeRows.filter((r) => r.health.status === 'Delay' || r.health.status === 'Stoper');
 
-  // Finished projects never need attention: Hyper Care (already live), 100% complete,
-  // or a status that means closed / completed / cancelled.
-  const isFinished = (r: ProjectRow) => isHyperCare(r.project)
-    || r.health.actual >= 100
-    || /close|complete|done|finish|cancel/i.test(`${r.project.status} ${statusLabel(r.project)}`);
+  // Finished = Hyper Care (already live), 100% complete, or a closed / completed / cancelled status.
+  // Running projects: schedule, overdue tasks, blocked issues, past-due milestones, high risks.
+  // Finished projects: only money not yet paid and issues not yet resolved (risks no longer matter).
+  rows.forEach((r) => {
+    r.finished = isHyperCare(r.project)
+      || r.health.actual >= 100
+      || /close|complete|done|finish|cancel/i.test(`${r.project.status} ${statusLabel(r.project)}`);
+  });
   const attention = rows
-    .filter((r) => !isFinished(r))
-    .filter((r) => r.health.status === 'Delay' || r.health.status === 'Stoper'
-      || r.overdueTasks || r.blockedIssues || r.overdueMilestones || r.highRisks)
-    .sort((a, b) => HEALTH_STYLE[a.health.status].rank - HEALTH_STYLE[b.health.status].rank
+    .filter((r) => (r.finished
+      ? r.unpaidMilestones > 0 || r.openIssues > 0
+      : r.health.status === 'Delay' || r.health.status === 'Stoper'
+        || r.overdueTasks || r.blockedIssues || r.overdueMilestones || r.highRisks))
+    .sort((a, b) => Number(a.finished) - Number(b.finished)
+      || HEALTH_STYLE[a.health.status].rank - HEALTH_STYLE[b.health.status].rank
       || b.health.gap - a.health.gap || b.overdueTasks - a.overdueTasks);
 
   // ── Billing (admin / PM) ──────────────────────────────────────────────────
@@ -194,11 +204,11 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
   const card: React.CSSProperties = { background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: C.shadow, padding: 18, minWidth: 0 };
   const sectionTitle = (title: string, extra?: React.ReactNode) => (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.text }}>{title}</h3>
+      <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.text }}>{title}</h3>
       {extra}
     </div>
   );
-  const empty = (text: string) => <div style={{ fontSize: 12, color: C.text2, padding: '8px 0' }}>{text}</div>;
+  const empty = (text: string) => <div style={{ fontSize: 13, color: C.text2, padding: '8px 0' }}>{text}</div>;
   const chip = (text: string, color: string, bg: string, to: string) => (
     <Link key={text} to={to} onClick={(e) => e.stopPropagation()}
       style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: bg, color, textDecoration: 'none', whiteSpace: 'nowrap' }}>
@@ -208,7 +218,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
 
   const myWorkCard = showTasks && role !== 'client' && (
     <section style={card} aria-label="My work">
-      {sectionTitle('My work', <Link to="/my-tasks" style={{ fontSize: 12, color: C.primary, fontWeight: 600, textDecoration: 'none' }}>All my tasks →</Link>)}
+      {sectionTitle('My work', <Link to="/my-tasks" style={{ fontSize: 13, color: C.primary, fontWeight: 600, textDecoration: 'none' }}>All my tasks →</Link>)}
       <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
         <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: myOverdue.length ? C.redBg : C.bg }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: myOverdue.length ? C.red : C.text }}>{myOverdue.length}</div>
@@ -231,7 +241,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
           <Link key={t.id} to={projectPath(t.projectId, 'tasks')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: `1px solid ${C.border}`, textDecoration: 'none' }}>
             <span style={{ width: 8, height: 8, borderRadius: 2, background: p?.color || C.primary, flexShrink: 0 }} />
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.taskName}</span>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.taskName}</span>
               <span style={{ display: 'block', fontSize: 11, color: C.text3 }}>{p?.code || ''}</span>
             </span>
             <span style={{ fontSize: 11, fontWeight: 600, color: late ? C.red : C.text2, whiteSpace: 'nowrap' }}>{fmtDate(t.endDate)}</span>
@@ -255,19 +265,28 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, cursor: 'pointer', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                 <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 2, background: r.project.color || C.primary, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
                     <span style={{ color: C.primary }}>{r.project.code}</span> · {r.project.name}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
-                    {r.overdueTasks > 0 && chip(`${r.overdueTasks} overdue task${r.overdueTasks > 1 ? 's' : ''}`, C.red, C.redBg, projectPath(id, 'tasks'))}
-                    {r.blockedIssues > 0 && chip(`${r.blockedIssues} blocked issue${r.blockedIssues > 1 ? 's' : ''}`, C.red, C.redBg, projectPath(id, 'issues'))}
-                    {r.highRisks > 0 && chip(`${r.highRisks} high risk${r.highRisks > 1 ? 's' : ''}`, C.amber, C.amberBg, projectPath(id, 'risks'))}
-                    {r.overdueMilestones > 0 && chip(`${r.overdueMilestones} milestone${r.overdueMilestones > 1 ? 's' : ''} past due`, C.amber, C.amberBg, projectPath(id, 'ms'))}
+                    {r.finished ? <>
+                      {r.unpaidMilestones > 0 && chip(`${r.unpaidMilestones} milestone${r.unpaidMilestones > 1 ? 's' : ''} not paid`, C.amber, C.amberBg, projectPath(id, 'ms'))}
+                      {r.openIssues > 0 && chip(`${r.openIssues} open issue${r.openIssues > 1 ? 's' : ''}`, C.red, C.redBg, projectPath(id, 'issues'))}
+                    </> : <>
+                      {r.overdueTasks > 0 && chip(`${r.overdueTasks} overdue task${r.overdueTasks > 1 ? 's' : ''}`, C.red, C.redBg, projectPath(id, 'tasks'))}
+                      {r.blockedIssues > 0 && chip(`${r.blockedIssues} blocked issue${r.blockedIssues > 1 ? 's' : ''}`, C.red, C.redBg, projectPath(id, 'issues'))}
+                      {r.highRisks > 0 && chip(`${r.highRisks} high risk${r.highRisks > 1 ? 's' : ''}`, C.amber, C.amberBg, projectPath(id, 'risks'))}
+                      {r.overdueMilestones > 0 && chip(`${r.overdueMilestones} milestone${r.overdueMilestones > 1 ? 's' : ''} past due`, C.amber, C.amberBg, projectPath(id, 'ms'))}
+                    </>}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: hs.bg, color: hs.color }}>{r.health.status}</span>
-                  <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{r.health.actual}% of {r.health.planned}% planned</div>
+                  {r.finished ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: C.bg2, color: C.text2 }}>Finished · {statusLabel(r.project)}</span>
+                  ) : <>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: hs.bg, color: hs.color }}>{r.health.status}</span>
+                    <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{r.health.actual}% of {r.health.planned}% planned</div>
+                  </>}
                 </div>
               </div>
             );
@@ -293,7 +312,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
             return (
               <Link key={r.project.id} to={projectPath(r.project.id)} title={`${r.project.name}: ${r.health.actual}% actual, ${r.health.planned}% planned (${statusLabel(r.project)})`}
                 style={{ display: 'grid', gridTemplateColumns: isMobile ? '90px 1fr 70px' : '140px 1fr 90px', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.project.code || r.project.name}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.project.code || r.project.name}</span>
                 <span style={{ position: 'relative', height: 10, background: C.bg2, borderRadius: 5 }}>
                   <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, r.health.actual)}%`, background: r.health.status === 'On Track' ? C.primary : hs.color, borderRadius: 5 }} />
                   {r.health.status !== 'Plan N/A' && (
@@ -327,15 +346,15 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
             return (
               <div key={day} style={{ display: 'flex', gap: 12 }}>
                 <div style={{ width: 44, flexShrink: 0, textAlign: 'center', padding: '4px 0', borderRadius: 8, background: isToday ? C.primaryBg : C.bg, alignSelf: 'flex-start' }}>
-                  <div style={{ fontSize: 10, color: isToday ? C.primary : C.text3, fontWeight: 600 }}>{isToday ? 'Today' : format(d, 'EEE')}</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: isToday ? C.primary : C.text }}>{format(d, 'd')}</div>
-                  <div style={{ fontSize: 10, color: C.text3 }}>{format(d, 'MMM')}</div>
+                  <div style={{ fontSize: 11, color: isToday ? C.primary : C.text3, fontWeight: 600 }}>{isToday ? 'Today' : format(d, 'EEE')}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: isToday ? C.primary : C.text }}>{format(d, 'd')}</div>
+                  <div style={{ fontSize: 11, color: C.text3 }}>{format(d, 'MMM')}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {items.map((u) => (
                     <Link key={u.key} to={u.to} style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', minWidth: 0 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: kindStyle[u.kind].bg, color: kindStyle[u.kind].color, flexShrink: 0 }}>{u.kind}</span>
-                      <span style={{ fontSize: 12, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.label}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: kindStyle[u.kind].bg, color: kindStyle[u.kind].color, flexShrink: 0 }}>{u.kind}</span>
+                      <span style={{ fontSize: 13, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.label}</span>
                       <span style={{ fontSize: 11, color: C.text3, marginLeft: 'auto', flexShrink: 0 }}>{u.project?.code || ''}</span>
                     </Link>
                   ))}
@@ -358,7 +377,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
           { label: `Paid in ${today.getFullYear()}`, value: paidThisYear.reduce((s, m) => s + amount(m), 0), color: C.green },
         ].map((b) => (
           <div key={b.label} style={{ padding: '10px 12px', borderRadius: 10, background: C.bg }}>
-            <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 800, color: b.color }}>฿{fmtMoney(b.value)}</div>
+            <div style={{ fontSize: isMobile ? 13 : 16, fontWeight: 800, color: b.color }}>฿{fmtMoney(b.value)}</div>
             <div style={{ fontSize: 11, color: C.text2 }}>{b.label}</div>
           </div>
         ))}
@@ -369,7 +388,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
           <div key={m.label} style={{ display: 'grid', gridTemplateColumns: '72px 1fr 110px', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 11, color: C.text2 }}>{m.label}</span>
             <ProgressBar value={(m.value / maxMonth) * 100} color={C.green} height={8} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: C.text, textAlign: 'right' }}>฿{fmtMoney(m.value)}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text, textAlign: 'right' }}>฿{fmtMoney(m.value)}</span>
           </div>
         ))}
       </div>
@@ -381,7 +400,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
   return (
     <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', fontFamily: F }}>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.text, margin: '0 0 6px' }}>Dashboard</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: '0 0 6px' }}>Dashboard</h2>
         <p style={{ color: C.text2, fontSize: 13, margin: 0 }}>{format(today, 'EEEE d MMMM yyyy')} · what needs attention across your projects</p>
       </div>
 
@@ -393,7 +412,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
                 <span aria-hidden="true" style={{ display: 'inline-flex' }}>{k.icon}</span>
                 <span style={{ fontSize: 11, color: C.text2, fontWeight: 500 }}>{k.label}</span>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.value}</div>
               {k.sub && <div style={{ fontSize: 11, color: C.text3, marginTop: 2 }}>{k.sub}</div>}
             </>
           );

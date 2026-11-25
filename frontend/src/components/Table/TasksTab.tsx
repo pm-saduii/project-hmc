@@ -426,7 +426,7 @@ function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean
         <input autoFocus type="number" min={0} max={100} value={draft}
           onChange={e => setDraft(e.target.value)} onBlur={commit}
           onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
-          style={{ width: 44, textAlign: 'right', border: `1.5px solid ${C.primary}`, borderRadius: 5, padding: '1px 4px', fontSize: 12, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg }}
+          style={{ width: 44, textAlign: 'right', border: `1.5px solid ${C.primary}`, borderRadius: 5, padding: '1px 4px', fontSize: 13, fontFamily: 'Poppins, sans-serif', outline: 'none', background: C.primaryBg }}
         />
       ) : (
         <span onClick={() => !isParent && setEditing(true)}
@@ -1277,7 +1277,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
         relatedTaskLagDays: newTaskInsert.relatedTaskLagDays,
       });
       if (normalized.adjusted) {
-        toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
+        toast.success('End date was moved so it is not before the start date');
       }
       toast.success('Task created');
       setNewTaskInsert(null);
@@ -1379,7 +1379,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     }
     const iso = normalizeDateInputToIso(raw);
     if (!iso) {
-      toast.error('วันที่ต้องเป็นรูปแบบ DD/MM/YYYY');
+      toast.error('Dates must use the DD/MM/YYYY format');
       return;
     }
     const updates: Partial<Task> = { [field]: iso };
@@ -1396,7 +1396,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       updates.endDate = normalized.endDate;
       updates.duration = calcDuration(normalized.startDate, normalized.endDate);
       if (normalized.adjusted) {
-        toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
+        toast.success('End date was moved so it is not before the start date');
       }
     }
     try { await updateTask(id, updates); }
@@ -1426,7 +1426,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const clearDependency = !raw;
     const parsed = clearDependency ? null : parsePredecessorInput(raw);
     if (!clearDependency && !parsed) {
-      toast.error('รูปแบบ Predecessors ไม่ถูกต้อง เช่น 2, 1FS+2d, 3SS+1d');
+      toast.error('Invalid predecessors format. Examples: 2, 1FS+2d, 3SS+1d');
       return;
     }
 
@@ -1443,7 +1443,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
     const matches = projectTasks.filter((item) => String(item.wbs || '').trim() === parsed!.wbs);
     if (matches.length !== 1) {
-      toast.error(matches.length ? `WBS ${parsed!.wbs} is not unique` : `ไม่พบ Task WBS ${parsed!.wbs}`);
+      toast.error(matches.length ? `WBS ${parsed!.wbs} is not unique` : `Task WBS ${parsed!.wbs} not found`);
       return;
     }
     const predecessor = matches[0];
@@ -2441,7 +2441,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                     position:'relative',
                     width: renderedColumnWidths[index],
                     minWidth: renderedColumnWidths[index],
-                    padding:'0 8px', fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
+                    padding:'0 8px', fontSize:11, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, display:'flex', alignItems:'center'
                   }}>
                     {col.label}
                     <div onMouseDown={e => onColumnResizeStart(index, e)}
@@ -2484,7 +2484,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       flexShrink:0,
                     }}>
                     {isColumnVisible('wbs') && (
-                      <div style={{ width:renderedColumnWidths[0], minWidth:renderedColumnWidths[0], padding:'0 8px', fontSize:10, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
+                      <div style={{ width:renderedColumnWidths[0], minWidth:renderedColumnWidths[0], padding:'0 8px', fontSize:11, color:C.text3, fontFamily:'Poppins, sans-serif', flexShrink:0 }}>{isNew ? '—' : rowTask!.wbs}</div>
                     )}
                     {isColumnVisible('taskName') && (
                       <div style={{
@@ -2500,10 +2500,10 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                           </button>
                         ) : (
                           <span style={{ width:18, flexShrink:0, display:'inline-flex', justifyContent:'center' }}>
-                            {!isNew && !!rowTask.parentId && <span style={{ color:C.border2, fontSize:10 }}>└</span>}
+                            {!isNew && !!rowTask.parentId && <span style={{ color:C.border2, fontSize:11 }}>└</span>}
                           </span>
                         ))}
-                        {!isNew && isPar && <span style={{ color:C.primary, fontSize:9, flexShrink:0 }}>◆</span>}
+                        {!isNew && isPar && <span style={{ color:C.primary, fontSize:11, flexShrink:0 }}>◆</span>}
                         <EditableCell
                           value={isNew ? newRow.taskName : rowTask.taskName}
                           onSave={(v) => {
@@ -2563,7 +2563,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                               if (!prev) return prev;
                               const normalized = normalizeTaskDateRange(v, calculateEndDateFromWorkingDays(normalizeDateInputToIso(v), prev.duration));
                               if (normalized.adjusted) {
-                                toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
+                                toast.success('End date was moved so it is not before the start date');
                               }
                               return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate };
                             });
@@ -2585,7 +2585,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                               if (!prev) return prev;
                               const normalized = normalizeTaskDateRange(prev.startDate, v);
                               if (normalized.adjusted) {
-                                toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
+                                toast.success('End date was moved so it is not before the start date');
                               }
                               return { ...prev, startDate: normalized.startDate, endDate: normalized.endDate, duration: calcDuration(normalized.startDate, normalized.endDate) };
                             });
@@ -2630,7 +2630,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                           const isDelayed = status === 'Delay';
                           return (
                             status
-                              ? <span style={{ display:'inline-flex', alignItems:'center', padding:'3px 7px', borderRadius:5, background:isDelayed ? C.redBg : C.greenBg, color:isDelayed ? C.red : C.green, fontSize:10, fontWeight:700 }}>{status}</span>
+                              ? <span style={{ display:'inline-flex', alignItems:'center', padding:'3px 7px', borderRadius:5, background:isDelayed ? C.redBg : C.greenBg, color:isDelayed ? C.red : C.green, fontSize:11, fontWeight:700 }}>{status}</span>
                               : <span style={{ color:C.text3 }}>—</span>
                           );
                         })()}
@@ -2740,13 +2740,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
               padding:'10px 12px', background: headerStyle.bg, border:`1px solid ${headerStyle.color}33`, borderRadius:14
             }}>
               <div style={{ fontSize:13, fontWeight:700, color: headerStyle.color }}>{status}</div>
-              <div style={{ fontSize:12, fontWeight:700, color: headerStyle.color }}>{tasks.length}</div>
+              <div style={{ fontSize:13, fontWeight:700, color: headerStyle.color }}>{tasks.length}</div>
             </div>
           );
         })()}
           <div style={{ flex:1, minHeight:0, overflowY:'auto', display:'flex', flexDirection:'column', gap:10 }}>
             {tasks.length === 0 ? (
-              <div style={{ color:C.text3, fontSize:12, padding:'16px 8px', border:`1px dashed ${C.border}`, borderRadius:12, textAlign:'center' }}>No tasks</div>
+              <div style={{ color:C.text3, fontSize:13, padding:'16px 8px', border:`1px dashed ${C.border}`, borderRadius:12, textAlign:'center' }}>No tasks</div>
             ) : tasks.map((task) => {
               const isSel = selected === task.id;
               const isExpanded = selected === task.id;
@@ -2821,7 +2821,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           <div style={{ display:'flex', gap:3, background:C.bg, borderRadius:8, padding:3 }}>
             {viewModes.map(m => (
               <button key={m} onClick={()=>setView(m)}
-                style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Poppins, sans-serif', background:view===m?C.white:C.bg, color:view===m?C.primary:C.text2, boxShadow:view===m?C.shadow:'none', transition:'all 0.15s' }}>
+                style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:13, fontWeight:600, fontFamily:'Poppins, sans-serif', background:view===m?C.white:C.bg, color:view===m?C.primary:C.text2, boxShadow:view===m?C.shadow:'none', transition:'all 0.15s' }}>
                 {m==='table' ? '☰ Table' : m==='split' ? '⊟ Split' : m==='gantt' ? '▦ Gantt' : '▦ Kanban'}
               </button>
             ))}
@@ -3024,7 +3024,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
       {columnModalOpen && (
         <Modal title="Task Columns" onClose={() => setColumnModalOpen(false)} width={560}>
           <div style={{ display:'grid', gap:14 }}>
-            <div style={{ fontSize:12, color:C.text2 }}>
+            <div style={{ fontSize:13, color:C.text2 }}>
               Save by project and user. WBS and Task Name are always visible.
             </div>
             <div style={{ display:'grid', gap:8, maxHeight:420, overflowY:'auto', paddingRight:4 }}>
@@ -3112,7 +3112,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                 options={availableMoveToMainPositions}
               />
             </FormRow>
-            <div style={{ fontSize: 12, color: C.text2 }}>
+            <div style={{ fontSize: 13, color: C.text2 }}>
               This task will become main task at row <strong>{moveToMainModal.targetIndex}</strong> (WBS <strong>{moveToMainModal.targetIndex}</strong>).
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
@@ -3153,20 +3153,20 @@ export default function TasksTab({ projectId, extraActions }: Props) {
             </Card>
             <Card style={{ padding: '14px 16px' }}>
               <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>ROWS</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.primary }}>{importPreview.rows.length}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: C.primary }}>{importPreview.rows.length}</div>
             </Card>
             <Card style={{ padding: '14px 16px' }}>
               <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>ROOT TASKS</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{importPreview.rows.filter((row) => !row.parentWbs).length}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{importPreview.rows.filter((row) => !row.parentWbs).length}</div>
             </Card>
             <Card style={{ padding: '14px 16px' }}>
               <div style={{ fontSize: 11, color: C.text2, marginBottom: 6 }}>WITH PREDECESSOR</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{importPreview.rows.filter((row) => !!row.predecessorWbs).length}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{importPreview.rows.filter((row) => !!row.predecessorWbs).length}</div>
             </Card>
           </div>
 
-          <div style={{ padding: '12px 14px', borderRadius: 12, background: C.redBg, color: C.red, fontSize: 12, fontWeight: 600, marginBottom: 16 }}>
-            การ import นี้จะลบ Task เดิมทั้งหมดของ project ปัจจุบัน แล้วสร้างใหม่จากไฟล์นี้ 100%
+          <div style={{ padding: '12px 14px', borderRadius: 12, background: C.redBg, color: C.red, fontSize: 13, fontWeight: 600, marginBottom: 16 }}>
+            This import deletes every existing task in this project and recreates them all from this file.
           </div>
 
           <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 18 }}>
@@ -3178,19 +3178,19 @@ export default function TasksTab({ projectId, extraActions }: Props) {
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
               {importPreview.rows.slice(0, 15).map((row, index) => (
                 <div key={`${row.wbs}-${index}`} style={{ display: 'grid', gridTemplateColumns: '90px 1.4fr 110px 110px 110px 120px', gap: 0, borderBottom: `1px solid ${C.border}` }}>
-                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text }}>{row.wbs}</div>
-                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text }}>{row.taskName}</div>
-                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.parentWbs || '-'}</div>
-                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.status || '-'}</div>
-                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.percentComplete}%</div>
-                  <div style={{ padding: '10px 12px', fontSize: 12, color: C.text2 }}>{row.resource || '-'}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: C.text }}>{row.wbs}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: C.text }}>{row.taskName}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: C.text2 }}>{row.parentWbs || '-'}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: C.text2 }}>{row.status || '-'}</div>
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: C.text2 }}>{row.percentComplete}%</div>
+                  <div style={{ padding: '10px 12px', fontSize: 13, color: C.text2 }}>{row.resource || '-'}</div>
                 </div>
               ))}
             </div>
           </div>
 
           {importPreview.rows.length > 15 && (
-            <div style={{ fontSize: 12, color: C.text2, marginBottom: 18 }}>
+            <div style={{ fontSize: 13, color: C.text2, marginBottom: 18 }}>
               Showing first 15 rows from {importPreview.rows.length} rows in the file.
             </div>
           )}
@@ -3209,27 +3209,27 @@ export default function TasksTab({ projectId, extraActions }: Props) {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, color: C.text2 }}>PROJECT RANGE</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fmtDate(suggestionPreview.projectStart)} - {fmtDate(suggestionPreview.projectEnd)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{fmtDate(suggestionPreview.projectStart)} - {fmtDate(suggestionPreview.projectEnd)}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: C.text2 }}>DURATION</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: C.primary }}>{suggestionPreview.projectDurationDays} days</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.primary }}>{suggestionPreview.projectDurationDays} days</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: C.text2 }}>WORKING DAYS</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{suggestionPreview.workingDayCount}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{suggestionPreview.workingDayCount}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, color: C.text2 }}>LEAF TASKS TO UPDATE</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{suggestionPreview.assignments.length}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{suggestionPreview.assignments.length}</div>
                 </div>
               </div>
-              <div style={{ fontSize: 12, color: C.text2, marginTop: 12 }}>
-                ระบบจะคำนวณจาก Dependency (FS/SS/FF/SF), lag/lead, Duration และลำดับ WBS โดยข้ามวันเสาร์-อาทิตย์อัตโนมัติ จากนั้นอัปเดตเฉพาะ leaf task แล้วให้ parent คำนวณวันตามลูกอีกที
+              <div style={{ fontSize: 13, color: C.text2, marginTop: 12 }}>
+                Dates are calculated from dependencies (FS/SS/FF/SF), lag/lead, duration and WBS order, skipping weekends. Only leaf tasks are updated; parent tasks then roll up from their children.
               </div>
               {suggestionPreview.unresolvedDependencyCount > 0 && (
-                <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>
-                  พบ dependency ที่ resolve ไม่ได้ {suggestionPreview.unresolvedDependencyCount} task (เช่น วนลูปหรืออ้าง predecessor ที่ไม่มีวัน) ระบบใช้ fallback ตามลำดับ WBS ให้รายการเหล่านี้
+                <div style={{ fontSize: 13, color: C.red, marginTop: 8 }}>
+                  {suggestionPreview.unresolvedDependencyCount} task(s) have dependencies that cannot be resolved (for example a loop, or a predecessor without dates). These follow WBS order instead.
                 </div>
               )}
             </Card>
@@ -3248,15 +3248,15 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                   <tbody>
                     {suggestionPreview.assignments.map((item) => (
                       <tr key={item.id}>
-                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text, borderBottom: `1px solid ${C.border}` }}>{item.taskName}</td>
-                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{item.level}</td>
-                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{fmtDate(item.startDate)}</td>
-                        <td style={{ padding: '10px 12px', fontSize: 12, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{fmtDate(item.endDate)}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 13, color: C.text, borderBottom: `1px solid ${C.border}` }}>{item.taskName}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 13, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{item.level}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 13, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{fmtDate(item.startDate)}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 13, color: C.text2, borderBottom: `1px solid ${C.border}` }}>{fmtDate(item.endDate)}</td>
                       </tr>
                     ))}
                     {!suggestionPreview.assignments.length && (
                       <tr>
-                        <td colSpan={4} style={{ padding: '18px 12px', fontSize: 12, color: C.text3, textAlign: 'center' }}>No suggested dates available. Check project start/end date and task list.</td>
+                        <td colSpan={4} style={{ padding: '18px 12px', fontSize: 13, color: C.text3, textAlign: 'center' }}>No suggested dates available. Check project start/end date and task list.</td>
                       </tr>
                     )}
                   </tbody>
@@ -3355,11 +3355,11 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
         <FormRow label="Insert Type">
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" onClick={() => setInsertType('main')}
-              style={{ padding:'6px 12px', borderRadius:8, border:`1px solid ${insertType==='main'?C.primary:C.border}`, background:insertType==='main'?C.primaryBg:C.white, color:insertType==='main'?C.primary:C.text2, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:12, fontWeight:600 }}>
+              style={{ padding:'6px 12px', borderRadius:8, border:`1px solid ${insertType==='main'?C.primary:C.border}`, background:insertType==='main'?C.primaryBg:C.white, color:insertType==='main'?C.primary:C.text2, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:13, fontWeight:600 }}>
               Main Task
             </button>
             <button type="button" onClick={() => setInsertType('sub')}
-              style={{ padding:'6px 12px', borderRadius:8, border:`1px solid ${insertType==='sub'?C.primary:C.border}`, background:insertType==='sub'?C.primaryBg:C.white, color:insertType==='sub'?C.primary:C.text2, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:12, fontWeight:600 }}>
+              style={{ padding:'6px 12px', borderRadius:8, border:`1px solid ${insertType==='sub'?C.primary:C.border}`, background:insertType==='sub'?C.primaryBg:C.white, color:insertType==='sub'?C.primary:C.text2, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:13, fontWeight:600 }}>
               Sub Task
             </button>
           </div>
@@ -3386,7 +3386,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           </div>
         </FormRow>
 
-        <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>
+        <div style={{ fontSize: 13, color: C.text2, marginTop: 4 }}>
           Anchor: {selectedTask ? `${selectedTask.wbs} ${selectedTask.taskName}` : 'No selected task'}
         </div>
       </div>
@@ -3471,7 +3471,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
       <div style={{ fontSize: 11, color: C.text3, marginTop: -4, marginBottom: 8 }}>
         {insertType === 'main' ? 'Main task effort is auto-calculated and locked (0 when no child).' : `Use increments of ${EFFORT_STEP} MD`}
       </div>
-      {dur>0&&<p style={{ fontSize:12, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
+      {dur>0&&<p style={{ fontSize:13, color:C.primary, marginBottom:12 }}>Duration: <strong>{dur} days</strong></p>}
       <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={()=>{
@@ -3479,7 +3479,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           const startDate = String(form.startDate || '');
           const endDate = String(form.endDate || '');
           if (!startDate || !endDate) {
-            toast.error('Start/End Date ต้องเลือกวันที่');
+            toast.error('Please choose start and end dates');
             return;
           }
           const normalized = normalizeTaskDateRange(startDate, endDate);
@@ -3500,7 +3500,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
           } else {
             parentId = (form.parentId as string) || selectedTask?.id || '';
             if (!parentId) {
-              toast.error('Sub Task ต้องมี Parent Task');
+              toast.error('A sub task needs a parent task');
               return;
             }
             const siblings = tasks.filter(t => (t.parentId || '') === parentId);
@@ -3531,7 +3531,7 @@ function TaskModal({ tasks, selectedTask, preset, phaseOptions, onClose, onSave 
             ),
           });
           if (normalized.adjusted) {
-            toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
+            toast.success('End date was moved so it is not before the start date');
           }
         }}>Create Task</Btn>
       </div>
@@ -3684,11 +3684,11 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
       <FormRow label="Quick Insert">
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
           <button type="button" onClick={onInsertBefore}
-            style={{ padding:'6px 10px', borderRadius:8, border:`1px solid ${C.primary}`, background:C.primaryBg, color:C.primary, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:12, fontWeight:600 }}>
+            style={{ padding:'6px 10px', borderRadius:8, border:`1px solid ${C.primary}`, background:C.primaryBg, color:C.primary, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:13, fontWeight:600 }}>
             Insert Before This Task
           </button>
           <button type="button" onClick={onInsertAfter}
-            style={{ padding:'6px 10px', borderRadius:8, border:`1px solid ${C.primary}`, background:C.primaryBg, color:C.primary, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:12, fontWeight:600 }}>
+            style={{ padding:'6px 10px', borderRadius:8, border:`1px solid ${C.primary}`, background:C.primaryBg, color:C.primary, cursor:'pointer', fontFamily:'Poppins, sans-serif', fontSize:13, fontWeight:600 }}>
             Insert After This Task
           </button>
         </div>
@@ -3709,7 +3709,7 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
             duration: calcDuration(normalized.startDate, normalized.endDate),
           });
           if (normalized.adjusted) {
-            toast.success('ปรับวันที่สิ้นสุดให้ไม่น้อยกว่าวันที่เริ่มต้นแล้ว');
+            toast.success('End date was moved so it is not before the start date');
           }
         }}>Save Changes</Btn>
       </div>

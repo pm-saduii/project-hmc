@@ -163,7 +163,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
         ].map(s => (
           <Card key={s.label} style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: 20, marginBottom: 5 }}>{s.icon}</div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{s.label}</div>
           </Card>
         ))}
@@ -203,13 +203,13 @@ export default function EffortTab({ projectId, extraActions }: Props) {
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 10, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{phase}</div>
-                  <div style={{ fontSize: 12, color: C.text2 }}>
+                  <div style={{ fontSize: 13, color: C.text2 }}>
                     Budget {totals.budgetManday} MD • Used {totals.usedManday} MD • Remaining {totals.remaining} MD
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 12, color: C.text2 }}>฿{fmtMoney(displayPhaseBudgetAmount)}</div>
-                  <div style={{ fontSize: 12, color: C.text2 }}>{phaseEfforts.length} tasks</div>
+                  <div style={{ fontSize: 13, color: C.text2 }}>฿{fmtMoney(displayPhaseBudgetAmount)}</div>
+                  <div style={{ fontSize: 13, color: C.text2 }}>{phaseEfforts.length} tasks</div>
                 </div>
               </div>
               {isMobile ? (
@@ -221,8 +221,8 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                       <Card key={e.id} style={{ padding: 14 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{e.module}</div>
-                            <div style={{ fontSize: 12, color: C.text2 }}>{e.budgetManday} MD • ฿{fmtMoney(permissions.getMaskedAmount(e.budgetAmount))}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{e.module}</div>
+                            <div style={{ fontSize: 13, color: C.text2 }}>{e.budgetManday} MD • ฿{fmtMoney(permissions.getMaskedAmount(e.budgetAmount))}</div>
                           </div>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button onClick={() => setModal(e)} style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.primaryBg, border: 'none', borderRadius: 8, color: C.primary, cursor: 'pointer' }}>
@@ -236,23 +236,23 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                           <div style={{ background: C.bg2, borderRadius: 10, padding: 10 }}>
                             <div style={{ fontSize: 11, color: C.text2, marginBottom: 4 }}>Used MD</div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: C.amber }}>{used}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.amber }}>{used}</div>
                           </div>
                           <div style={{ background: C.bg2, borderRadius: 10, padding: 10 }}>
                             <div style={{ fontSize: 11, color: C.text2, marginBottom: 4 }}>Remaining</div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: rem < 0 ? C.red : C.green }}>{rem}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: rem < 0 ? C.red : C.green }}>{rem}</div>
                           </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
                           {months.map(mo => (
                             <div key={mo} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 72 }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: C.text2, marginBottom: 6 }}>{fmtMonth(mo)}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, marginBottom: 6 }}>{fmtMonth(mo)}</div>
                               <input
                                 type="number" min={0}
                                 value={(e.monthly || {})[mo] || ''}
                                 onChange={ev => handleMonthly(e.id, mo, ev.target.value)}
                                 placeholder="—"
-                                style={{ width: '100%', textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 6px', fontFamily: 'Poppins, sans-serif', fontSize: 12, color: C.text, background: ((e.monthly || {})[mo] > 0) ? C.amberBg : C.white, outline: 'none' }}
+                                style={{ width: '100%', textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 6px', fontFamily: 'Poppins, sans-serif', fontSize: 13, color: C.text, background: ((e.monthly || {})[mo] > 0) ? C.amberBg : C.white, outline: 'none' }}
                                 onFocus={ev => ev.target.style.borderColor = C.primary}
                                 onBlur={ev  => ev.target.style.borderColor = C.border}
                               />
@@ -308,7 +308,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                                   placeholder="—"
                                   style={{
                                     width: 54, textAlign: 'center', border: `1px solid ${C.border}`, borderRadius: 6,
-                                    padding: '4px 4px', fontFamily: 'Poppins, sans-serif', fontSize: 12, color: C.text,
+                                    padding: '4px 4px', fontFamily: 'Poppins, sans-serif', fontSize: 13, color: C.text,
                                     background: ((e.monthly || {})[mo] > 0) ? C.amberBg : C.white, outline: 'none',
                                   }}
                                   onFocus={ev => ev.target.style.borderColor = C.primary}
@@ -373,7 +373,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 8, borderTop: `2px solid ${C.border2}` }}>
             <span style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>TOTAL</span>
-            <span style={{ fontSize: 14, color: C.primary, fontWeight: 800 }}>{Object.values(taskPhaseGroups).reduce((s, v) => s + v, 0)} MD</span>
+            <span style={{ fontSize: 13, color: C.primary, fontWeight: 800 }}>{Object.values(taskPhaseGroups).reduce((s, v) => s + v, 0)} MD</span>
           </div>
         </Modal>
       )}

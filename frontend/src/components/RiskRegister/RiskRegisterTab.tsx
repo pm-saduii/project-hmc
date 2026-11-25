@@ -67,7 +67,7 @@ export default function RiskRegisterTab({ projectId, extraActions }: Props) {
         ].map(s => (
           <Card key={s.label} style={{ padding: '14px 18px' }}>
             <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
             <div style={{ fontSize: 11, color: C.text2, marginTop: 2 }}>{s.label}</div>
           </Card>
         ))}
@@ -87,14 +87,14 @@ export default function RiskRegisterTab({ projectId, extraActions }: Props) {
                 <Card key={risk.id} style={{ padding: 10, borderRadius: 12, border: `1px solid ${C.border}`, boxShadow: 'rgba(0,0,0,0.06) 0px 1px 3px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                     <div style={{ minWidth: 0, flex: '1 1 140px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{risk.title}</div>
-                      <div style={{ fontSize: 10, color: C.text2, marginTop: 4 }}>{fmtDate(risk.riskDate)} · {risk.owner || 'No owner'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{risk.title}</div>
+                      <div style={{ fontSize: 11, color: C.text2, marginTop: 4 }}>{fmtDate(risk.riskDate)} · {risk.owner || 'No owner'}</div>
                     </div>
                     <div style={{ textAlign: 'right', minWidth: 90 }}>
                       <Badge bg={RISK_LEVEL_COLOR[score] + '18'} color={RISK_LEVEL_COLOR[score]}>{score}</Badge>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gap: 6, marginTop: 10, fontSize: 10, color: C.text2 }}>
+                  <div style={{ display: 'grid', gap: 6, marginTop: 10, fontSize: 11, color: C.text2 }}>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Probability:</strong> <span style={{ color: RISK_LEVEL_COLOR[risk.probability] || C.text2 }}>{risk.probability}</span></div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Impact:</strong> <span style={{ color: RISK_LEVEL_COLOR[risk.impact] || C.text2 }}>{risk.impact}</span></div>
                     <div><strong style={{ color: C.text, fontWeight: 600 }}>Status:</strong> {risk.status}</div>

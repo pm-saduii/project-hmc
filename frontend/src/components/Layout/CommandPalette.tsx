@@ -117,7 +117,7 @@ export default function CommandPalette({ open, onClose, pages }: { open: boolean
             aria-label="Search projects and pages"
             aria-controls="command-results"
             aria-activedescendant={results[cursor] ? `cmd-${cursor}` : undefined}
-            style={{ flex: 1, height: 48, border: 0, outline: 'none', fontSize: 14, fontFamily: F, background: 'transparent', color: C.text }}
+            style={{ flex: 1, height: 48, border: 0, outline: 'none', fontSize: 13, fontFamily: F, background: 'transparent', color: C.text }}
           />
           <kbd style={kbd}>Esc</kbd>
         </div>
@@ -130,7 +130,7 @@ export default function CommandPalette({ open, onClose, pages }: { open: boolean
             return (
               <React.Fragment key={cmd.id}>
                 {(!prev || prev.kind !== cmd.kind) && (
-                  <div style={{ padding: '8px 10px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.text3 }}>
+                  <div style={{ padding: '8px 10px 4px', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.text3 }}>
                     {cmd.kind === 'Page' ? 'Pages' : cmd.kind === 'Screen' ? 'This project' : 'Projects'}
                   </div>
                 )}
@@ -164,5 +164,5 @@ export default function CommandPalette({ open, onClose, pages }: { open: boolean
 }
 
 const kbd: React.CSSProperties = {
-  fontFamily: F, fontSize: 10, padding: '1px 6px', borderRadius: 5, border: `1px solid ${C.border}`, background: C.bg, color: C.text2,
+  fontFamily: F, fontSize: 11, padding: '1px 6px', borderRadius: 5, border: `1px solid ${C.border}`, background: C.bg, color: C.text2,
 };

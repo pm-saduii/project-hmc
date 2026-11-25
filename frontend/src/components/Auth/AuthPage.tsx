@@ -66,7 +66,7 @@ export default function AuthPage() {
       }
     } catch (err) {
       const message = (err as Error).message;
-      setError(message === 'ACCOUNT_INACTIVE' ? 'บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ' : message);
+      setError(message === 'ACCOUNT_INACTIVE' ? 'This account is disabled. Please contact an administrator.' : message);
     } finally {
       setLoading(false);
     }
@@ -118,12 +118,12 @@ export default function AuthPage() {
             background: 'linear-gradient(135deg, #4F46E5, #818CF8)',
             marginBottom: 12,
           }}>
-            <span style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>PM</span>
+            <span style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>PM</span>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: isDark ? '#F1F5F9' : '#0F172A' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: isDark ? '#F1F5F9' : '#0F172A' }}>
             ProjectMS
           </div>
-          <div style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B', marginTop: 4 }}>
             Enterprise Project Management
           </div>
         </div>
@@ -134,10 +134,10 @@ export default function AuthPage() {
             background: isDark ? '#064E3B' : '#D1FAE5',
             borderRadius: 12, marginBottom: 16,
           }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: isDark ? '#6EE7B7' : '#065F46' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#6EE7B7' : '#065F46' }}>
               Account created!
             </div>
-            <div style={{ fontSize: 12, color: isDark ? '#A7F3D0' : '#047857', marginTop: 6 }}>
+            <div style={{ fontSize: 13, color: isDark ? '#A7F3D0' : '#047857', marginTop: 6 }}>
               Check your email to confirm, then sign in.
             </div>
             <button
@@ -182,7 +182,7 @@ export default function AuthPage() {
                 padding: '10px 14px', borderRadius: 8, marginBottom: 16,
                 background: isDark ? '#7F1D1D' : '#FEE2E2',
                 color: isDark ? '#FCA5A5' : '#991B1B',
-                fontSize: 12, fontWeight: 500,
+                fontSize: 13, fontWeight: 500,
               }}>
                 {error}
               </div>
@@ -276,17 +276,17 @@ export default function AuthPage() {
                     {allowedRole === 'client' && <option value="client">Client</option>}
                   </select>
                   {allowedRole === 'member' && (
-                    <div style={{ marginTop: 8, color: isDark ? '#A7F3D0' : '#047857', fontSize: 12 }}>
+                    <div style={{ marginTop: 8, color: isDark ? '#A7F3D0' : '#047857', fontSize: 13 }}>
                       Your email is registered as internal; only Member is allowed.
                     </div>
                   )}
                   {allowedRole === 'client' && (
-                    <div style={{ marginTop: 8, color: isDark ? '#A7F3D0' : '#047857', fontSize: 12 }}>
+                    <div style={{ marginTop: 8, color: isDark ? '#A7F3D0' : '#047857', fontSize: 13 }}>
                       Your email is registered as client; only Client is allowed.
                     </div>
                   )}
                   {emailError && (
-                    <div style={{ marginTop: 8, color: isDark ? '#FECACA' : '#B91C1C', fontSize: 12 }}>
+                    <div style={{ marginTop: 8, color: isDark ? '#FECACA' : '#B91C1C', fontSize: 13 }}>
                       {emailError}
                     </div>
                   )}
@@ -296,7 +296,7 @@ export default function AuthPage() {
                 type="submit"
                 disabled={loading}
                 style={{
-                  width: '100%', padding: '12px 0', fontSize: 14, fontWeight: 700,
+                  width: '100%', padding: '12px 0', fontSize: 13, fontWeight: 700,
                   borderRadius: 10, border: 'none', cursor: loading ? 'wait' : 'pointer',
                   background: 'linear-gradient(135deg, #4F46E5, #6366F1)',
                   color: '#fff', fontFamily: 'Poppins, sans-serif',

@@ -42,7 +42,7 @@ function badgeColors(value: string): { background: string; color: string } {
 function Tag({ value }: { value: string }) {
   const colors = badgeColors(value);
   const label = CATEGORIES.find((item) => item.value === value)?.label || value;
-  return <span style={{ padding: '3px 8px', borderRadius: 4, background: colors.background, color: colors.color, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>{label}</span>;
+  return <span style={{ padding: '3px 8px', borderRadius: 4, background: colors.background, color: colors.color, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>{label}</span>;
 }
 
 export default function LessonsLearnedTab({ project }: { project: Project }) {
@@ -351,7 +351,7 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: isMobile ? 14 : 24, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><BookOpen size={18} color={C.primary} /><h2 style={{ margin: 0, color: C.text, fontSize: 18, fontWeight: 800 }}>Lessons Learned</h2></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><BookOpen size={18} color={C.primary} /><h2 style={{ margin: 0, color: C.text, fontSize: 16, fontWeight: 800 }}>Lessons Learned</h2></div>
           <p style={{ margin: '5px 0 0', color: C.text3, fontSize: 11 }}>Project lessons and follow-up actions</p>
         </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -366,29 +366,29 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
           { label: 'Open follow-ups', value: followUps, color: '#B45309' },
           { label: 'Completed actions', value: done, color: '#047857' },
         ].map((item) => <Card key={item.label} style={{ padding: '11px 14px', borderRadius: 6, boxShadow: 'none' }}>
-          <div style={{ color: C.text3, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{item.label}</div>
-          <div style={{ marginTop: 3, color: item.color, fontSize: 21, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
+          <div style={{ color: C.text3, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{item.label}</div>
+          <div style={{ marginTop: 3, color: item.color, fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
         </Card>)}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(220px, 1fr) 180px 170px', gap: 8, marginBottom: 14 }}>
-        <div style={{ position: 'relative' }}><Search size={14} color={C.text3} style={{ position: 'absolute', top: 11, left: 11 }} /><Input value={query} onChange={setQuery} placeholder="Search lessons, context, or owner" style={{ paddingLeft: 32, fontSize: 12 }} /></div>
+        <div style={{ position: 'relative' }}><Search size={14} color={C.text3} style={{ position: 'absolute', top: 11, left: 11 }} /><Input value={query} onChange={setQuery} placeholder="Search lessons, context, or owner" style={{ paddingLeft: 32, fontSize: 13 }} /></div>
         <Select value={categoryFilter} onChange={setCategoryFilter} options={[{ value: '', label: 'All categories' }, ...CATEGORIES]} />
         <Select value={statusFilter} onChange={(value) => setStatusFilter(value as Status | '')} options={STATUSES} />
       </div>
 
-      {loadError ? <div role="alert" style={{ padding: 14, border: `1px solid ${C.red}44`, borderRadius: 6, background: C.redBg, color: C.red, fontSize: 12 }}>{loadError}</div>
-      : loading ? <div style={{ padding: 36, color: C.text3, textAlign: 'center', fontSize: 12 }}>Loading lessons…</div>
+      {loadError ? <div role="alert" style={{ padding: 14, border: `1px solid ${C.red}44`, borderRadius: 6, background: C.redBg, color: C.red, fontSize: 13 }}>{loadError}</div>
+      : loading ? <div style={{ padding: 36, color: C.text3, textAlign: 'center', fontSize: 13 }}>Loading lessons…</div>
       : visible.length ? <div style={{ display: 'grid', gap: 10 }}>
         {visible.map((item) => <Card key={item.id} style={{ padding: isMobile ? 13 : '15px 18px', borderRadius: 6, boxShadow: 'none' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginBottom: 6 }}>
                 <Tag value={item.category} /><Tag value={item.status} />
-                <span style={{ color: C.text3, fontSize: 10 }}>{fmtDate(item.occurredAt)}</span>
-                <span style={{ color: C.text3, fontSize: 10 }}>{item.phase}</span>
+                <span style={{ color: C.text3, fontSize: 11 }}>{fmtDate(item.occurredAt)}</span>
+                <span style={{ color: C.text3, fontSize: 11 }}>{item.phase}</span>
               </div>
-              <h3 style={{ margin: '0 0 8px', color: C.text, fontSize: 14, lineHeight: 1.4, overflowWrap: 'anywhere' }}>{item.title}</h3>
+              <h3 style={{ margin: '0 0 8px', color: C.text, fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>{item.title}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
                 {[
                   { label: 'Event and context', value: item.context },
@@ -398,11 +398,11 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
                   { label: 'Recommendation', value: item.recommendation },
                   { label: 'Follow-up action', value: item.followUp },
                 ].map((field) => <div key={field.label}>
-                  <div style={{ color: C.text3, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>{field.label}</div>
+                  <div style={{ color: C.text3, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>{field.label}</div>
                   <div style={{ color: C.text2, fontSize: 11, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{field.value || '—'}</div>
                 </div>)}
               </div>
-              {(item.owner || item.dueDate || item.referenceUrl) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 9, color: C.text3, fontSize: 10 }}>
+              {(item.owner || item.dueDate || item.referenceUrl) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 9, color: C.text3, fontSize: 11 }}>
                 {item.owner && <span>Owner: <strong style={{ color: C.text2 }}>{item.owner}</strong></span>}
                 {item.dueDate && <span>Due: <strong style={{ color: C.text2 }}>{fmtDate(item.dueDate)}</strong></span>}
                 {item.referenceUrl && <a href={item.referenceUrl} target="_blank" rel="noreferrer" style={{ color: C.primary, overflowWrap: 'anywhere' }}>Reference</a>}
@@ -415,7 +415,7 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
           </div>
         </Card>)}
       </div> : <div style={{ display: 'grid', placeItems: 'center', minHeight: 230, padding: 24, border: `1px dashed ${C.border2}`, borderRadius: 6, background: C.white, textAlign: 'center' }}>
-        <div><BookOpen size={22} color={C.text3} /><h3 style={{ margin: '8px 0 4px', color: C.text, fontSize: 14 }}>{projectLessons.length ? 'No matching lessons' : 'No lessons recorded yet'}</h3>
+        <div><BookOpen size={22} color={C.text3} /><h3 style={{ margin: '8px 0 4px', color: C.text, fontSize: 13 }}>{projectLessons.length ? 'No matching lessons' : 'No lessons recorded yet'}</h3>
           <p style={{ margin: 0, color: C.text3, fontSize: 11 }}>{projectLessons.length ? 'Adjust filters to see more results.' : 'Add the first lesson for this project.'}</p>
           {!projectLessons.length && canEdit && <Btn onClick={openNew} small style={{ marginTop: 14 }}><Plus size={13} /> Add Lesson</Btn>}
         </div>
