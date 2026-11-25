@@ -247,6 +247,25 @@ export const avatarColor = (name: string): string => {
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return AVT_COLORS[Math.abs(h) % AVT_COLORS.length];
 };
+/**
+ * Short form of a task's Resource: first letter of the first and last name, e.g.
+ * "somchai khrmkrad" → "SK"; an email uses the part before @ ("somchai.k@x.com" → "SK");
+ * several people (comma / semicolon / slash) → "SK, NP".
+ */
+export const resourceInitials = (resource: string): string =>
+  String(resource || '')
+    .split(/[,;/]/)
+    .map((person) => {
+      const base = person.trim().split('@')[0];
+      const words = base.split(/[\s._-]+/).filter(Boolean);
+      if (!words.length) return '';
+      const first = words[0].charAt(0);
+      const last = words.length > 1 ? words[words.length - 1].charAt(0) : '';
+      return `${first}${last}`.toUpperCase();
+    })
+    .filter(Boolean)
+    .join(', ');
+
 export const getInitials = (name: string): string =>
   name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 

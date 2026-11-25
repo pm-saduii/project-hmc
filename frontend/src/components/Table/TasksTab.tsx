@@ -7,8 +7,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
-import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C, ConfirmModal } from '../Common';
-import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
+import { Btn, EditableCell, Card, Modal, FormRow, Input, Select, C, ConfirmModal } from '../Common';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, resourceInitials, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Task, ViewMode } from '../../types';
@@ -48,10 +48,10 @@ const COLS: Array<{ id: TaskColumnId; label: string; w: number; canHide: boolean
   { id: 'percentComplete', label: '% Done',        w: 90,  canHide: true },
   { id: 'scheduleStatus',  label: 'Status',        w: 100, canHide: true },
   { id: 'effortManday',    label: 'Effort (MD)',   w: 90,  canHide: true },
-  { id: 'resource',        label: 'Resource',      w: 160, canHide: true },
+  { id: 'resource',        label: 'Resource',      w: 96,  canHide: true },
   { id: 'actions',         label: '',              w: 66,  canHide: true },
 ];
-const MIN_COLUMN_WIDTHS = [44, 220, 56, 92, 110, 110, 110, 64, 76, 72, 96, 50];
+const MIN_COLUMN_WIDTHS = [44, 220, 56, 92, 110, 110, 110, 64, 76, 72, 64, 50];
 const DEFAULT_COLUMN_VISIBILITY: Record<TaskColumnId, boolean> = COLS.reduce((acc, col) => {
   acc[col.id] = true;
   return acc;
@@ -454,7 +454,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [importPreview, setImportPreview] = useState<TaskImportPreview | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
-  const [tableWidthRatio, setTableWidthRatio] = useState(0.85);
+  const [tableWidthRatio, setTableWidthRatio] = useState(1);
   const isMobile = windowWidth < 768;
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
@@ -1737,7 +1737,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const delta = e.clientX - resizeStartX.current;
     const nextWidth = Math.max(60, resizeStartWidth.current + delta);
     if (resizingColumn.current === 1 && tableViewportWidth) {
-      setTableWidthRatio(Math.max(0.85, Math.min(1, (resizeStartTableWidth.current + delta) / tableViewportWidth)));
+      setTableWidthRatio(Math.max(0.6, Math.min(1, (resizeStartTableWidth.current + delta) / tableViewportWidth)));
     }
     setColWidths((prev) => {
       const next = [...prev];
@@ -2322,7 +2322,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                 </div>
                 {!isExpanded ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
-                    <span>{task.resource || 'No owner'}</span>
+                    <span title={task.resource || undefined}>{task.resource ? resourceInitials(task.resource) : 'No owner'}</span>
                     <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
                     <span>Predecessor: {formatPredecessorInput(task, projectTasks) || '—'}</span>
                     <span>{Number(task.effortManday || 0).toFixed(3)} MD</span>
@@ -2400,7 +2400,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const extraWidthTarget = visibleIndices.includes(1) ? 1 : visibleIndices[0];
 
     if (totalBaseWidth <= availableWidth) {
+      // Fill the screen: the Task Name column takes the space left over.
       visibleIndices.forEach((index) => { result[index] = bases[index]; });
+      result[extraWidthTarget] += Math.floor(availableWidth - totalBaseWidth);
       return result;
     }
 
@@ -2665,9 +2667,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                     )}
                     {isColumnVisible('resource') && (
                       <div style={{ width:renderedColumnWidths[10], minWidth:renderedColumnWidths[10], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
-                        {!isNew && rowTask.resource && <Avatar name={rowTask.resource} size={20} />}
                         <EditableCell
                           value={isNew ? newRow.resource : rowTask.resource}
+                          display={isNew ? undefined : <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>{resourceInitials(rowTask.resource)}</span>}
                           onSave={(v) => {
                             if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, resource: v } : prev);
                             else handleUpdate(rowTask.id, { resource: v });
@@ -2760,7 +2762,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                     <div style={{ minWidth:0, flex:1 }}>
                       <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.taskName || 'Untitled task'}</div>
                       <div style={{ display:'flex', flexWrap:'wrap', gap:8, fontSize:11, color:C.text2 }}>
-                        <span>{task.resource || 'No owner'}</span>
+                        <span title={task.resource || undefined}>{task.resource ? resourceInitials(task.resource) : 'No owner'}</span>
                         <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
                       </div>
                       {isExpanded && (

@@ -270,7 +270,9 @@ export const EditableCell: React.FC<{
   value: string; onSave: (v: string) => void;
   type?: string; placeholder?: string; style?: React.CSSProperties;
   alwaysSave?: boolean;
-}> = ({ value, onSave, type = 'text', placeholder = '—', style, alwaysSave = false }) => {
+  /** Shown instead of the value when not editing (the full value stays in the tooltip). */
+  display?: React.ReactNode;
+}> = ({ value, onSave, type = 'text', placeholder = '—', style, alwaysSave = false, display }) => {
   const toDateInputValue = useCallback((raw: string) => {
     const text = String(raw || '').trim();
     if (!text) return '';
@@ -373,9 +375,9 @@ export const EditableCell: React.FC<{
     );
   }
   return (
-    <span onClick={() => setEditing(true)} title="Click to edit"
+    <span onClick={() => setEditing(true)} title={display && value ? `${value} · Click to edit` : 'Click to edit'}
       style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'text', fontSize: 13, fontFamily: 'Poppins, sans-serif', color: value ? C.text : C.text3, fontStyle: value ? 'normal' : 'italic', ...style }}>
-      {value || placeholder}
+      {value ? (display ?? value) : placeholder}
     </span>
   );
 };
