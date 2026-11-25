@@ -10,6 +10,7 @@ import { fmtDate } from '../utils';
 import { projectPath } from '../utils/projectRoutes';
 import type { Member, Task } from '../types';
 import { PageBody } from './AdminPages';
+import { isMyTask, myIdentityNames } from '../utils/myTasks';
 
 type Filter = 'open' | 'overdue' | 'week' | 'done' | 'all';
 
@@ -27,21 +28,6 @@ function toDate(value: string): Date | null {
   if (!value) return null;
   const d = parseISO(value);
   return isValid(d) ? d : null;
-}
-
-/**
- * Names a task's Resource may use for the signed-in user: their email, profile name, and the
- * name / nickname / Thai name of every member row with the same email (same rule as the reminder email).
- */
-function identityNames(email: string, fullName: string, members: Member[]): Set<string> {
-  const names = new Set<string>();
-  const me = norm(email);
-  if (me) names.add(me);
-  if (norm(fullName)) names.add(norm(fullName));
-  members.filter((m) => norm(m.email) === me && me).forEach((m) => {
-    [m.name, m.nickname, m.thaiName].forEach((value) => { if (norm(value)) names.add(norm(value)); });
-  });
-  return names;
 }
 
 /** /my-tasks — leaf tasks assigned to me across every project I can read. */
@@ -80,14 +66,9 @@ export default function MyTasksPage() {
   const projectById = React.useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
   const mine = React.useMemo(() => {
-    const names = identityNames(user?.email || '', profile?.fullName || '', members);
-    if (!names.size) return [];
+    const names = myIdentityNames(user?.email || '', profile?.fullName || '', members);
     const parentIds = new Set(tasks.map((t) => t.parentId).filter(Boolean));
-    return tasks.filter((t) => {
-      if (parentIds.has(t.id)) return false; // summary rows roll up their children
-      const owners = String(t.resource || '').split(/[,;/]/).map(norm).filter(Boolean);
-      return owners.some((owner) => names.has(owner));
-    });
+    return tasks.filter((t) => isMyTask(t, names, parentIds));
   }, [tasks, members, user?.email, profile?.fullName]);
 
   const today = new Date();

@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Copy, Download, Home, Plus, Save, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar, Btn, Modal, FormRow, Select, Input } from '../Common';
-import { fmtDate, computeBaselineProgress } from '../../utils';
+import { fmtDate } from '../../utils';
+import { projectHealth } from '../../utils/projectHealth';
 import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
@@ -602,18 +603,7 @@ export default function ProjectDetail({ project }: Props) {
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
   const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
   const projectTasks = tasks.filter((t) => t.projectId === project.id);
-  const rootTasks = projectTasks.filter((t) => !t.parentId);
-  const overallProgress = rootTasks.length ? Math.round(rootTasks.reduce((sum, t) => sum + t.percentComplete, 0) / rootTasks.length) : 0;
-
-  const currentDate = new Date();
-  const todayIso = currentDate.toISOString().slice(0, 10);
-  const todayBaseline = computeBaselineProgress(projectTasks, [todayIso]);
-  const plannedPercent = todayBaseline[0]?.baselinePercent ?? 0;
-  const scheduleGap = plannedPercent - overallProgress;
-  const scheduleStatus = !todayBaseline.length ? 'Plan N/A'
-    : scheduleGap > 20 ? 'Stoper'
-    : scheduleGap > 3 ? 'Delay'
-    : 'On Track';
+  const { actual: overallProgress, planned: plannedPercent, status: scheduleStatus } = projectHealth(projectTasks);
   const scheduleColor = scheduleStatus === 'Stoper'
     ? C.red
     : scheduleStatus === 'Delay'

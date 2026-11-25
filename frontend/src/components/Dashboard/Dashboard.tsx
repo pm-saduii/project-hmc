@@ -10,6 +10,7 @@ import { fmtDate } from '../../utils';
 import { projectPath } from '../../utils/projectRoutes';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
+import PortfolioDashboard from './PortfolioDashboard';
 
 const STATUS_ACCENT_PALETTE = ['#B45309', '#0F766E', '#C2410C', '#2563EB', '#15803D', '#BE185D', '#6D28D9', '#4D7C0F', '#0369A1', '#A21CAF', '#B91C1C', '#475569'];
 
@@ -33,8 +34,8 @@ function getStatusIcon(status: string) {
 
 /**
  * Portfolio screens.
- *  - mode "dashboard" (route /): status cards + project list + daily reminder toast
- *  - mode "projects"  (route /projects): the project list only
+ *  - mode "dashboard" (route /): PortfolioDashboard (attention, health, upcoming, billing) + daily reminder toast
+ *  - mode "projects"  (route /projects): status cards (click to filter) + the project list
  */
 export default function Dashboard({ mode = 'dashboard' }: { mode?: 'dashboard' | 'projects' }) {
   const { projects, tasks, milestones, deleteProject, fetchTasks, fetchMilestones, masterCodes } = useStore();
@@ -176,7 +177,9 @@ export default function Dashboard({ mode = 'dashboard' }: { mode?: 'dashboard' |
 
   return (
     <div style={{ height: '100%', overflow: 'auto', background: C.bg }}>
-      {permissions.canViewPortfolioOverview ? (
+      {mode === 'dashboard' ? (
+        <PortfolioDashboard isMobile={isMobile} />
+      ) : permissions.canViewPortfolioOverview ? (
         <WelcomeSummary
           projects={allProjects}
           tasks={tasks}
@@ -185,9 +188,9 @@ export default function Dashboard({ mode = 'dashboard' }: { mode?: 'dashboard' |
           onDelete={requestDelete}
           canEdit={canEditOverview}
           isMobile={isMobile}
-          title={mode === 'dashboard' ? 'Dashboard' : 'Projects'}
-          subtitle={mode === 'dashboard' ? 'Portfolio overview of all projects you can access.' : 'Every project you can access. Open one to see its workspace.'}
-          showStatusCards={mode === 'dashboard'}
+          title="Projects"
+          subtitle="Every project you can access. Click a status to filter, open a project to see its workspace."
+          showStatusCards
           actions={canEditOverview ? addProjectButton : undefined}
         />
       ) : (
@@ -246,6 +249,7 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
   const { masterCodes } = useStore();
   const [showHC, setShowHC] = useState(false);
   const [projectView, setProjectView] = useState<'card' | 'table'>('table');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const projectStatusOptions = masterCodes
     .filter((code) => code.codeType === 'project_status' && code.active)
     .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -270,14 +274,18 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
         { label: 'Go Live', value: projects.filter(p => p.status === 'Go Live').length, bg: C.greenBg, color: C.green, codeValue: 'Go Live', icon: '📌' },
         { label: 'Hyper Care', value: projects.filter(p => p.status === 'Hyper Care').length, bg: C.amberBg, color: C.amber, codeValue: 'Hyper Care', icon: '📌' },
       ];
-  const normalProjects = projects.filter((p) => {
+  const shown = statusFilter ? projects.filter((p) => p.status === statusFilter) : projects;
+  const normalProjects = shown.filter((p) => {
     const status = projectStatusOptions.find((code) => code.codeValue === p.status);
     return status ? status.label !== 'Hyper Care' : p.status !== 'Hyper Care';
   }).sort((a, b) => new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime());
-  const hypercareProjects = projects.filter((p) => {
+  const hypercareProjects = shown.filter((p) => {
     const status = projectStatusOptions.find((code) => code.codeValue === p.status);
     return status ? status.label === 'Hyper Care' : p.status === 'Hyper Care';
   }).sort((a, b) => new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime());
+
+  // Filtering on Hyper Care leaves the main list empty, so open that section automatically.
+  const hcOpen = showHC || (!!statusFilter && normalProjects.length === 0);
 
   const renderOverviewProjectCard = (p: Project, fallbackColor = C.primary) => {
     const roots = tasks.filter(t => t.projectId === p.id && !t.parentId);
@@ -355,12 +363,18 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
       {showStatusCards && <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))', gap: 14, marginBottom: 28 }}>
         {statusCards.map((s, index) => {
           const accent = STATUS_ACCENT_PALETTE[index] || `hsl(${((index - STATUS_ACCENT_PALETTE.length) * 360) / Math.max(statusCards.length - STATUS_ACCENT_PALETTE.length, 1)} 62% 38%)`;
+          const selected = statusFilter === s.codeValue;
           return (
-          <Card key={s.label} style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, border: `1px solid ${accent}66`, borderLeft: `4px solid ${accent}`, boxShadow: `0 5px 18px ${accent}1A` }}>
+          <button key={s.label} type="button" aria-pressed={selected}
+            onClick={() => setStatusFilter(selected ? null : s.codeValue)}
+            title={selected ? 'Show all projects' : `Show only ${s.label}`}
+            style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', cursor: 'pointer', fontFamily: 'Poppins, sans-serif',
+              background: selected ? s.bg : C.white, borderRadius: 12, border: `1px solid ${selected ? accent : `${accent}66`}`, borderLeft: `4px solid ${accent}`,
+              boxShadow: selected ? `0 0 0 2px ${accent}55` : `0 5px 18px ${accent}1A`, opacity: statusFilter && !selected ? 0.6 : 1 }}>
             <div style={{ width: 42, height: 42, borderRadius: 11, background: s.bg, color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{getStatusIcon(s.codeValue)}</div>
             <div><div style={{ fontSize: 24, fontWeight: 800, color: accent }}>{s.value}</div>
               <div style={{ fontSize: 11, color: C.text2 }}>{s.label}</div></div>
-          </Card>
+          </button>
         );})}
       </div>}
 
@@ -382,7 +396,15 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
             </button>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: C.text2 }}>{normalProjects.length} projects</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: C.text2 }}>
+          {statusFilter && (
+            <button type="button" onClick={() => setStatusFilter(null)}
+              style={{ border: 0, background: 'transparent', color: C.primary, fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'Poppins, sans-serif' }}>
+              Clear filter
+            </button>
+          )}
+          {normalProjects.length} projects
+        </div>
       </div>
 
       {projectView === 'card' ? (
@@ -459,10 +481,10 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
           <button
             onClick={() => setShowHC(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: C.amberBg, border: `1px solid ${C.amber}33`, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: C.amber, fontFamily: 'Poppins, sans-serif', transition: 'all 0.15s', width: '100%' }}>
-            {showHC ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            {hcOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
             🛡️ Hyper Care Projects ({hypercareProjects.length})
           </button>
-          {showHC && (
+          {hcOpen && (
             <div style={{ overflowX: 'auto', marginTop: 12, border: `1px solid ${C.amber}66`, borderRadius: 8, background: C.white }}>
               <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
                 <thead>
