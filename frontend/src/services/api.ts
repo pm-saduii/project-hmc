@@ -594,6 +594,39 @@ export const projectChecklistApi = {
     return projectChecklistApi.getTopics();
   },
 
+  /** Create or update one topic (admin). */
+  saveTopic: async (topic: ProjectChecklistTopic): Promise<void> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const title = topic.title.trim();
+    if (!title) throw new Error('Enter the topic');
+    const workSystem = topic.category === 'project' ? '' : String(topic.workSystem || '').trim();
+    const stage = topic.category === 'project' ? String(topic.stage || '').trim() : '';
+    if (topic.category !== 'project' && !workSystem) throw new Error('Choose a work system');
+    if (topic.category === 'project' && !stage) throw new Error('Choose a stage');
+    const { error } = await supabase.from('project_checklist_topics').upsert({
+      id: topic.id, category: topic.category, work_system: workSystem, stage, order_no: Math.max(1, Math.round(Number(topic.orderNo) || 1)), title,
+    }, { onConflict: 'id' });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Renumber topics (admin): order_no 1..n in the given order. */
+  saveTopicOrder: async (ids: string[]): Promise<void> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    for (let i = 0; i < ids.length; i += 1) {
+      const { error } = await supabase.from('project_checklist_topics').update({ order_no: i + 1 }).eq('id', ids[i]);
+      if (error) throw new Error(error.message);
+    }
+  },
+
+  deleteTopic: async (id: string): Promise<void> => {
+    const user = await getCurrentUserRoleAndId();
+    if (user.role !== 'admin') throw new Error('FORBIDDEN');
+    const { error } = await supabase.from('project_checklist_topics').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
   getProgress: async (projectId: string): Promise<ProjectChecklistProgress> => {
     const canRead = await checkProjectPermission(projectId, 'read', 'checklists');
     if (!canRead) throw new Error('FORBIDDEN');

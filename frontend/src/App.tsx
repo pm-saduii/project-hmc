@@ -20,9 +20,10 @@ const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const OnePagePage = lazy(() => import('./pages/OnePagePage'));
 const EmailLogsPage = lazy(() => import('./pages/EmailLogsPage'));
-const SystemSettingsPage = lazy(() => import('./pages/SystemSettingsPage'));
+const SettingsLayout = lazy(() => import('./pages/admin/settings/SettingsLayout'));
+const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
+const UserDetailPage = lazy(() => import('./pages/admin/UserDetailPage'));
 const TimesheetModal = lazy(() => import('./components/Timesheet/TimesheetModal'));
-const ManageUsersModal = lazy(() => import('./components/Users/ManageUsersModal'));
 const SystemNotesModal = lazy(() => import('./components/SystemNotes/SystemNotesModal'));
 
 function OnePageGuard({ children }: { children: React.ReactNode }) {
@@ -121,9 +122,9 @@ export default function App() {
           <Route path="timesheet" element={page(<PageBody><TimesheetModal inline onClose={noop} /></PageBody>)} />
           <Route path="admin" element={<AdminOnly />}>
             <Route index element={<Navigate to="/admin/users" replace />} />
-            <Route path="users" element={page(<PageBody><ManageUsersModal inline onClose={noop} /></PageBody>)} />
-            <Route path="settings" element={page(<SystemSettingsPage section="lookup" />)} />
-            <Route path="settings/templates" element={page(<SystemSettingsPage section="templates" />)} />
+            <Route path="users" element={page(<UsersPage />)} />
+            <Route path="users/:userId" element={page(<UserDetailPage />)} />
+            <Route path="settings/*" element={page(<SettingsLayout />)} />
             <Route path="email-logs" element={page(<div style={{ height: '100%', overflowY: 'auto' }}><EmailLogsPage /></div>)} />
             <Route path="system-notes" element={page(<PageBody><SystemNotesModal inline onClose={noop} /></PageBody>)} />
           </Route>

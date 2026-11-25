@@ -2,11 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 
 const USER_SCREEN_IDS = [
   'portfolio-overview', 'tasks', 'summary', 'members', 'ms', 'effort', 'checklists',
-  'cr', 'issues', 'risks', 'activities', 'env', 'onepage',
+  'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'lessons',
 ];
+const ROLES = ['admin', 'pm', 'member', 'client'];
 
 export default async function handler(req, res) {
-  if (!['POST', 'PATCH', 'DELETE'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
+  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -30,11 +31,24 @@ export default async function handler(req, res) {
   if (callerError) return res.status(500).json({ error: callerError.message });
   if (caller?.role !== 'admin' || caller.is_active === false) return res.status(403).json({ error: 'FORBIDDEN' });
 
+  // GET: sign-in activity for the Users page (only the auth admin API can read it).
+  if (req.method === 'GET') {
+    const users = [];
+    for (let page = 1; page <= 20; page += 1) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) return res.status(500).json({ error: error.message });
+      const batch = data?.users || [];
+      batch.forEach((u) => users.push({ id: u.id, lastSignInAt: u.last_sign_in_at || null, invitedAt: u.invited_at || null, confirmedAt: u.email_confirmed_at || null }));
+      if (batch.length < 1000) break;
+    }
+    return res.status(200).json({ users });
+  }
+
   if (req.method === 'POST') {
     const email = String(req.body?.email || '').normalize('NFC').replace(/\p{Cf}/gu, '').trim().toLowerCase();
     const fullName = String(req.body?.fullName || '').trim();
     const role = req.body?.role;
-    if (!email || !fullName || !['admin', 'member', 'client'].includes(role)) return res.status(400).json({ error: 'INVALID_INVITE_DETAILS' });
+    if (!email || !fullName || !ROLES.includes(role)) return res.status(400).json({ error: 'INVALID_INVITE_DETAILS' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'INVALID_EMAIL' });
     if (role !== 'admin') {
       const { data: member, error: memberError } = await supabase
@@ -45,8 +59,9 @@ export default async function handler(req, res) {
         .maybeSingle();
       if (memberError) return res.status(500).json({ error: memberError.message });
       if (!member) return res.status(400).json({ error: 'EMAIL_NOT_ALLOWED' });
-      const allowedRole = member.type === 'client' ? 'client' : 'member';
-      if (role !== allowedRole) return res.status(400).json({ error: 'ROLE_TYPE_MISMATCH' });
+      // Customer contacts can only be clients; internal staff can be members or PMs.
+      const allowed = member.type === 'client' ? ['client'] : ['member', 'pm'];
+      if (!allowed.includes(role)) return res.status(400).json({ error: 'ROLE_TYPE_MISMATCH' });
     }
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName, role },
@@ -90,7 +105,7 @@ export default async function handler(req, res) {
       updates.full_name = fullName;
     }
     if (req.body?.role !== undefined) {
-      if (!['admin', 'member', 'client'].includes(req.body.role)) return res.status(400).json({ error: 'INVALID_ROLE' });
+      if (!ROLES.includes(req.body.role)) return res.status(400).json({ error: 'INVALID_ROLE' });
       if (userId === callerId && req.body.role !== target.role) return res.status(400).json({ error: 'CANNOT_CHANGE_SELF_ROLE' });
       updates.role = req.body.role;
       authUpdates.user_metadata_role = req.body.role;
