@@ -113,7 +113,13 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
   const activeRows = rows.filter((r) => !isHyperCare(r.project));
   const behind = activeRows.filter((r) => r.health.status === 'Delay' || r.health.status === 'Stoper');
 
+  // Finished projects never need attention: Hyper Care (already live), 100% complete,
+  // or a status that means closed / completed / cancelled.
+  const isFinished = (r: ProjectRow) => isHyperCare(r.project)
+    || r.health.actual >= 100
+    || /close|complete|done|finish|cancel/i.test(`${r.project.status} ${statusLabel(r.project)}`);
   const attention = rows
+    .filter((r) => !isFinished(r))
     .filter((r) => r.health.status === 'Delay' || r.health.status === 'Stoper'
       || r.overdueTasks || r.blockedIssues || r.overdueMilestones || r.highRisks)
     .sort((a, b) => HEALTH_STYLE[a.health.status].rank - HEALTH_STYLE[b.health.status].rank
