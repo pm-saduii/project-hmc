@@ -440,13 +440,11 @@ export default function ExecutiveOnePage({ project }: Props) {
     return { ...min, month };
   })();
   const monthColWidth = fixedColumnWidths.month;
-  const timelineWidth = Math.max(monthCount * monthColWidth, 0);
   const ganttGridTemplate = `${fixedColumnWidths.wbs}px ${fixedColumnWidths.task}px ${fixedColumnWidths.start}px ${fixedColumnWidths.end}px ${fixedColumnWidths.pic}px ${fixedColumnWidths.progress}px ${fixedColumnWidths.status}px minmax(0, 1fr)`;
   const compactMonthHeaders = monthColWidth < 48;
 
   return (
     <div style={{ minHeight: '100%', overflowY: 'auto', background: '#F3F6FB', padding: isMobile ? 14 : 18 }}>
-      {/* Old Section: previous executive report is intentionally preserved in ProjectReport.tsx */}
       <div
         style={{
           marginBottom: 14,

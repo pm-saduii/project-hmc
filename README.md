@@ -28,7 +28,10 @@ npm run dev
 npm run dev
 npm run build
 npm run preview
-npm run lint:modal-size
 ```
 
-`npm run migrate:local` ใช้รัน database migrations ในเครื่อง ดูรายละเอียดการตั้งค่าเพิ่มเติมใน `docs/`.
+## Database migrations
+
+ไฟล์ใน `migrations/` เรียงตามวันที่ และ **รันซ้ำไม่ได้** ทุกไฟล์ (บางไฟล์ไม่มี `IF NOT EXISTS`) เมื่อมี migration ใหม่ ให้เปิดไฟล์นั้นแล้วรันเฉพาะไฟล์ใหม่ใน Supabase SQL Editor
+
+ดูรายละเอียดการตั้งค่าเพิ่มเติมใน `docs/`.

@@ -20,21 +20,6 @@ export const supabase = createClient(
 );
 
 /**
- * Test Supabase connection
- */
-export async function testSupabaseConnection(): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('projects')
-      .select('count', { count: 'exact', head: true });
-    if (error) throw error;
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Check if Supabase is configured (env vars present)
  */
 export function isSupabaseConfigured(): boolean {

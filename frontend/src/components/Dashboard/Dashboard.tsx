@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { parseISO, isValid, addDays } from 'date-fns';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, Home, Mail, ClipboardList, FileSearch, Settings, FlaskConical, Rocket, Headphones, CircleDot, FolderKanban } from 'lucide-react';
+import { parseISO, isValid } from 'date-fns';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Eye, Home, Mail, ClipboardList, FileSearch, Settings, FlaskConical, Rocket, Headphones, CircleDot, FolderKanban } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
@@ -8,12 +8,11 @@ import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
-import { Card, Btn, Badge, ProgressBar, Modal, C, MILESTONE_STATUS, TH, TD } from '../Common';
-import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress, getHalfMonthSnapshotDates } from '../../utils';
+import { Card, Btn, Badge, ProgressBar, Modal, C, MILESTONE_STATUS } from '../Common';
+import { fmtDate, fmtMoney, compareWbs, computeBaselineProgress } from '../../utils';
 import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
 
-const STATUS_ORDER = ['Planning', 'Req & Design', 'Setup', 'Testing', 'Go Live', 'Hyper Care'];
 const STATUS_ACCENT_PALETTE = ['#B45309', '#0F766E', '#C2410C', '#2563EB', '#15803D', '#BE185D', '#6D28D9', '#4D7C0F', '#0369A1', '#A21CAF', '#B91C1C', '#475569'];
 const DASHBOARD_VIEW_STATE_KEY = 'dashboard-view-state';
 
@@ -48,7 +47,7 @@ function getStatusIcon(status: string) {
 }
 
 export default function Dashboard() {
-  const { projects, tasks, milestones, issues, risks, changeRequests, activeProject, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
+  const { projects, tasks, milestones, setActiveProject, deleteProject, fetchTasks, fetchIssues, fetchRisks, fetchCRs, fetchMembers, fetchMilestones, fetchEfforts, masterCodes } = useStore();
   const { profile } = useAuth();
   const permissions = useRolePermissions();
   const canEditOverview = permissions.getScreenAccess('portfolio-overview') === 'full';
@@ -61,7 +60,6 @@ export default function Dashboard() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deletingProject, setDeletingProject] = useState(false);
   const [showAdd,    setShowAdd]    = useState(false);
-  const [showHypercare, setShowHypercare] = useState(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [notificationsShown, setNotificationsShown] = useState(false);
   const [sendingAll, setSendingAll] = useState(false);
@@ -209,14 +207,7 @@ export default function Dashboard() {
     return index >= 0 ? index : statusOrder.length;
   };
 
-  const normalProjects = projects.filter(p => p.status !== 'Hyper Care').sort((a, b) => getStatusOrder(a.status) - getStatusOrder(b.status));
-  const hypercareProjects = projects.filter(p => p.status === 'Hyper Care').sort((a, b) => a.name.localeCompare(b.name));
   const allProjects = [...projects].sort((a, b) => getStatusOrder(a.status) - getStatusOrder(b.status));
-
-  const getProgress = (pid: string) => {
-    const roots = tasks.filter(t => t.projectId === pid && !t.parentId);
-    return roots.length ? Math.round(roots.reduce((s, t) => s + t.percentComplete, 0) / roots.length) : 0;
-  };
 
   const requestDelete = (project: Project) => {
     setDeletePassword('');
@@ -246,65 +237,6 @@ export default function Dashboard() {
     } finally {
       setDeletingProject(false);
     }
-  };
-
-  const renderProjectCard = (p: Project, compact = false) => {
-    const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === p.status);
-    const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: p.status || 'Unknown' };
-    const prog = getProgress(p.id);
-    return (
-      <div key={p.id}
-        style={{ background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s', marginBottom: 8, borderLeft: `4px solid ${p.color || C.primary}` }}
-        onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFF'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = C.white; }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: C.text, lineHeight: 1.35, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <FolderKanban size={14} color={p.color || C.primary} />
-              <span><span style={{ color: C.text2 }}>Project ID : </span><span style={{ color: C.primary, fontFamily: 'Poppins, sans-serif' }}>{(p.code || p.id || '-').replace(/\s+/g, ' ').trim()}</span></span>
-            </span>
-          </div>
-          <Badge bg={s.bg} color={s.color}>{s.label}</Badge>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-            <button onClick={e => { e.stopPropagation(); setEditing(p); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
-              onMouseEnter={e => e.currentTarget.style.color = C.primary}
-              onMouseLeave={e => e.currentTarget.style.color = C.text3}>
-              <Pencil size={11} />
-            </button>
-            <button onClick={e => { e.stopPropagation(); requestDelete(p); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text3, padding: 2, display: 'flex', alignItems: 'center' }}
-              onMouseEnter={e => e.currentTarget.style.color = C.red}
-              onMouseLeave={e => e.currentTarget.style.color = C.text3}>
-              <Trash2 size={11} />
-            </button>
-          </div>
-        </div>
-
-        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 4, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-          <span style={{ color: C.text2 }}>Project Name : </span>
-          <span style={{ fontWeight: 700 }}>{p.name || '-'}</span>
-        </div>
-
-        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.35, marginBottom: 5, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-          <span style={{ color: C.text2 }}>Client : </span>
-          <span>{p.client || '-'}</span>
-        </div>
-
-        <div style={{ fontSize: 12, color: C.text2, marginBottom: 6, whiteSpace: 'normal', wordBreak: 'break-word' }}>
-          {fmtDate(p.startDate)} - {fmtDate(p.endDate)}
-        </div>
-
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text2, marginBottom: 4 }}>
-            <span>% Progress</span>
-            <span style={{ fontWeight: 700, color: prog >= 100 ? C.green : C.primary }}>{prog}%</span>
-          </div>
-          <ProgressBar value={prog} height={4} color={prog >= 100 ? C.green : p.color || C.primary} />
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -702,13 +634,8 @@ function WelcomeSummary({ projects, tasks, onOpen, onEdit, onDelete, canEdit, is
 
 // ── Per-project summary panel ─────────────────────────────────────────────────
 function ProjectSummaryPanel({ project, onOpen, onEdit, canEdit, onViewMilestones, onOpenWithTab, isMobile }: { project: Project; onOpen: () => void; onEdit: () => void; canEdit: boolean; onViewMilestones: () => void; onOpenWithTab: (tab: string) => void; isMobile: boolean }) {
-  const { tasks, milestones, members, efforts, changeRequests, issues, risks, masterCodes } = useStore();
+  const { tasks, milestones, efforts, changeRequests, issues, risks, masterCodes } = useStore();
   const permissions = useRolePermissions();
-  const [showAllCompletedModal, setShowAllCompletedModal] = React.useState(false);
-  const [showActivitiesModal, setShowActivitiesModal] = React.useState<null | 'inProgress' | 'upcoming' | 'overdue'>(null);
-  const [showAllIssuesModal, setShowAllIssuesModal] = React.useState(false);
-  const accomplishedListRef = React.useRef<HTMLDivElement | null>(null);
-  const [accomplishedOverflow, setAccomplishedOverflow] = React.useState(false);
   const statusCode = masterCodes.find((code) => code.codeType === 'project_status' && code.active && code.codeValue === project.status);
   const s = statusCode ? { bg: statusCode.bgColor, color: statusCode.textColor, label: statusCode.label } : { bg: C.bg2, color: C.text, label: project.status || 'Unknown' };
 
@@ -722,19 +649,6 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, canEdit, onViewMilestone
   const roots = pt.filter((t) => !t.parentId);
   const rootTasksSorted = [...roots].sort((a, b) => compareWbs(a.wbs, b.wbs));
   const prog = roots.length ? Math.round(roots.reduce((sum, t) => sum + t.percentComplete, 0) / roots.length) : 0;
-  const doneTasks = pt.filter((t) => t.percentComplete === 100).length;
-  const totalTasks = pt.length;
-
-  const totalContract = ms.reduce((sum, m) => sum + (m.amount || 0), 0);
-  const billedAmt = ms.filter((m) => String(m.status).toLowerCase() === 'billed').reduce((sum, m) => sum + (m.amount || 0), 0);
-  const paidAmt = ms.filter((m) => String(m.status).toLowerCase() === 'paid').reduce((sum, m) => sum + (m.amount || 0), 0);
-  const outstandingAmt = Math.max(totalContract - paidAmt, 0);
-  const payPct = totalContract > 0 ? Math.round((paidAmt / totalContract) * 100) : 0;
-  const visibleTotalContract = permissions.getMaskedAmount(totalContract);
-  const visibleBilledAmt = permissions.getMaskedAmount(billedAmt);
-  const visiblePaidAmt = permissions.getMaskedAmount(paidAmt);
-  const visibleOutstandingAmt = permissions.maskFinancialAmounts ? 0 : outstandingAmt;
-  const visiblePayPct = permissions.maskFinancialAmounts ? 0 : payPct;
 
   const tBudMD = ef.reduce((sum, e) => sum + (e.budgetManday || 0), 0);
   const tUsedMD = ef.reduce((sum, e) => sum + Object.values(e.monthly || {}).reduce((acc, v) => acc + Number(v || 0), 0), 0);
@@ -769,9 +683,6 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, canEdit, onViewMilestone
     : scheduleGap > 3 ? 'Delay'
     : 'On Track';
   const scheduleColor = scheduleStatus === 'Stoper' ? C.red : scheduleStatus === 'Delay' ? C.amber : C.green;
-  const scheduleDetail = `Plan ${plannedPercent}% · Actual ${prog}%`;
-  const healthValue = `${prog}%`;
-  const healthSubtitle = `Plan ${plannedPercent}% by today`;
 
   const stageTasks = rootTasksSorted.map((t) => ({
     id: t.id,
@@ -779,98 +690,9 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, canEdit, onViewMilestone
     progress: Math.round(Number(t.percentComplete || 0)),
   }));
 
-  const parentTaskIds = new Set(pt.map((t) => String(t.parentId || '')).filter(Boolean));
-  const leafTasks = pt.filter((t) => !parentTaskIds.has(String(t.id || '')));
-
-  const accomplishedTasks = leafTasks
-    .filter((t) => Number(t.percentComplete || 0) >= 100)
-    .sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''))
-    .map((t) => ({
-      id: t.id,
-      wbs: t.wbs || '-',
-      taskName: t.taskName || '-',
-      completedDate: t.actualFinish || '',
-      resource: t.resource || '-',
-    }));
-
-  const today = parseISO(todayIso);
-
-  const inProgressTasks = leafTasks
-    .filter((t) => String(t.status || '') === 'In Progress' && Number(t.percentComplete || 0) < 100)
-    .sort((a, b) => compareWbs(a.wbs || '', b.wbs || ''));
-
-  const upcomingTasks = leafTasks
-    .filter((t) => {
-      if (String(t.status || '') !== 'Todo') return false;
-      const start = parseISO(t.startDate || '');
-      return isValid(start) && start >= today;
-    })
-    .sort((a, b) => {
-      const as = parseISO(a.startDate || '');
-      const bs = parseISO(b.startDate || '');
-      if (isValid(as) && isValid(bs) && Number(as) !== Number(bs)) return Number(as) - Number(bs);
-      return compareWbs(a.wbs || '', b.wbs || '');
-    });
-
-  const overdueTasks = leafTasks
-    .filter((t) => {
-      if (String(t.status || '') === 'Done') return false;
-      const due = parseISO(t.endDate || '');
-      return isValid(due) && due < today;
-    })
-    .sort((a, b) => {
-      const ad = parseISO(a.endDate || '');
-      const bd = parseISO(b.endDate || '');
-      if (isValid(ad) && isValid(bd) && Number(ad) !== Number(bd)) return Number(ad) - Number(bd);
-      return compareWbs(a.wbs || '', b.wbs || '');
-    });
-
-  const activityTaskRows = {
-    inProgress: inProgressTasks,
-    upcoming: upcomingTasks,
-    overdue: overdueTasks,
-  } as const;
-
-  const activityModalTitle = showActivitiesModal === 'inProgress'
-    ? 'In Progress Tasks (All)'
-    : showActivitiesModal === 'upcoming'
-      ? 'Upcoming Tasks (All)'
-      : showActivitiesModal === 'overdue'
-        ? 'Overdue Tasks (All)'
-        : '';
-
-  const activityModalRows = showActivitiesModal ? activityTaskRows[showActivitiesModal] : [];
-
-  React.useEffect(() => {
-    const checkOverflow = () => {
-      const el = accomplishedListRef.current;
-      if (!el) {
-        setAccomplishedOverflow(false);
-        return;
-      }
-      setAccomplishedOverflow(el.scrollHeight > el.clientHeight + 1);
-    };
-    const raf = window.requestAnimationFrame(checkOverflow);
-    window.addEventListener('resize', checkOverflow);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener('resize', checkOverflow);
-    };
-  }, [accomplishedTasks.length, isMobile, stageTasks.length]);
-
   const overviewText = todayBaseline.length
     ? `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้า ${prog}% และอยู่ในระดับ ${scheduleStatus.toLowerCase()} เมื่อเทียบกับแผนงาน. มี ${openIssues} issue, ${openRisks} risk และ ${openCRs} CR ที่ต้องติดตาม.`
     : `โครงการอยู่ในสถานะ ${s.label} มีความคืบหน้าปัจจุบัน ${prog}% และมี ${openIssues} issue, ${openRisks} risk, ${openCRs} CR ที่ต้องติดตาม.`;
-
-  const _statusCard = ({ title, value, subtitle, color, bg }: any) => (
-    <Card style={{ padding: '14px 16px', minHeight: 110, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-      <div>
-        <div style={{ fontSize: 11, color: C.text2, marginBottom: 8 }}>{title}</div>
-        <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
-      </div>
-      <div style={{ fontSize: 10, color: C.text2, marginTop: 8 }}>{subtitle}</div>
-    </Card>
-  );
 
   return (
     <div style={{ padding: isMobile ? '16px 14px' : '24px 28px', width: '100%' }}>
@@ -1044,153 +866,6 @@ function ProjectSummaryPanel({ project, onOpen, onEdit, canEdit, onViewMilestone
         </div>
       </Card>
 
-      {/* Old rows that are no longer displayed (modals preserved) */}
-      <div style={{ display: 'none' }}>
-
-      </div>
-
-      {showAllIssuesModal && (() => {
-        const openIssueList = iss
-          .filter((i) => i.status === 'Open' || i.status === 'In Progress')
-          .sort((a, b) => (a.issueDate > b.issueDate ? -1 : 1));
-        return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
-              <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Open Issues (All)</div>
-                  <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>ทั้งหมด {openIssueList.length} รายการ</div>
-                </div>
-                <button onClick={() => setShowAllIssuesModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
-              </div>
-              <div style={{ overflow: 'auto', flex: 1 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
-                      {['#', 'Issue Title', 'Issue Date', 'Status', 'Assignee'].map((h) => (
-                        <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {openIssueList.map((issue, index) => {
-                      const ss2 = issue.status === 'Open' ? { color: C.primary, bg: C.primaryBg } : issue.status === 'In Progress' ? { color: C.amber, bg: C.amberBg } : { color: C.text2, bg: C.bg };
-                      return (
-                        <tr key={issue.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                          <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{index + 1}</td>
-                          <td style={{ padding: '9px 12px', color: C.text, fontWeight: 600 }}>{issue.title}</td>
-                          <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{issue.issueDate ? fmtDate(issue.issueDate) : '—'}</td>
-                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: ss2.color, background: ss2.bg, padding: '3px 10px', borderRadius: 20 }}>{issue.status}</span>
-                          </td>
-                          <td style={{ padding: '9px 12px', color: C.text2 }}>{issue.assignedTo || '—'}</td>
-                        </tr>
-                      );
-                    })}
-                    {!openIssueList.length && (
-                      <tr><td colSpan={5} style={{ padding: '24px 12px', color: C.text3, textAlign: 'center' }}>No open issues found.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
-                <Btn variant="ghost" onClick={() => setShowAllIssuesModal(false)}>Close</Btn>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {showActivitiesModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 980, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
-            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{activityModalTitle}</div>
-                <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>ทั้งหมด {activityModalRows.length} รายการ</div>
-              </div>
-              <button onClick={() => setShowActivitiesModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
-            </div>
-
-            <div style={{ overflow: 'auto', flex: 1 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
-                    {['ที่', 'Task', 'Progress', 'Due Date', 'Resource'].map((h) => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activityModalRows.map((task, index) => (
-                    <tr key={task.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{index + 1}</td>
-                      <td style={{ padding: '9px 12px', color: C.text }}>{task.taskName}</td>
-                      <td style={{ padding: '9px 12px', color: C.text2 }}>{Math.round(Number(task.percentComplete || 0))}%</td>
-                      <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{(task.endDate || task.startDate) ? fmtDate(task.endDate || task.startDate) : '-'}</td>
-                      <td style={{ padding: '9px 12px', color: C.text2 }}>{task.resource || '-'}</td>
-                    </tr>
-                  ))}
-                  {!activityModalRows.length && (
-                    <tr>
-                      <td colSpan={5} style={{ padding: '24px 12px', color: C.text3, textAlign: 'center' }}>No tasks found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
-              <Btn variant="ghost" onClick={() => setShowActivitiesModal(null)}>Close</Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAllCompletedModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: C.white, borderRadius: 14, width: '100%', maxWidth: 920, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: C.shadow }}>
-            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Accomplished Task (All)</div>
-                <div style={{ fontSize: 12, color: C.text2, marginTop: 4 }}>เสร็จแล้วทั้งหมด {accomplishedTasks.length} รายการ</div>
-              </div>
-              <button onClick={() => setShowAllCompletedModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.text2, fontSize: 20, lineHeight: 1, padding: 2 }}>×</button>
-            </div>
-
-            <div style={{ overflow: 'auto', flex: 1 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: C.bg, position: 'sticky', top: 0, zIndex: 1 }}>
-                    {['No.', 'Task Name', 'Completed Date', 'Owner/Resource'].map((h) => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: C.text2, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {accomplishedTasks.map((task, index) => (
-                    <tr key={task.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: '9px 12px', color: C.primary, fontWeight: 700, whiteSpace: 'nowrap' }}>{index + 1}</td>
-                      <td style={{ padding: '9px 12px', color: C.text }}>{task.taskName}</td>
-                      <td style={{ padding: '9px 12px', color: C.text2, whiteSpace: 'nowrap' }}>{task.completedDate ? fmtDate(task.completedDate) : '-'}</td>
-                      <td style={{ padding: '9px 12px', color: C.text2 }}>{task.resource || '-'}</td>
-                    </tr>
-                  ))}
-                  {!accomplishedTasks.length && (
-                    <tr>
-                      <td colSpan={4} style={{ padding: '24px 12px', color: C.text3, textAlign: 'center' }}>No accomplished tasks found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
-              <Btn variant="ghost" onClick={() => setShowAllCompletedModal(false)}>Close</Btn>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
