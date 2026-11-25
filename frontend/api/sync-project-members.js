@@ -1,17 +1,21 @@
-import { createClient } from '@supabase/supabase-js';
+import { getServiceClient, getCaller, canAccessProject } from '../server/auth.js';
+
+// Roles whose project access comes from the project's members list.
+const LINKED_ROLES = new Set(['member', 'client', 'pm']);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
   const { projectId } = req.body || {};
   if (!projectId) return res.status(400).json({ error: 'Missing projectId' });
 
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing Supabase service env' });
+  const supabase = getServiceClient();
+  if (!supabase) return res.status(500).json({ error: 'Missing Supabase service env' });
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const caller = await getCaller(supabase, req);
+  if (!caller) return res.status(401).json({ error: 'Unauthorized' });
+  if (caller.role === 'client' || !(await canAccessProject(supabase, caller, projectId))) {
+    return res.status(403).json({ error: 'FORBIDDEN' });
+  }
 
   try {
     const { data: members, error: membersError } = await supabase
@@ -32,13 +36,14 @@ export default async function handler(req, res) {
       ? await supabase.from('profiles').select('id,email,role').in('email', emails)
       : { data: [], error: null };
     if (profilesQuery.error) throw profilesQuery.error;
-    const profiles = profilesQuery.data;
 
     const profileByEmail = new Map();
-    (profiles || []).forEach((row) => {
+    const linkedRoleUserIds = new Set();
+    (profilesQuery.data || []).forEach((row) => {
       const role = String(row.role || '').trim().toLowerCase();
-      if (row.email && (role === 'member' || role === 'client')) {
+      if (row.email && LINKED_ROLES.has(role)) {
         profileByEmail.set(String(row.email).trim().toLowerCase(), row.id);
+        linkedRoleUserIds.add(row.id);
       }
     });
 
@@ -49,11 +54,7 @@ export default async function handler(req, res) {
     if (existingError) throw existingError;
 
     const existingUserIds = new Set((existingRows || []).map((row) => row.user_id));
-    const desiredUserIds = Array.from(
-      new Set(
-        emails.map((email) => profileByEmail.get(email)).filter(Boolean)
-      )
-    );
+    const desiredUserIds = Array.from(new Set(emails.map((email) => profileByEmail.get(email)).filter(Boolean)));
 
     const inserted = [];
     const toInsert = desiredUserIds
@@ -68,9 +69,21 @@ export default async function handler(req, res) {
       inserted.push(...(insertedRows || []));
     }
 
+    // Only remove links of users whose role is managed by the members list
+    // and who are no longer listed. Admin (and other) links are left alone.
+    const { data: existingProfiles, error: existingProfilesError } = existingRows?.length
+      ? await supabase.from('profiles').select('id,role').in('id', existingRows.map((row) => row.user_id))
+      : { data: [], error: null };
+    if (existingProfilesError) throw existingProfilesError;
+    const managedIds = new Set(
+      (existingProfiles || [])
+        .filter((row) => LINKED_ROLES.has(String(row.role || '').trim().toLowerCase()))
+        .map((row) => row.id)
+    );
+
     const desiredSet = new Set(desiredUserIds);
     const toDeleteIds = (existingRows || [])
-      .filter((row) => row.user_id && !desiredSet.has(row.user_id))
+      .filter((row) => row.user_id && managedIds.has(row.user_id) && !desiredSet.has(row.user_id))
       .map((row) => row.id);
 
     const deleted = [];
@@ -92,6 +105,6 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     console.error('sync-project-members error', e);
-    return res.status(500).json({ error: 'Server error', details: String(e) });
+    return res.status(500).json({ error: 'Server error' });
   }
 }

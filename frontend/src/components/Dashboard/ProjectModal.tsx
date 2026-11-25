@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
+import { supabase } from '../../services/supabase';
 import { Modal, FormRow, Input, Select, Textarea, Btn } from '../Common';
 import type { Project } from '../../types';
 
@@ -117,9 +118,14 @@ export default function ProjectModal({ project, onClose }: Props) {
     if (!project?.id) return;
     setTesting(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
       const res = await fetch('/api/send-task-reminders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ projectId: project.id, test: true }),
       });
       const data = await res.json();

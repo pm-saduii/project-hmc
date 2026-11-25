@@ -1,85 +1,66 @@
+import { getServiceClient, getCaller, escapeLike } from '../server/auth.js';
+
+// Links a user account to every project whose members list contains the user's email.
+// The user id is never taken from the request body:
+//  - linking yourself: the id comes from the verified access token
+//  - linking another email (after adding a member): the id is looked up from profiles by email
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
-  const { email, userId: providedUserId } = req.body || {};
+
+  const supabase = getServiceClient();
+  if (!supabase) return res.status(500).json({ error: 'Missing Supabase service env' });
+
+  const caller = await getCaller(supabase, req);
+  if (!caller) return res.status(401).json({ error: 'Unauthorized' });
+
+  const email = String(req.body?.email || caller.email || '').trim().toLowerCase();
   if (!email) return res.status(400).json({ error: 'Missing email' });
 
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing Supabase service env' });
-
-  let userId = providedUserId;
-  if (!userId) {
-    const profResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=id`, {
-      headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-        apikey: SUPABASE_SERVICE_KEY,
-      },
-    });
-    const profData = await profResp.json();
-    if (Array.isArray(profData) && profData.length > 0 && profData[0].id) {
-      userId = profData[0].id;
-    }
-  }
-
-  if (!userId) {
-    return res.status(200).json({ message: 'No linked auth user found for email', linked: [] });
-  }
-
   try {
-    // 1) call RPC to get matching member rows (may include project_id)
-    const rpcResp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/validate_member_email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-        apikey: SUPABASE_SERVICE_KEY,
-      },
-      body: JSON.stringify({ p_email: email }),
-    });
-    const rpcData = await rpcResp.json();
-    if (!Array.isArray(rpcData) || rpcData.length === 0) {
-      return res.status(200).json({ message: 'No matching member rows', linked: [] });
+    let userId = '';
+    if (email === caller.email) {
+      userId = caller.id;
+    } else {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .limit(1)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      userId = profile?.id || '';
     }
+    if (!userId) return res.status(200).json({ message: 'No linked auth user found for email', linked: [] });
 
-    const projectIds = Array.from(new Set(rpcData.map((r) => r.project_id).filter(Boolean)));
-    if (projectIds.length === 0) {
-      return res.status(200).json({ message: 'No project mapped for that email', linked: [] });
-    }
+    const { data: memberRows, error: memberError } = await supabase
+      .from('members')
+      .select('project_id')
+      .ilike('email', escapeLike(email));
+    if (memberError) throw memberError;
 
-    // 2) find existing project_members for this user to avoid duplicates
-    const existingResp = await fetch(`${SUPABASE_URL}/rest/v1/project_members?user_id=eq.${userId}&select=project_id`, {
-      headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-        apikey: SUPABASE_SERVICE_KEY,
-      },
-    });
-    const existing = await existingResp.json();
-    const existingIds = Array.isArray(existing) ? existing.map((r) => r.project_id) : [];
+    const projectIds = Array.from(new Set((memberRows || []).map((row) => row.project_id).filter(Boolean)));
+    if (!projectIds.length) return res.status(200).json({ message: 'No matching member rows', linked: [] });
 
-    const toInsert = projectIds.filter((pid) => !existingIds.includes(pid)).map((pid) => ({ project_id: pid, user_id: userId }));
-    if (toInsert.length === 0) return res.status(200).json({ message: 'Already linked', linked: projectIds });
+    const { data: existing, error: existingError } = await supabase
+      .from('project_members')
+      .select('project_id')
+      .eq('user_id', userId);
+    if (existingError) throw existingError;
+    const existingIds = new Set((existing || []).map((row) => row.project_id));
 
-    // 3) insert new project_members rows
-    const insertResp = await fetch(`${SUPABASE_URL}/rest/v1/project_members`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-        apikey: SUPABASE_SERVICE_KEY,
-        Prefer: 'return=representation',
-      },
-      body: JSON.stringify(toInsert),
-    });
+    const toInsert = projectIds
+      .filter((projectId) => !existingIds.has(projectId))
+      .map((projectId) => ({ project_id: projectId, user_id: userId }));
+    if (!toInsert.length) return res.status(200).json({ message: 'Already linked', linked: projectIds });
 
-    if (!insertResp.ok) {
-      const err = await insertResp.text();
-      return res.status(500).json({ error: 'Insert failed', details: err });
-    }
-
-    const inserted = await insertResp.json();
-    return res.status(200).json({ message: 'Linked', linked: inserted });
+    const { data: inserted, error: insertError } = await supabase
+      .from('project_members')
+      .insert(toInsert)
+      .select();
+    if (insertError) throw insertError;
+    return res.status(200).json({ message: 'Linked', linked: inserted || [] });
   } catch (e) {
     console.error('link-member error', e);
-    return res.status(500).json({ error: 'Server error', details: String(e) });
+    return res.status(500).json({ error: 'Server error' });
   }
 }

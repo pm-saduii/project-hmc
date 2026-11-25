@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        await syncProjectMemberships(s.user.email ?? '', s.user.id);
+        await syncProjectMemberships(s.user.email ?? '', s.access_token);
         fetchProjects();
         await fetchProfile(s.user.id);
       } else {
@@ -139,13 +139,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  async function syncProjectMemberships(email: string, userId: string) {
-    if (!email || !userId) return;
+  async function syncProjectMemberships(email: string, accessToken: string | undefined) {
+    if (!email || !accessToken) return;
     try {
       const response = await fetch('/api/link-member', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), userId }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       if (!response.ok) {
         const body = await response.text();
@@ -182,9 +182,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (signupError) throw new Error(signupError.message);
 
-    const createdUserId = (signupData as any)?.user?.id;
-    if (createdUserId) {
-      await syncProjectMemberships(normalized, createdUserId);
+    // Only possible when sign-up returns a session (email confirmation off).
+    // Otherwise the profile-insert trigger and the first sign-in handle linking.
+    const signupToken = signupData?.session?.access_token;
+    if (signupToken) {
+      await syncProjectMemberships(normalized, signupToken);
     }
   };
 

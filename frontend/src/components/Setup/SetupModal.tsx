@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { projectChecklistApi } from '../../services/api';
 import { Edit3, Plus, Trash2, X } from 'lucide-react';
-import { Modal, Input, Btn, C, Select } from '../Common';
+import { Modal, Input, Btn, C, Select, ConfirmModal } from '../Common';
 import type { MasterCode } from '../../types';
 import {
   PROJECT_CHECKLIST_CATEGORIES,
@@ -32,6 +32,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
   const [newTitle, setNewTitle] = useState('');
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [savingTopics, setSavingTopics] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<ProjectChecklistTopic | null>(null);
   const needsWorkSystem = category !== 'project';
   const needsStage = category === 'project';
   const compactFieldStyle: React.CSSProperties = { fontSize: 10, padding: '4px 8px', lineHeight: 1.3 };
@@ -229,7 +230,7 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
                     ) : (
                       <>
                         <button type="button" aria-label={`Edit ${topic.title}`} onClick={() => startEdit(topic)} style={{ ...rowActionStyle, marginRight: 5 }}><Edit3 size={14} /></button>
-                        <button type="button" aria-label={`Remove ${topic.title || 'checklist topic'}`} onClick={() => setTopics((currentTopics) => currentTopics.filter((item) => item.id !== topic.id))} style={{ ...rowActionStyle, background: C.redBg, color: C.red }}><Trash2 size={14} /></button>
+                        <button type="button" aria-label={`Remove ${topic.title || 'checklist topic'}`} onClick={() => setPendingRemove(topic)} style={{ ...rowActionStyle, background: C.redBg, color: C.red }}><Trash2 size={14} /></button>
                       </>
                     )}
                   </td>
@@ -252,6 +253,17 @@ function ChecklistTopicsManager({ category, workSystems }: { category: ProjectCh
           <Btn onClick={addTopic} small><Plus size={14} /> Add Topic</Btn>
         </div>
       </div>
+      {pendingRemove && (
+        <ConfirmModal
+          message={`Delete checklist topic "${pendingRemove.title || 'Untitled'}"? The saved progress for this topic in every project will also be deleted. This cannot be undone.`}
+          onConfirm={() => {
+            const id = pendingRemove.id;
+            setPendingRemove(null);
+            setTopics((currentTopics) => currentTopics.filter((item) => item.id !== id));
+          }}
+          onCancel={() => setPendingRemove(null)}
+        />
+      )}
     </div>
   );
 }

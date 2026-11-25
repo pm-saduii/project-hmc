@@ -336,7 +336,7 @@ export default function Dashboard() {
                 ><Home size={14} /> Home</button>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {permissions.canViewPortfolioOverview && (
+                {profile?.role === 'admin' && (
                   <Btn variant="outline" onClick={async () => {
                     setSendingAll(true);
                     try {
@@ -353,10 +353,11 @@ export default function Dashboard() {
                       });
                       const result = await res.json();
                       if (!res.ok) throw new Error(result?.error || 'Send email failed');
-                      const sentCount = Array.isArray(result.results)
-                        ? result.results.filter((r: any) => r.sentTo?.length).length
-                        : 0;
-                      toast.success(`Sent reminders for ${sentCount} project(s)`);
+                      const results = Array.isArray(result.results) ? result.results : [];
+                      const sentCount = results.filter((r: any) => r.recipient && !r.error).length;
+                      const failedCount = results.filter((r: any) => r.recipient && r.error).length;
+                      if (failedCount) toast.error(`Failed to send to ${failedCount} recipient(s)`);
+                      toast.success(`Sent reminders to ${sentCount} recipient(s)`);
                     } catch (error) {
                       const msg = error instanceof Error ? error.message : 'Failed to send email reminders';
                       toast.error(msg);

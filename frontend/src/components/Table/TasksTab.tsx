@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
-import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C } from '../Common';
+import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C, ConfirmModal } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import type { Task, ViewMode } from '../../types';
@@ -458,6 +458,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [buttonFocus, setButtonFocus] = useState<'expand' | 'collapse' | null>(null);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; task: Task | null; taskLevel: number }>({ visible: false, x: 0, y: 0, task: null, taskLevel: 0 });
   const [newTaskInsert, setNewTaskInsert] = useState<NewTaskInsert | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const [moveToSubModal, setMoveToSubModal] = useState<{ task: Task; targetParentId: string; targetLevel: 1 | 2 } | null>(null);
   const [moveToMainModal, setMoveToMainModal] = useState<{ task: Task; targetIndex: number } | null>(null);
   const [suggestModalOpen, setSuggestModalOpen] = useState(false);
@@ -1558,6 +1559,14 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     catch { toast.error('Failed to delete'); }
   };
 
+  const requestDelete = (task: Task) => setPendingDelete(task);
+
+  const confirmPendingDelete = async () => {
+    const task = pendingDelete;
+    setPendingDelete(null);
+    if (task) await handleDelete(task.id);
+  };
+
   const handleCreate = async (form: Partial<Task>) => {
     try { await createTask({ ...form, projectId }); toast.success('Task created'); setAddModal(false); }
     catch (e) {
@@ -2388,7 +2397,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       style={{ height: 32, background: C.primaryBg, border: 'none', borderRadius: 8, padding: '0 14px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
                       Edit
                     </button>
-                    <button onClick={e => { e.stopPropagation(); handleDelete(task.id); }}
+                    <button onClick={e => { e.stopPropagation(); requestDelete(task); }}
                       style={{ height: 32, background: C.redBg, border: 'none', borderRadius: 8, padding: '0 10px', fontSize: 11, color: C.red, cursor: 'pointer', fontWeight: 600 }}>
                       Delete
                     </button>
@@ -2724,7 +2733,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                               style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.primaryBg, border:'none', borderRadius:5, cursor:'pointer', color:C.primary }}>
                               <Pencil size={12} />
                             </button>
-                            <button onClick={e => { e.stopPropagation(); handleDelete(rowTask.id); }}
+                            <button onClick={e => { e.stopPropagation(); requestDelete(rowTask); }}
                               title="Delete"
                               style={{ width:22, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center', background:C.redBg, border:'none', borderRadius:5, cursor:'pointer', color:C.red }}>
                               <Trash2 size={12} />
@@ -3297,6 +3306,20 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           </div>
         </Modal>
       )}
+
+      {pendingDelete && (() => {
+        const childCount = getDescendantIds(pendingDelete.id).size;
+        const label = `${pendingDelete.wbs ? `${pendingDelete.wbs} ` : ''}${pendingDelete.taskName || 'Untitled task'}`;
+        return (
+          <ConfirmModal
+            message={childCount > 0
+              ? `Delete "${label}" and its ${childCount} sub task(s)? This cannot be undone.`
+              : `Delete "${label}"? This cannot be undone.`}
+            onConfirm={() => { void confirmPendingDelete(); }}
+            onCancel={() => setPendingDelete(null)}
+          />
+        );
+      })()}
 
       {unlockModalOpen && (
         <Modal title="Unlock Suggestion" onClose={() => setUnlockModalOpen(false)} width={520}>

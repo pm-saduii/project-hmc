@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
+import { getCaller, canAccessProject } from '../server/auth.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -115,20 +116,27 @@ const getGreeting = (recipients, members) => {
   return 'To whom it may concern,';
 };
 
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 const buildEmailHtml = (greeting, rows) => {
   const rowsHtml = rows.map((task) => `
       <tr style="border-bottom:1px solid #e5e7eb;">
-        <td style="padding:8px 10px;">${task.project_code || ''}</td>
-        <td style="padding:8px 10px;">${task.project_name || ''}</td>
-        <td style="padding:8px 10px;">${task.task_name || ''}</td>
-        <td style="padding:8px 10px;">${formatDate(task.end_date)}</td>
-        <td style="padding:8px 10px; text-align:center;">${task.percent_complete ?? ''}%</td>
-        <td style="padding:8px 10px;">${task.statusLabel}</td>
+        <td style="padding:8px 10px;">${escapeHtml(task.project_code)}</td>
+        <td style="padding:8px 10px;">${escapeHtml(task.project_name)}</td>
+        <td style="padding:8px 10px;">${escapeHtml(task.task_name)}</td>
+        <td style="padding:8px 10px;">${escapeHtml(formatDate(task.end_date))}</td>
+        <td style="padding:8px 10px; text-align:center;">${escapeHtml(task.percent_complete)}%</td>
+        <td style="padding:8px 10px;">${escapeHtml(task.statusLabel)}</td>
       </tr>`).join('');
 
   return `
     <div style="font-family: Arial, sans-serif; color: #111827;">
-      <p>${greeting}</p>
+      <p>${escapeHtml(greeting)}</p>
       <p>This is a reminder that the following tasks are due soon or already overdue.</p>
       <table style="border-collapse: collapse; width: 100%; margin-top: 12px;">
         <thead>
@@ -209,8 +217,6 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
   const { projectId, test, force } = req.body || {};
   const secret = req.headers['x-reminder-secret'] || req.query.secret;
-  const accessTokenHeader = req.headers.authorization || req.headers.Authorization || '';
-  const accessToken = accessTokenHeader.startsWith('Bearer ') ? accessTokenHeader.slice(7) : accessTokenHeader || null;
   const isTestMode = Boolean(test);
   const isForceSend = Boolean(force);
 
@@ -219,34 +225,33 @@ export default async function handler(req, res) {
   if (!SUPABASE_SERVICE_KEY) missing.push('SUPABASE_SERVICE_KEY or SUPABASE_SERVICE_ROLE_KEY');
   if (!GMAIL_USER) missing.push('GMAIL_USER or GMAIL_USERNAME');
   if (!GMAIL_APP_PASSWORD) missing.push('GMAIL_APP_PASSWORD or GMAIL_PASSWORD');
-  if (!REMINDER_API_SECRET && !accessToken && !isTestMode) missing.push('REMINDER_API_SECRET or Admin authorization');
   if (missing.length > 0) {
     return res.status(500).json({ error: `Missing env: ${missing.join(', ')}` });
+  }
+  if (isTestMode && !projectId) {
+    return res.status(400).json({ error: 'projectId is required for a test send' });
   }
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
-    let isAuthorized = false;
-    if (!isTestMode && secret === REMINDER_API_SECRET) {
-      isAuthorized = true;
-    }
 
-    if (!isTestMode && !isAuthorized && accessToken) {
-      const { data: callerUser, error: callerErr } = await supabase.auth.getUser(accessToken);
-      if (!callerErr && callerUser?.user) {
-        const callerId = callerUser.user.id;
-        const { data: callerProfile, error: profErr } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', callerId)
-          .maybeSingle();
-        if (!profErr && callerProfile?.role === 'admin') {
-          isAuthorized = true;
-        }
+    // 1) Scheduler call: the shared secret must be configured and match exactly.
+    let isAuthorized = Boolean(REMINDER_API_SECRET)
+      && typeof secret === 'string'
+      && secret === REMINDER_API_SECRET;
+
+    // 2) Signed-in user: admins may send anything; a test send for one project
+    //    is also allowed for non-client users who can access that project.
+    if (!isAuthorized) {
+      const caller = await getCaller(supabase, req);
+      if (caller?.role === 'admin') {
+        isAuthorized = true;
+      } else if (caller && isTestMode && caller.role !== 'client' && await canAccessProject(supabase, caller, projectId)) {
+        isAuthorized = true;
       }
     }
 
-    if (!isTestMode && !isAuthorized) {
+    if (!isAuthorized) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 

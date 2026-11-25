@@ -119,13 +119,21 @@ export default function MembersTab({ projectId, extraActions }: Props) {
   const internal = members.filter(m => m.type === 'internal').sort(sortMembers);
   const client   = members.filter(m => m.type === 'client').sort(sortMembers);
 
+  const authHeaders = async (): Promise<Record<string, string>> => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token
+      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+      : { 'Content-Type': 'application/json' };
+  };
+
   const syncMemberEmail = async (email: string) => {
     const normalized = String(email || '').trim().toLowerCase();
     if (!normalized) return;
     try {
       const response = await fetch('/api/link-member', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ email: normalized }),
       });
       if (!response.ok) {
@@ -166,7 +174,7 @@ export default function MembersTab({ projectId, extraActions }: Props) {
     try {
       const response = await fetch('/api/sync-project-members', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ projectId }),
       });
       const result = await response.json();

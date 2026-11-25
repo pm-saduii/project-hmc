@@ -51,7 +51,9 @@ export default function Navbar() {
   const navBorder = isDark ? '#334155' : C.border;
   const textColor = isDark ? '#F1F5F9' : C.text;
   const textMuted = isDark ? '#94A3B8' : C.text3;
-  const commitIdRaw = (import.meta as any).env?.VITE_COMMIT_ID || 'local';
+  // Read the single variable; touching the whole import.meta.env object makes
+  // Vite inline every VITE_* variable into the bundle.
+  const commitIdRaw = import.meta.env.VITE_COMMIT_ID || 'local';
   const commitId = String(commitIdRaw).slice(0, 8);
 
   const openSetup = async () => {
