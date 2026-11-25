@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import toast from 'react-hot-toast';
 import type { Project, Task, Member, Milestone, Effort, ChangeRequest, CRItem, Issue, Risk, ProjectEnvironment, ProjectProgressSnapshot, MasterCode, Activity, Note, ProjectLessonLearned } from '../types';
 import { projectApi, taskApi, memberApi, milestoneApi, effortApi, crApi, issueApi, riskApi, projectEnvironmentApi, projectProgressApi, masterCodeApi, activityApi, noteApi, projectLessonsApi } from '../services/api';
 
@@ -94,6 +95,9 @@ interface Store {
   saveProjectProgressSnapshot: (snapshot: Partial<ProjectProgressSnapshot>) => Promise<ProjectProgressSnapshot>;
   deleteProjectProgressSnapshot: (id: string) => Promise<void>;
 }
+
+// Pending debounced saves for effort monthly cells, keyed by "effortId|yyyy-MM".
+const effortMonthlyTimers = new Map<string, number>();
 
 export const useStore = create<Store>((set, get) => ({
   // Track pending save/delete operations globally for minimal UI loading state.
@@ -389,9 +393,23 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
   updateEffortMonthly: async (id, month, manday) => {
-    // Keep monthly typing smooth: optimistic update without global loading overlay.
+    // Optimistic update right away; the save is debounced per cell so typing
+    // "12.5" sends one request instead of one per keystroke.
     set(s => ({ efforts: s.efforts.map(e => e.id === id ? { ...e, monthly: { ...e.monthly, [month]: manday } } : e) }));
-    await effortApi.updateMonthly(id, month, manday);
+    const key = `${id}|${month}`;
+    const pending = effortMonthlyTimers.get(key);
+    if (pending) window.clearTimeout(pending);
+    effortMonthlyTimers.set(key, window.setTimeout(async () => {
+      effortMonthlyTimers.delete(key);
+      try {
+        await effortApi.updateMonthly(id, month, manday);
+      } catch (e) {
+        toast.error(`Could not save effort: ${(e as Error).message}`);
+        // Reload so the grid shows what is really stored.
+        const projectId = get().efforts.find((effort) => effort.id === id)?.projectId;
+        if (projectId) await get().fetchEfforts(projectId).catch(() => undefined);
+      }
+    }, 600));
   },
   deleteEffort: async (id)  => {
     set((s: any) => ({ _pendingMutationCount: (s._pendingMutationCount || 0) + 1, dataLoading: true }));

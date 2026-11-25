@@ -103,8 +103,8 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
   const exportPDF = async () => {
     let exportHost: HTMLDivElement | null = null;
     let exportRoot: HTMLDivElement | null = null;
-    const thaiFontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Regular.ttf';
-    const thaiBoldFontUrl = 'https://raw.githubusercontent.com/google/fonts/main/ofl/sarabun/Sarabun-Bold.ttf';
+    const thaiFontUrl = '/fonts/Sarabun-Regular.ttf';
+    const thaiBoldFontUrl = '/fonts/Sarabun-Bold.ttf';
     const applyTextFont = (element: HTMLElement, value: string, bold = false) => {
       element.style.fontFamily = 'Sarabun, sans-serif';
       element.style.fontWeight = bold ? '700' : '400';

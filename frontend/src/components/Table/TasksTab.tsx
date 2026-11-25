@@ -10,6 +10,7 @@ import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Avatar, Card, Modal, FormRow, Input, Select, C, ConfirmModal } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
+import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Task, ViewMode } from '../../types';
 
 interface Props {
@@ -1538,13 +1539,12 @@ export default function TasksTab({ projectId, extraActions }: Props) {
 
     try {
       setLoading(true);
-      for (const assignment of suggestionPreview.assignments) {
-        await updateTask(assignment.id, {
-          startDate: assignment.startDate,
-          endDate: assignment.endDate,
-        });
-      }
-      await fetchTasks(projectId);
+      const result = await taskApi.bulkUpdateDates(projectId, suggestionPreview.assignments.map((assignment) => ({
+        id: assignment.id,
+        startDate: assignment.startDate,
+        endDate: assignment.endDate,
+      })));
+      useStore.setState({ tasks: result.allTasks });
       toast.success(`Suggested dates applied to ${suggestionPreview.assignments.length} task(s)`);
       setSuggestModalOpen(false);
     } catch {
@@ -1578,7 +1578,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const handleEditSave = async (form: Partial<Task>) => {
     if (!form.id) return;
     try { await updateTask(form.id, form); toast.success('Saved'); setEditModal(null); }
-    catch { toast.error('Failed to save'); }
+    catch (e) { toast.error(e instanceof Error && e.message ? e.message : 'Failed to save'); }
   };
 
   const normalizeExcelDate = (value: unknown): string => {
@@ -1980,44 +1980,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     const tHdrH = 8;
     const baseRowH = 6.2;
 
-    const u8ToBase64 = (bytes: Uint8Array): string => {
-      let out = '';
-      const chunk = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunk) {
-        out += String.fromCharCode(...bytes.subarray(i, i + chunk));
-      }
-      return btoa(out);
-    };
-
-    const ensurePoppinsFont = async () => {
-      try {
-        const fl = (doc as any).getFontList?.();
-        if (fl?.Poppins || fl?.poppins) return;
-
-        const [regRes, boldRes] = await Promise.all([
-          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf'),
-          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf'),
-        ]);
-        if (!regRes.ok || !boldRes.ok) return;
-
-        const [regBuf, boldBuf] = await Promise.all([regRes.arrayBuffer(), boldRes.arrayBuffer()]);
-        doc.addFileToVFS('Poppins-Regular.ttf', u8ToBase64(new Uint8Array(regBuf)));
-        doc.addFileToVFS('Poppins-Bold.ttf', u8ToBase64(new Uint8Array(boldBuf)));
-        doc.addFont('Poppins-Regular.ttf', 'Poppins', 'normal');
-        doc.addFont('Poppins-Bold.ttf', 'Poppins', 'bold');
-      } catch {
-        // Keep default font fallback if external font loading fails.
-      }
-    };
-
-    await ensurePoppinsFont();
-
-    // jsPDF needs embedded TTF for true custom fonts; use Poppins name when available, fallback otherwise.
-    const setPdfFont = (style: 'normal' | 'bold' = 'normal') => {
-      const fl = (doc as any).getFontList?.();
-      const popName = fl?.Poppins ? 'Poppins' : (fl?.poppins ? 'poppins' : null);
-      doc.setFont(popName || 'helvetica', style);
-    };
+    // Thai-capable font (Sarabun); falls back to Helvetica if it cannot load.
+    const pdfFont = await ensureThaiFont(doc);
+    const setPdfFont = (style: 'normal' | 'bold' = 'normal') => doc.setFont(pdfFont, style);
 
     // ── Helper: row height ──
     const getRowH = (task: Task): number => {
@@ -3602,6 +3567,18 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
   const up = (k:string,v:string|number) => setForm(p=>({...p,[k]:v}));
   const dur = calcDuration(String(form.startDate || ''), String(form.endDate || ''));
   const sortedTasks = [...tasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+  // Exclude this task and everything under it from the parent choices (would create a loop).
+  const blockedParentIds = new Set<string>([task.id]);
+  for (let grew = true; grew;) {
+    grew = false;
+    tasks.forEach((t) => {
+      if (t.parentId && blockedParentIds.has(t.parentId) && !blockedParentIds.has(t.id)) {
+        blockedParentIds.add(t.id);
+        grew = true;
+      }
+    });
+  }
+  const parentChoices = sortedTasks.filter((t) => !blockedParentIds.has(t.id));
   return (
     <Modal title="Edit Task" onClose={onClose} width={980}>
       <FormRow label="Task Name" required>
@@ -3663,7 +3640,7 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
 
         <FormRow label="Parent Task (change to restructure)">
           <Select value={form.parentId??''} onChange={v=>up('parentId',v)}
-            options={[{value:'',label:'— None (Root) —'},...sortedTasks.filter(t=>t.id!==task.id).map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
+            options={[{value:'',label:'— None (Root) —'},...parentChoices.map(t=>({value:t.id,label:`${t.wbs||''} ${t.taskName}`.trim()}))]} />
         </FormRow>
 
         <FormRow label="Predecessor">

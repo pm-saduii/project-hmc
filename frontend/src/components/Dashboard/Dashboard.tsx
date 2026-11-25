@@ -97,6 +97,7 @@ export default function Dashboard() {
     if (!tasks.length && !milestones.length) return;
 
     const now = new Date();
+    now.setHours(0, 0, 0, 0); // due dates are date-only; "due today" is not overdue
     const endIn7 = new Date(now);
     endIn7.setDate(endIn7.getDate() + 7);
     const dueIn10 = new Date(now);
@@ -126,7 +127,7 @@ export default function Dashboard() {
     if (upcomingTasks.length) messages.push(`มี ${upcomingTasks.length} แผนงานที่ใกล้ครบใน 7 วัน`);
     if (dueMilestones.length) messages.push(`มี ${dueMilestones.length} milestone ที่กำลังจะครบหรือเลย Due Date ภายใน 10 วัน`);
 
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const lastNotified = window.localStorage.getItem('projectNotificationsLastDate');
     if (messages.length > 0 && lastNotified !== todayKey) {
       toast.custom((t) => (

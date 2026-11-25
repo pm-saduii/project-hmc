@@ -86,7 +86,10 @@ export default function Navbar() {
     return isValid(d) ? d : null;
   };
 
+  // Compare against the start of today: due dates are date-only (local midnight),
+  // so a task due today must count as upcoming, not overdue.
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const endIn7 = new Date(now);
   endIn7.setDate(endIn7.getDate() + 7);
   const dueIn10 = new Date(now);

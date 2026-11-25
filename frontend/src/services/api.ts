@@ -820,6 +820,25 @@ export const taskApi = {
     const okUpdate = await checkProjectPermission(projectIdForUpdate, 'write', 'tasks');
     if (!okUpdate) throw new Error('FORBIDDEN');
 
+    // A task may not become a child of itself or of one of its own descendants.
+    const newParentId = row.parent_id ? String(row.parent_id) : '';
+    if (newParentId) {
+      if (newParentId === id) throw new Error('A task cannot be its own parent');
+      const { data: links, error: linksErr } = await supabase
+        .from('tasks')
+        .select('id, parent_id')
+        .eq('project_id', projectIdForUpdate);
+      if (linksErr) throw new Error(linksErr.message);
+      const parentOf = new Map((links || []).map((link: { id: string; parent_id: string | null }) => [String(link.id), String(link.parent_id || '')]));
+      const seen = new Set<string>();
+      let cursor = newParentId;
+      while (cursor && !seen.has(cursor)) {
+        if (cursor === id) throw new Error('Cannot move a task under one of its own sub tasks');
+        seen.add(cursor);
+        cursor = parentOf.get(cursor) || '';
+      }
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .update(row)
@@ -924,6 +943,29 @@ export const taskApi = {
     return { allTasks };
   },
 
+  /** Save many task date ranges, then recalculate parents once (instead of once per task). */
+  bulkUpdateDates: async (projectId: string, assignments: Array<{ id: string; startDate: string; endDate: string }>): Promise<{ allTasks: Task[] }> => {
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    if (!await checkProjectPermission(projectId, 'write', 'tasks')) throw new Error('FORBIDDEN');
+    const CHUNK = 20;
+    for (let i = 0; i < assignments.length; i += CHUNK) {
+      const results = await Promise.all(assignments.slice(i, i + CHUNK).map((item) =>
+        supabase
+          .from('tasks')
+          .update({
+            start_date: item.startDate,
+            end_date: item.endDate,
+            duration: calcDurationFromDates({ startDate: item.startDate, endDate: item.endDate } as Task),
+          })
+          .eq('id', item.id)
+          .eq('project_id', projectId)
+      ));
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw new Error(failed.error.message);
+    }
+    return { allTasks: await recalcAndPersistProject(projectId) };
+  },
+
   setComplete: async (id: string, pct: number): Promise<{ allTasks: Task[] }> => {
     const { data: existing, error: lookupError } = await supabase.from('tasks').select('project_id').eq('id', id).maybeSingle();
     if (lookupError) throw new Error(lookupError.message);
@@ -983,80 +1025,21 @@ export const taskApi = {
     );
     const emptyRelationValue: string | null = usesEmptyStringRelations ? '' : null;
 
-    const sourceTasks = [...selectedSource].sort((a, b) => {
-      const al = Number(a.level || 0);
-      const bl = Number(b.level || 0);
-      if (al !== bl) return al - bl;
-      return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
-    });
-
-    const idMap = new Map<string, string>();
-    const createdByOld = new Map<string, Task>();
-
-    for (const srcTask of sourceTasks) {
-      const row = objToRow({
-        ...srcTask,
-        projectId: targetProjectId,
-        startDate: null,
-        endDate: null,
-        actualFinish: null,
-        percentComplete: 0,
-        parentId: srcTask.parentId ? (idMap.get(srcTask.parentId) || srcTask.parentId) : emptyRelationValue,
-        relatedTask: emptyRelationValue,
-        relatedTaskType: srcTask.relatedTaskType || 'FS',
-        relatedTaskLagDays: normalizeDependencyLagDays(srcTask.relatedTaskLagDays),
-      } as Record<string, unknown>);
-      delete row.id;
-      delete row.created_at;
-
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert(row)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      const created = rowToObj<Task>(data);
-      idMap.set(srcTask.id, created.id);
-      createdByOld.set(srcTask.id, created);
-    }
-
-    // Remap predecessor links after all ids are known.
-    for (const srcTask of sourceTasks) {
-      if (!srcTask.relatedTask) continue;
-      const newTask = createdByOld.get(srcTask.id);
-      const mappedPred = idMap.get(srcTask.relatedTask);
-      if (!newTask || !mappedPred) continue;
-      await supabase
-        .from('tasks')
-        .update({
-          related_task: mappedPred,
-          related_task_type: normalizeDependencyType(srcTask.relatedTaskType || 'FS'),
-          related_task_lag_days: normalizeDependencyLagDays(srcTask.relatedTaskLagDays || 0),
-        })
-        .eq('id', newTask.id);
-    }
-
-    const all = await taskApi.getByProject(targetProjectId);
-    const structured = recalcStructure(all.data);
-    const allTasks = recalcParents(structured);
-    await persistTaskChanges(all.data, allTasks);
-
-    return { data: allTasks };
+    const rows = buildCopiedTaskRows(selectedSource, targetProjectId, emptyRelationValue);
+    if (rows.length) await insertTaskRowsInOneRequest(rows);
+    return { data: await recalcAndPersistProject(targetProjectId) };
   },
 
   replaceFromProject: async (sourceProjectId: string, targetProjectId: string): Promise<{ data: Task[] }> => {
     const canWriteTarget = await checkProjectPermission(targetProjectId, 'write', 'tasks');
     if (!canWriteTarget) throw new Error('FORBIDDEN');
 
-    const existing = await taskApi.getByProject(targetProjectId);
-    if (existing.data.length) {
-      const { error: deleteErr } = await supabase.from('tasks').delete().eq('project_id', targetProjectId);
-      if (deleteErr) throw new Error(deleteErr.message);
-    }
-
-    const copied = await taskApi.copyFromProject(sourceProjectId, targetProjectId, 'all');
-    return { data: copied.data };
+    const src = await taskApi.getByProject(sourceProjectId);
+    const emptyRelationValue: string | null = src.data.some((t) => t.parentId === '' || t.relatedTask === '') ? '' : null;
+    const rows = buildCopiedTaskRows(src.data, targetProjectId, emptyRelationValue);
+    if (!rows.length) throw new Error('SOURCE_PROJECT_HAS_NO_TASKS');
+    await replaceProjectTasks(targetProjectId, rows);
+    return { data: await recalcAndPersistProject(targetProjectId) };
   },
 
   replaceByImport: async (projectId: string, importedTasks: Array<Partial<Task> & { parentWbs?: string; predecessorWbs?: string; predecessorType?: string; predecessorLagDays?: number }>): Promise<{ data: Task[] }> => {
@@ -1131,69 +1114,118 @@ export const taskApi = {
     }
 
     const sorted = [...rows].sort((a, b) => compareWbs(a.wbs, b.wbs));
-    const existing = await taskApi.getByProject(projectId);
-    const existingIds = existing.data.map((task) => task.id);
-    if (existingIds.length) {
-      const { error: deleteErr } = await supabase.from('tasks').delete().eq('project_id', projectId);
-      if (deleteErr) throw new Error(deleteErr.message);
-    }
+    const rowByWbs = new Map(sorted.map((row) => [row.wbs, row]));
 
-    const createdByWbs = new Map<string, Task>();
-    let runningOrder = 1;
+    // Reject parent loops (e.g. 1.1 -> 1.2 -> 1.1): such rows would never be reachable from a root.
+    const levelByWbs = new Map<string, number>();
     for (const row of sorted) {
-      const parentTask = row.parentWbs ? createdByWbs.get(row.parentWbs) : null;
-      const level = parentTask ? (Number(parentTask.level || 0) + 1) : 0;
-      const payload = objToRow({
-        projectId,
-        wbs: row.wbs,
-        taskName: row.taskName,
-        effortManday: row.effortManday,
-        startDate: row.startDate,
-        endDate: row.endDate,
-        actualFinish: row.actualFinish,
-        phase: row.phase,
-        duration: calcDurationFromDates({ startDate: row.startDate, endDate: row.endDate } as Task),
-        percentComplete: row.percentComplete,
-        status: row.status,
-        resource: row.resource,
-        relatedTask: '',
-        relatedTaskType: row.predecessorWbs ? row.predecessorType : 'FS',
-        relatedTaskLagDays: row.predecessorWbs ? row.predecessorLagDays : 0,
-        parentId: parentTask?.id || '',
-        level,
-        order: runningOrder++,
-      } as Record<string, unknown>);
-      delete payload.id;
-      delete payload.created_at;
-
-      const { data, error } = await supabase.from('tasks').insert(payload).select().single();
-      if (error) throw new Error(`Row ${row.sourceRow}: ${error.message}`);
-      createdByWbs.set(row.wbs, rowToObj<Task>(data));
+      const seen = new Set<string>();
+      let cursor: typeof row | undefined = row;
+      let depth = 0;
+      while (cursor?.parentWbs) {
+        if (seen.has(cursor.wbs)) throw new Error(`Row ${row.sourceRow}: Parent WBS forms a loop`);
+        seen.add(cursor.wbs);
+        cursor = rowByWbs.get(cursor.parentWbs);
+        depth += 1;
+      }
+      levelByWbs.set(row.wbs, depth);
     }
 
-    for (const row of sorted) {
-      if (!row.predecessorWbs) continue;
-      const task = createdByWbs.get(row.wbs);
-      const predecessor = createdByWbs.get(row.predecessorWbs);
-      if (!task || !predecessor) continue;
-      const { error: relationErr } = await supabase
-        .from('tasks')
-        .update({
-          related_task: predecessor.id,
-          related_task_type: row.predecessorType || 'FS',
-          related_task_lag_days: normalizeDependencyLagDays(row.predecessorLagDays || 0),
-        })
-        .eq('id', task.id);
-      if (relationErr) throw new Error(`Row ${row.sourceRow}: ${relationErr.message}`);
-    }
+    const idByWbs = new Map(sorted.map((row) => [row.wbs, newTaskId()]));
+    const payloads = sorted.map((row, index) => objToRow({
+      id: idByWbs.get(row.wbs),
+      projectId,
+      wbs: row.wbs,
+      taskName: row.taskName,
+      effortManday: row.effortManday,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      actualFinish: row.actualFinish,
+      phase: row.phase,
+      duration: calcDurationFromDates({ startDate: row.startDate, endDate: row.endDate } as Task),
+      percentComplete: row.percentComplete,
+      status: row.status,
+      resource: row.resource,
+      relatedTask: row.predecessorWbs ? idByWbs.get(row.predecessorWbs) || '' : '',
+      relatedTaskType: row.predecessorWbs ? row.predecessorType : 'FS',
+      relatedTaskLagDays: row.predecessorWbs ? normalizeDependencyLagDays(row.predecessorLagDays || 0) : 0,
+      parentId: row.parentWbs ? idByWbs.get(row.parentWbs) || '' : '',
+      level: levelByWbs.get(row.wbs) || 0,
+      order: index + 1,
+      sortOrder: (index + 1) * 1000,
+    } as Record<string, unknown>));
 
-    const all = await taskApi.getByProject(projectId);
-    const structured = recalcStructure(all.data);
-    const allTasks = recalcParents(structured);
-    await persistTaskChanges(all.data, allTasks);
-    return { data: allTasks };
+    await replaceProjectTasks(projectId, payloads);
+    return { data: await recalcAndPersistProject(projectId) };
   },
 };
+
+// ── Bulk task helpers ──────────────────────────────────────────────────────
+// Imports/copies/templates build every row (with pre-generated ids so parent and
+// predecessor links can point at each other) and insert them in ONE request.
+// PostgREST runs a single insert as one statement, so it either fully succeeds
+// or leaves nothing behind. Replacements delete the old tasks only after the
+// new set is safely stored, so a failure can never leave a half-empty project.
+
+function newTaskId(): string {
+  return window.crypto.randomUUID();
+}
+
+async function insertTaskRowsInOneRequest(rows: Record<string, unknown>[]): Promise<void> {
+  // Callers build every row with the same keys, so no column falls back to NULL.
+  const { error } = await supabase.from('tasks').insert(rows);
+  if (error) throw new Error(error.message);
+}
+
+async function replaceProjectTasks(projectId: string, rows: Record<string, unknown>[]): Promise<void> {
+  const { data: oldRows, error: listErr } = await supabase.from('tasks').select('id').eq('project_id', projectId);
+  if (listErr) throw new Error(listErr.message);
+  const oldIds = (oldRows || []).map((row: { id: string }) => row.id);
+
+  await insertTaskRowsInOneRequest(rows);
+
+  if (oldIds.length) {
+    const { error: deleteErr } = await supabase.from('tasks').delete().eq('project_id', projectId).in('id', oldIds);
+    if (deleteErr) {
+      throw new Error(`New tasks were saved, but the previous tasks could not be removed (${deleteErr.message}). Please retry or remove the old tasks manually.`);
+    }
+  }
+}
+
+async function recalcAndPersistProject(projectId: string): Promise<Task[]> {
+  const all = await taskApi.getByProject(projectId);
+  const allTasks = recalcParents(recalcStructure(all.data));
+  await persistTaskChanges(all.data, allTasks);
+  return allTasks;
+}
+
+/** Copy tasks into another project with fresh ids, remapping parent/predecessor links. */
+function buildCopiedTaskRows(sourceTasks: Task[], targetProjectId: string, emptyRelationValue: string | null): Record<string, unknown>[] {
+  const idMap = new Map(sourceTasks.map((task) => [task.id, newTaskId()]));
+  return sourceTasks.map((srcTask) => {
+    const mappedPredecessor = srcTask.relatedTask ? idMap.get(srcTask.relatedTask) : undefined;
+    const row = objToRow({
+      ...srcTask,
+      id: idMap.get(srcTask.id),
+      projectId: targetProjectId,
+      startDate: null,
+      endDate: null,
+      actualFinish: null,
+      baselineStartDate: null,
+      baselineEndDate: null,
+      percentComplete: 0,
+      status: 'Todo',
+      parentId: srcTask.parentId ? (idMap.get(srcTask.parentId) ?? emptyRelationValue) : emptyRelationValue,
+      // A predecessor outside the copied set (e.g. "main tasks only") is dropped.
+      relatedTask: mappedPredecessor ?? emptyRelationValue,
+      relatedTaskType: mappedPredecessor ? normalizeDependencyType(srcTask.relatedTaskType || 'FS') : 'FS',
+      relatedTaskLagDays: mappedPredecessor ? normalizeDependencyLagDays(srcTask.relatedTaskLagDays) : 0,
+    } as Record<string, unknown>);
+    delete row.created_at;
+    delete row.updated_at;
+    return row;
+  });
+}
 
 // ── Task Templates (System-wide) ───────────────────────────────────────────
 
@@ -1329,19 +1361,23 @@ export const taskTemplateApi = {
     const items = rowsToObjs<TaskTemplateItem>(itemRows || []);
     if (!items.length) throw new Error('TEMPLATE_HAS_NO_ITEMS');
 
-    const { error: deleteErr } = await supabase.from('tasks').delete().eq('project_id', targetProjectId);
-    if (deleteErr) throw new Error(deleteErr.message);
-
-    const createdByWbs = new Map<string, Task>();
     const sorted = [...items].sort((a, b) => {
       const levelDiff = Number(a.level || 0) - Number(b.level || 0);
       if (levelDiff !== 0) return levelDiff;
       return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
     });
+    const idByWbs = new Map<string, string>();
+    sorted.forEach((item) => { if (item.wbs && !idByWbs.has(item.wbs)) idByWbs.set(item.wbs, newTaskId()); });
+    const payloadIds = new Set<string>();
 
-    for (const item of sorted) {
-      const parentTask = item.parentWbs ? createdByWbs.get(item.parentWbs) : null;
-      const payload = objToRow({
+    const payloads = sorted.map((item) => {
+      const ownId = item.wbs && idByWbs.get(item.wbs);
+      // Duplicate/blank WBS rows still get their own id.
+      const id = ownId && !payloadIds.has(ownId) ? ownId : newTaskId();
+      payloadIds.add(id);
+      const parentId = item.parentWbs ? idByWbs.get(item.parentWbs) || '' : '';
+      return objToRow({
+        id,
         projectId: targetProjectId,
         wbs: item.wbs,
         taskName: item.taskName,
@@ -1357,27 +1393,35 @@ export const taskTemplateApi = {
         relatedTask: '',
         relatedTaskType: 'FS',
         relatedTaskLagDays: 0,
-        parentId: parentTask?.id || '',
+        parentId: parentId === id ? '' : parentId,
         level: Number(item.level || 0),
         sortOrder: Number(item.sortOrder || 0),
       } as Record<string, unknown>);
-      delete payload.id;
-      delete payload.created_at;
+    });
 
-      const { data, error } = await supabase.from('tasks').insert(payload).select().single();
-      if (error) throw new Error(error.message);
-      const createdTask = rowToObj<Task>(data as Record<string, unknown>);
-      createdByWbs.set(item.wbs, createdTask);
-    }
-
-    const all = await taskApi.getByProject(targetProjectId);
-    const structured = recalcStructure(all.data);
-    const allTasks = recalcParents(structured);
-    await persistTaskChanges(all.data, allTasks);
-
-    return { data: allTasks };
+    breakParentCycles(payloads);
+    await replaceProjectTasks(targetProjectId, payloads);
+    return { data: await recalcAndPersistProject(targetProjectId) };
   },
 };
+
+/** Detach any row whose parent chain loops back to itself (it would vanish from the tree). */
+function breakParentCycles(rows: Record<string, unknown>[]): void {
+  const parentOf = new Map(rows.map((row) => [String(row.id), String(row.parent_id || '')]));
+  for (const row of rows) {
+    const seen = new Set<string>();
+    let cursor = String(row.id);
+    while (cursor) {
+      if (seen.has(cursor)) {
+        row.parent_id = '';
+        parentOf.set(String(row.id), '');
+        break;
+      }
+      seen.add(cursor);
+      cursor = parentOf.get(cursor) || '';
+    }
+  }
+}
 
 async function deleteTaskAndChildren(taskId: string): Promise<void> {
   // Find children

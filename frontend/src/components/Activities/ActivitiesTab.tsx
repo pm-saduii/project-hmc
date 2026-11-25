@@ -7,6 +7,7 @@ import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { Btn, Card, C, ConfirmModal, FormRow, Input, Modal, Select, TD, TH, Textarea } from '../Common';
 import { fmtDate, todayISO } from '../../utils';
+import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Activity } from '../../types';
 
 interface Props {
@@ -122,43 +123,9 @@ export default function ActivitiesTab({ projectId }: Props) {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const reportDate = formatDateDMYDash(new Date());
 
-    const u8ToBase64 = (bytes: Uint8Array): string => {
-      let out = '';
-      const chunk = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunk) {
-        out += String.fromCharCode(...bytes.subarray(i, i + chunk));
-      }
-      return btoa(out);
-    };
-
-    const ensurePoppinsFont = async () => {
-      try {
-        const fl = (doc as any).getFontList?.();
-        if (fl?.Poppins || fl?.poppins) return;
-
-        const [regRes, boldRes] = await Promise.all([
-          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf'),
-          fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf'),
-        ]);
-        if (!regRes.ok || !boldRes.ok) return;
-
-        const [regBuf, boldBuf] = await Promise.all([regRes.arrayBuffer(), boldRes.arrayBuffer()]);
-        doc.addFileToVFS('Poppins-Regular.ttf', u8ToBase64(new Uint8Array(regBuf)));
-        doc.addFileToVFS('Poppins-Bold.ttf', u8ToBase64(new Uint8Array(boldBuf)));
-        doc.addFont('Poppins-Regular.ttf', 'Poppins', 'normal');
-        doc.addFont('Poppins-Bold.ttf', 'Poppins', 'bold');
-      } catch {
-        // Fallback to built-in font if external font loading fails.
-      }
-    };
-
-    const setPdfFont = (style: 'normal' | 'bold' = 'normal') => {
-      const fl = (doc as any).getFontList?.();
-      const popName = fl?.Poppins ? 'Poppins' : (fl?.poppins ? 'poppins' : null);
-      doc.setFont(popName || 'helvetica', style);
-    };
-
-    await ensurePoppinsFont();
+    // Thai-capable font (Sarabun); falls back to Helvetica if it cannot load.
+    const pdfFont = await ensureThaiFont(doc);
+    const setPdfFont = (style: 'normal' | 'bold' = 'normal') => doc.setFont(pdfFont, style);
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(203, 213, 225);
@@ -187,7 +154,7 @@ export default function ActivitiesTab({ projectId }: Props) {
         row.description || '-',
       ]),
       theme: 'grid',
-      styles: { font: 'Poppins', fontSize: 9, cellPadding: 2.5, textColor: [30, 41, 59], lineColor: [226, 232, 240] },
+      styles: { font: pdfFont, fontSize: 9, cellPadding: 2.5, textColor: [30, 41, 59], lineColor: [226, 232, 240] },
       headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' },
       columnStyles: {
         0: { cellWidth: 26 },

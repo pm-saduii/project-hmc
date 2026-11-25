@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Badge, Tabs, C, PROJECT_STATUS, ProgressBar, Btn, Modal, FormRow, Select, Input } from '../Common';
 import { fmtDate, computeBaselineProgress } from '../../utils';
+import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Project } from '../../types';
 import TasksTab          from '../Table/TasksTab';
 import ProjectSummaryTab from './ProjectSummaryTab';
@@ -125,7 +126,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
   const categoryLabel = PROJECT_CHECKLIST_CATEGORIES.find((item) => item.id === category)?.label || 'Project';
   const hasUnsavedChanges = isLoaded && JSON.stringify(progress) !== savedSnapshot;
 
-  const exportChecklistPdf = () => {
+  const exportChecklistPdf = async () => {
     const title = category === 'project' ? 'Project Checklist' : category === 'setup' ? 'Setup Checklist' : 'Data Migration Checklist';
     const notRequiredMark = '__CHECKLIST_NOT_REQUIRED__';
     const doneMark = '__CHECKLIST_DONE__';
@@ -191,6 +192,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     }
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pdfFont = await ensureThaiFont(doc); // Thai-capable (Sarabun)
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const left = 8;
@@ -204,7 +206,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
       startY: headerHeight + 5,
       margin: { top: headerHeight + 5, bottom: footerHeight + 5, left, right },
       theme: 'grid',
-      styles: { font: 'helvetica', fontSize: 7, cellPadding: 2, textColor: [30, 30, 30], lineColor: [203, 213, 225], lineWidth: 0.15, overflow: 'linebreak' },
+      styles: { font: pdfFont, fontSize: 7, cellPadding: 2, textColor: [30, 30, 30], lineColor: [203, 213, 225], lineWidth: 0.15, overflow: 'linebreak' },
       headStyles: { fillColor: [239, 246, 255], textColor: [49, 46, 129], fontStyle: 'bold', halign: 'center' },
       columnStyles: category === 'migrate-data'
         ? {
@@ -248,13 +250,13 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
       doc.setDrawColor(203, 213, 225);
       doc.setLineWidth(0.3);
       doc.roundedRect(left, 2, contentWidth, headerHeight, 3, 3, 'FD');
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(pdfFont, 'bold');
       doc.setTextColor(30, 30, 30);
       doc.setFontSize(9.5);
       doc.text(doc.splitTextToSize(project.client || project.name || 'Project', 150)[0], left + 5.5, 10.8);
       doc.setFontSize(11.5);
       doc.text(title, left + 5.5, 16.2);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(pdfFont, 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
       doc.text(`Print Date : ${reportDate}`, pageWidth - right - 5, 11, { align: 'right' });
@@ -267,9 +269,9 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
       doc.text('Prepared by Humanica Public Company Limited', left, footerTextY);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont(pdfFont, 'bold');
       doc.text('Confidential', pageWidth / 2, footerTextY, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
+      doc.setFont(pdfFont, 'normal');
       doc.text(`Project ID: ${project.code || projectId} | Page ${page} of ${totalPages}`, pageWidth - right, footerTextY, { align: 'right' });
     }
 

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Check, Trash2 } from 'lucide-react';
 import { Btn, Card, C, FormRow, TH, TD } from '../Common';
 import { fmtDate, getHalfMonthSnapshotDates, computeBaselineProgress } from '../../utils';
+import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Project, ProjectProgressSnapshot } from '../../types';
 import { useStore } from '../../store';
 
@@ -290,9 +291,9 @@ export default function ProjectSummaryTab({ project }: Props) {
     image.src = url;
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    doc.setFont('helvetica');
+    const pdfFont = await ensureThaiFont(doc); // Thai-capable (Sarabun)
     doc.setFontSize(14);
     doc.setFillColor(241, 245, 255);
     doc.rect(14, 10, 268, 20, 'F');
@@ -373,7 +374,7 @@ export default function ProjectSummaryTab({ project }: Props) {
       body,
       theme: 'grid',
       headStyles: { fillColor: '#F8FAFC', textColor: '#0F172A', halign: 'left' },
-      styles: { fontSize: 9, cellPadding: 3 },
+      styles: { font: pdfFont, fontSize: 9, cellPadding: 3 },
     });
     doc.save(`${project.code || project.name}-project-summary.pdf`);
   };
