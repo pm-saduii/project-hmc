@@ -311,8 +311,10 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
             const hs = HEALTH_STYLE[r.health.status];
             return (
               <Link key={r.project.id} to={projectPath(r.project.id)} title={`${r.project.name}: ${r.health.actual}% actual, ${r.health.planned}% planned (${statusLabel(r.project)})`}
-                style={{ display: 'grid', gridTemplateColumns: isMobile ? '90px 1fr 70px' : '140px 1fr 90px', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.project.code || r.project.name}</span>
+                style={{ display: 'grid', gridTemplateColumns: isMobile ? '130px 1fr 64px' : '220px 1fr 90px', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {r.project.code || r.project.name}{r.project.customerAbbreviation ? ` (${r.project.customerAbbreviation})` : ''}
+                </span>
                 <span style={{ position: 'relative', height: 10, background: C.bg2, borderRadius: 5 }}>
                   <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, r.health.actual)}%`, background: r.health.status === 'On Track' ? C.primary : hs.color, borderRadius: 5 }} />
                   {r.health.status !== 'Plan N/A' && (
