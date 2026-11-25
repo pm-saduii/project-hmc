@@ -126,26 +126,26 @@ END $$;
 -- ── Child tables (project comes from the parent row) ──────────────────────
 ALTER TABLE public.effort_monthly ENABLE ROW LEVEL SECURITY;
 CREATE POLICY effort_monthly_project_select ON public.effort_monthly FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_id AND public.can_read_project(e.project_id)));
+  USING (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_monthly.effort_id AND public.can_read_project(e.project_id)));
 CREATE POLICY effort_monthly_project_insert ON public.effort_monthly FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')));
+  WITH CHECK (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_monthly.effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')));
 CREATE POLICY effort_monthly_project_update ON public.effort_monthly FOR UPDATE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')));
+  USING (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_monthly.effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_monthly.effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')));
 CREATE POLICY effort_monthly_project_delete ON public.effort_monthly FOR DELETE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')));
+  USING (EXISTS (SELECT 1 FROM public.efforts e WHERE e.id = effort_monthly.effort_id AND public.can_access_project_screen(e.project_id, 'effort', 'write')));
 REVOKE ALL ON public.effort_monthly FROM anon;
 
 ALTER TABLE public.cr_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY cr_items_project_select ON public.cr_items FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_id AND public.can_read_project(c.project_id)));
+  USING (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_items.cr_id AND public.can_read_project(c.project_id)));
 CREATE POLICY cr_items_project_insert ON public.cr_items FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')));
+  WITH CHECK (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_items.cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')));
 CREATE POLICY cr_items_project_update ON public.cr_items FOR UPDATE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')));
+  USING (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_items.cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_items.cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')));
 CREATE POLICY cr_items_project_delete ON public.cr_items FOR DELETE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')));
+  USING (EXISTS (SELECT 1 FROM public.change_requests c WHERE c.id = cr_items.cr_id AND public.can_access_project_screen(c.project_id, 'cr', 'write')));
 REVOKE ALL ON public.cr_items FROM anon;
 
 -- ── projects ──────────────────────────────────────────────────────────────
