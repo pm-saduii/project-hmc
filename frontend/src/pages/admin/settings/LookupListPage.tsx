@@ -2,7 +2,7 @@ import React from 'react';
 import toast from 'react-hot-toast';
 import { GripVertical, Plus } from 'lucide-react';
 import { Btn, C, Modal } from '../../../components/Common';
-import { AdminHeader, F, SearchBox, SidePanel, Switch, fieldLabel, hint, input, panel, td, th } from '../../../components/Admin/AdminUi';
+import { AdminHeader, F, SearchBox, FormModal, Switch, fieldLabel, hint, input, panel, td, th } from '../../../components/Admin/AdminUi';
 import { useStore } from '../../../store';
 import { supabase } from '../../../services/supabase';
 import type { MasterCode } from '../../../types';
@@ -174,7 +174,7 @@ export default function LookupListPage({ section }: { section: LookupSection & {
       <div style={hint}>Drag rows to change the order. A value in use cannot be deleted — make it inactive instead, so existing records keep it.</div>
 
       {editing && (
-        <SidePanel title={editing.id ? `Edit ${section.noun}` : `Add ${section.noun}`} subtitle={section.label} onClose={() => setEditing(null)} busy={busy}
+        <FormModal title={editing.id ? `Edit ${section.noun}` : `Add ${section.noun}`} subtitle={section.label} onClose={() => setEditing(null)} busy={busy}
           footer={<>
             {editing.id && original && <button type="button" disabled={editingUsed > 0} onClick={() => setDeleting(original)}
               title={editingUsed > 0 ? 'In use — make it inactive instead' : undefined}
@@ -208,11 +208,11 @@ export default function LookupListPage({ section }: { section: LookupSection & {
             <span><strong>Active</strong><br /><span style={{ fontSize: 11, color: C.text2 }}>Inactive values stay on existing records but cannot be picked for new ones.</span></span>
             <Switch checked={editing.active ?? true} onChange={(v) => setEditing({ ...editing, active: v })} label="Active" />
           </label>
-        </SidePanel>
+        </FormModal>
       )}
 
       {deleting && (
-        <Modal title={`Delete ${section.noun}`} onClose={() => !busy && setDeleting(null)} width={420}>
+        <Modal title={`Delete ${section.noun}`} onClose={() => !busy && setDeleting(null)} width={420} closeOnBackdrop={false}>
           <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px' }}>Delete "{deleting.label}"? This cannot be undone.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <Btn variant="ghost" onClick={() => setDeleting(null)} disabled={busy}>Cancel</Btn>

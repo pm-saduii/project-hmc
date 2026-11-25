@@ -58,33 +58,31 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
   );
 }
 
-/** Right-hand panel for add / edit forms. */
-export function SidePanel({ title, subtitle, onClose, children, footer, busy }: {
-  title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode; busy?: boolean;
+/**
+ * Centered dialog for add / edit forms. It closes only from its × button or the footer's
+ * Cancel / Close button — never from a click outside or the Escape key, so work is not lost.
+ */
+export function FormModal({ title, subtitle, onClose, children, footer, busy, width = 560 }: {
+  title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode; busy?: boolean; width?: number;
 }) {
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, busy]);
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 400, fontFamily: F }}>
-      <div onClick={busy ? undefined : onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.35)' }} />
-      <aside role="dialog" aria-modal="true" aria-label={title}
-        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(460px, 100vw)', background: C.white, boxShadow: '-12px 0 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 250, fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }} />
+      <div role="dialog" aria-modal="true" aria-label={title}
+        style={{ position: 'relative', width, maxWidth: '100%', maxHeight: '92vh', background: C.white, borderRadius: 16, boxShadow: '0 20px 50px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>{title}</h2>
             {subtitle && <div style={{ fontSize: 13, color: C.text2 }}>{subtitle}</div>}
           </div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close"
-            style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.text2, cursor: 'pointer' }}>
+            style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.text2, cursor: busy ? 'default' : 'pointer' }}>
             <X size={16} />
           </button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
-        <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, alignItems: 'center' }}>{footer}</div>
-      </aside>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
+        <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>{footer}</div>
+      </div>
     </div>
   );
 }

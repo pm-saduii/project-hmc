@@ -1,16 +1,17 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format, isValid, parseISO } from 'date-fns';
 import { ChevronRight, RefreshCw, UserPlus } from 'lucide-react';
 import { Btn, C } from '../../components/Common';
-import { AdminHeader, F, Pill, SearchBox, SidePanel, StatusDot, fieldLabel, hint, input, panel, td, th } from '../../components/Admin/AdminUi';
+import { AdminHeader, F, Pill, SearchBox, FormModal, StatusDot, fieldLabel, hint, input, panel, td, th } from '../../components/Admin/AdminUi';
 import {
   ROLE_INFO, ROLE_ORDER, adminUsersApi, effectiveScreens, isCustomScreens, projectIdsFor, visibleScreenCount,
   type AdminUser, type SignInInfo,
 } from '../../services/adminUsers';
 import { USER_SCREEN_OPTIONS } from '../../constants/rolePermissions';
 import type { UserRole } from '../../types';
+import UserEditModal from './UserEditModal';
 
 const PAGE_SIZE = 25;
 const AVATAR = ['#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#F97316', '#14B8A6'];
@@ -20,9 +21,10 @@ const when = (v?: string | null) => { if (!v) return ''; const d = parseISO(v); 
 
 type Memberships = Awaited<ReturnType<typeof adminUsersApi.memberships>>;
 
-/** /admin/users — everyone who can sign in. */
+/** /admin/users — everyone who can sign in; /admin/users/:userId opens the edit dialog over the list. */
 export default function UsersPage() {
   const navigate = useNavigate();
+  const { userId = '' } = useParams();
   const [users, setUsers] = React.useState<AdminUser[]>([]);
   const [signIns, setSignIns] = React.useState<Record<string, SignInInfo>>({});
   const [memberships, setMemberships] = React.useState<Memberships | null>(null);
@@ -162,6 +164,7 @@ export default function UsersPage() {
         </div>
       </section>
 
+      {userId && <UserEditModal key={userId} userId={userId} onClose={() => navigate('/admin/users')} onChanged={() => void load()} />}
       {inviting && <InvitePanel onClose={() => setInviting(false)} onDone={() => { setInviting(false); void load(); }} />}
     </div>
   );
@@ -188,7 +191,7 @@ function InvitePanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   };
 
   return (
-    <SidePanel title="Invite user" subtitle="They get an email with a link to set their password." onClose={onClose} busy={busy}
+    <FormModal title="Invite user" subtitle="They get an email with a link to set their password." onClose={onClose} busy={busy}
       footer={<>
         <span style={{ marginLeft: 'auto' }} />
         <Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
@@ -208,6 +211,6 @@ function InvitePanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
           </label>
         ))}
       </fieldset>
-    </SidePanel>
+    </FormModal>
   );
 }

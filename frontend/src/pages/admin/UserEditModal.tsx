@@ -1,10 +1,10 @@
 import React from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format, isValid, parseISO } from 'date-fns';
 import { KeyRound, ShieldCheck } from 'lucide-react';
 import { Btn, C, Modal } from '../../components/Common';
-import { F, Pill, SidePanel, StatusDot, fieldLabel, hint, input, panel } from '../../components/Admin/AdminUi';
+import { F, FormModal, Pill, StatusDot, fieldLabel, hint, input } from '../../components/Admin/AdminUi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStore } from '../../store';
 import { USER_SCREEN_OPTIONS, type ScreenAccessLevel, type UserScreenPermissions } from '../../constants/rolePermissions';
@@ -28,10 +28,11 @@ const when = (v?: string | null) => { if (!v) return ''; const d = parseISO(v); 
 interface Draft { fullName: string; email: string; role: UserRole; scope: 'member' | 'all'; screens: UserScreenPermissions }
 const draftOf = (u: AdminUser): Draft => ({ fullName: u.fullName, email: u.email, role: u.role, scope: u.role === 'admin' ? 'all' : u.projectAccessScope, screens: effectiveScreens(u) });
 
-/** /admin/users/:userId — one user's profile, role, project access and screen access. */
-export default function UserDetailPage() {
-  const { userId = '' } = useParams();
-  const navigate = useNavigate();
+/**
+ * Edit one user (opened from the Users list, /admin/users/:userId): profile, role, project access,
+ * screen access, password and account status. Closes only from × or Close.
+ */
+export default function UserEditModal({ userId, onClose, onChanged }: { userId: string; onClose: () => void; onChanged: () => void }) {
   const { user: me } = useAuth();
   const projects = useStore((s) => s.projects);
   const [user, setUser] = React.useState<AdminUser | null>(null);
@@ -59,13 +60,12 @@ export default function UserDetailPage() {
   }, [userId]);
   React.useEffect(() => { void load(); }, [load]);
 
-  if (loading && !user) return <div style={{ padding: 32, fontSize: 13, color: C.text2, fontFamily: F }}>Loading…</div>;
   if (!user || !draft) {
     return (
-      <div style={{ padding: 32, fontFamily: F }}>
-        <h1 style={{ margin: '0 0 6px', fontSize: 20, color: C.text }}>User not found</h1>
-        <Link to="/admin/users" style={{ fontSize: 13, fontWeight: 600 }}>Back to Users</Link>
-      </div>
+      <FormModal title={loading ? 'Loading…' : 'User not found'} onClose={onClose} width={440}
+        footer={<><span style={{ marginLeft: 'auto' }} /><Btn variant="ghost" onClick={onClose}>Close</Btn></>}>
+        <div style={{ fontSize: 13, color: C.text2 }}>{loading ? 'Loading the user…' : 'This user does not exist or was deleted.'}</div>
+      </FormModal>
     );
   }
 
@@ -102,7 +102,8 @@ export default function UserDetailPage() {
         if (Object.keys(patch).length) await adminUsersApi.update(user.id, patch);
       }
       toast.success('Changes saved');
-      await load();
+      onChanged();
+      onClose();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not save the changes');
     } finally { setSaving(false); }
@@ -116,62 +117,53 @@ export default function UserDetailPage() {
       if (action === 'delete') {
         await adminUsersApi.remove(user.id);
         toast.success('User deleted');
-        navigate('/admin/users', { replace: true });
+        onChanged();
+        onClose();
         return;
       }
       await adminUsersApi.update(user.id, { is_active: action === 'activate' });
       toast.success(action === 'activate' ? 'User activated' : 'User deactivated');
       setConfirm(null);
+      onChanged();
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not update the user');
     } finally { setSaving(false); }
   };
 
-  const section = (title: string, children: React.ReactNode, extra?: React.ReactNode) => (
-    <section style={{ ...panel, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+  const block = (title: string, children: React.ReactNode, extra?: React.ReactNode) => (
+    <section style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>{title}</h2>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>{title}</h3>
         {extra}
       </div>
       {children}
     </section>
   );
   const info = ROLE_INFO[user.role];
+  const subtitle = `${user.email} · Added ${when(user.createdAt) || '—'}${signIn ? ` · ${signIn.lastSignInAt ? `Last sign-in ${when(signIn.lastSignInAt)}` : signIn.invitedAt && !signIn.confirmedAt ? 'Invited, not joined yet' : 'Never signed in'}` : ''}`;
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', boxSizing: 'border-box', fontFamily: F, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '20px 32px 24px', display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
-        <nav aria-label="Breadcrumb" style={{ fontSize: 13, color: C.text2 }}>
-          <Link to="/admin/users" style={{ color: C.text2, textDecoration: 'none' }}>Users</Link> › <span style={{ color: C.text, fontWeight: 600 }}>{user.fullName || user.email}</span>
-        </nav>
-
-        <section style={{ ...panel, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <span aria-hidden="true" style={{ width: 52, height: 52, borderRadius: '50%', background: user.isActive ? C.primary : C.text3, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 700 }}>
-            {(user.fullName || user.email).split(/[\s@.]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
-          </span>
-          <div style={{ flex: '1 1 240px', minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: C.text }}>{user.fullName || '(no name)'}</h1>
-            <div style={{ fontSize: 13, color: C.text2 }}>
-              {user.email} · Added {when(user.createdAt) || '—'}
-              {signIn && ` · ${signIn.lastSignInAt ? `Last sign-in ${when(signIn.lastSignInAt)}` : signIn.invitedAt && !signIn.confirmedAt ? 'Invited, not joined yet' : 'Never signed in'}`}
-            </div>
-          </div>
+    <>
+      <FormModal title={`Edit user · ${user.fullName || user.email}`} subtitle={subtitle} onClose={onClose} busy={saving} width={1040}
+        footer={<>
           <Pill bg={info.bg} fg={info.fg}>{info.label}</Pill>
           <StatusDot active={user.isActive} />
-          <Btn variant="outline" onClick={() => setPasswordOpen(true)}><KeyRound size={14} style={{ marginRight: 6 }} />Set password</Btn>
-        </section>
-
+          {dirty && <span style={{ fontSize: 13, color: '#B45309', fontWeight: 600 }}>Unsaved changes</span>}
+          <span style={{ marginLeft: 'auto' }} />
+          <Btn variant="ghost" onClick={onClose} disabled={saving}>Close</Btn>
+          <Btn onClick={() => void save()} disabled={saving || !dirty}>{saving ? 'Saving…' : 'Save changes'}</Btn>
+        </>}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 16, alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-            {section('Profile', <>
+            {block('Profile', <>
               <label style={fieldLabel}>Full name<input value={draft.fullName} onChange={(e) => set('fullName', e.target.value)} style={input} /></label>
               <label style={fieldLabel}>Email<input type="email" value={draft.email} onChange={(e) => set('email', e.target.value)} style={input} />
                 <span style={hint}>Changing the email changes how they sign in.</span>
               </label>
-            </>)}
+            </>, <Btn small variant="outline" onClick={() => setPasswordOpen(true)}><KeyRound size={13} style={{ marginRight: 6 }} />Set password</Btn>)}
 
-            {section('Role', <>
+            {block('Role', <>
               <div role="radiogroup" aria-label="Role" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
                 {ROLE_ORDER.map((r) => {
                   const on = draft.role === r;
@@ -189,7 +181,7 @@ export default function UserDetailPage() {
                 : draft.role !== user.role && <span style={hint}>Changing the role resets screen access to the {ROLE_INFO[draft.role].label} defaults.</span>}
             </>)}
 
-            {section('Project access', isAdminDraft ? (
+            {block('Project access', isAdminDraft ? (
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#4338CA', background: C.primaryBg, padding: 12, borderRadius: 10 }}><ShieldCheck size={16} />Admins see every project.</div>
             ) : <>
               {([['member', 'Only their projects', 'Projects where they are in the member list'], ['all', 'All projects', 'Every project, now and later']] as const).map(([value, title, desc]) => (
@@ -212,73 +204,66 @@ export default function UserDetailPage() {
             </>)}
           </div>
 
-          {section('Screen access', isAdminDraft ? (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#4338CA', background: C.primaryBg, padding: 12, borderRadius: 10 }}><ShieldCheck size={16} />Admins can use every screen.</div>
-          ) : <>
-            <div style={{ fontSize: 11, color: C.text2, marginTop: -6 }}>{matchesDefault ? `${ROLE_INFO[draft.role].label} defaults` : 'Custom for this user'} · {visible} of {USER_SCREEN_OPTIONS.length} screens visible</div>
-            {SCREEN_GROUPS.map((group) => (
-              <div key={group.title}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: C.text2, padding: '6px 0', borderBottom: `1px solid ${C.border}` }}>{group.title}</div>
-                {group.ids.map((id) => {
-                  const screen = USER_SCREEN_OPTIONS.find((s) => s.id === id);
-                  if (!screen) return null;
-                  const value = draft.screens[id] || 'hidden';
-                  return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderBottom: `1px solid ${C.bg2}` }}>
-                      <span style={{ fontSize: 13, color: C.text }}>{screen.label}{SCREEN_NOTES[id] && <span style={{ fontSize: 11, color: C.text3 }}> · {SCREEN_NOTES[id]}</span>}</span>
-                      <span role="radiogroup" aria-label={`${screen.label} access`} style={{ display: 'inline-flex', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                        {LEVELS.map((level) => {
-                          const on = value === level.value;
-                          return (
-                            <button key={level.value} type="button" role="radio" aria-checked={on}
-                              onClick={() => set('screens', { ...draft.screens, [id]: level.value })}
-                              style={{ height: 28, padding: '0 10px', border: 0, cursor: 'pointer', fontFamily: F, fontSize: 11, fontWeight: 600,
-                                background: on ? (level.value === 'hidden' ? C.bg2 : C.primary) : C.white, color: on ? (level.value === 'hidden' ? C.text : '#fff') : C.text2 }}>
-                              {level.label}
-                            </button>
-                          );
-                        })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </>, !isAdminDraft && !matchesDefault ? (
-            <Btn small variant="outline" onClick={() => set('screens', roleDefaultScreens(draft.role))}>Reset to {ROLE_INFO[draft.role].label} defaults</Btn>
-          ) : undefined)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {block('Screen access', isAdminDraft ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#4338CA', background: C.primaryBg, padding: 12, borderRadius: 10 }}><ShieldCheck size={16} />Admins can use every screen.</div>
+            ) : <>
+              <div style={{ fontSize: 11, color: C.text2, marginTop: -6 }}>{matchesDefault ? `${ROLE_INFO[draft.role].label} defaults` : 'Custom for this user'} · {visible} of {USER_SCREEN_OPTIONS.length} screens visible</div>
+              {SCREEN_GROUPS.map((group) => (
+                <div key={group.title}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: C.text2, padding: '6px 0', borderBottom: `1px solid ${C.border}` }}>{group.title}</div>
+                  {group.ids.map((id) => {
+                    const screen = USER_SCREEN_OPTIONS.find((s) => s.id === id);
+                    if (!screen) return null;
+                    const value = draft.screens[id] || 'hidden';
+                    return (
+                      <div key={id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '7px 0', borderBottom: `1px solid ${C.bg2}` }}>
+                        <span style={{ fontSize: 13, color: C.text }}>{screen.label}{SCREEN_NOTES[id] && <span style={{ fontSize: 11, color: C.text3 }}> · {SCREEN_NOTES[id]}</span>}</span>
+                        <span role="radiogroup" aria-label={`${screen.label} access`} style={{ display: 'inline-flex', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+                          {LEVELS.map((level) => {
+                            const on = value === level.value;
+                            return (
+                              <button key={level.value} type="button" role="radio" aria-checked={on}
+                                onClick={() => set('screens', { ...draft.screens, [id]: level.value })}
+                                style={{ height: 28, padding: '0 10px', border: 0, cursor: 'pointer', fontFamily: F, fontSize: 11, fontWeight: 600,
+                                  background: on ? (level.value === 'hidden' ? C.bg2 : C.primary) : C.white, color: on ? (level.value === 'hidden' ? C.text : '#fff') : C.text2 }}>
+                                {level.label}
+                              </button>
+                            );
+                          })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </>, !isAdminDraft && !matchesDefault ? (
+              <Btn small variant="outline" onClick={() => set('screens', roleDefaultScreens(draft.role))}>Reset to {ROLE_INFO[draft.role].label} defaults</Btn>
+            ) : undefined)}
+
+            {user.role !== 'admin' && !isSelf && (
+              <section style={{ border: '1px solid #FECACA', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 220px' }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#B91C1C' }}>{user.isActive ? 'Deactivate account' : 'Inactive account'}</h3>
+                  <div style={{ fontSize: 13, color: C.text2 }}>
+                    {user.isActive ? 'They can no longer sign in. Their history stays. An inactive account can then be deleted.' : 'This account cannot sign in. Activate it again, or delete it for good.'}
+                  </div>
+                </div>
+                {user.isActive
+                  ? <Btn variant="outline" onClick={() => setConfirm('deactivate')} style={{ color: '#B91C1C', borderColor: '#FCA5A5' }}>Deactivate</Btn>
+                  : <>
+                    <Btn variant="outline" onClick={() => setConfirm('activate')}>Activate</Btn>
+                    <Btn variant="danger" onClick={() => setConfirm('delete')}>Delete user</Btn>
+                  </>}
+              </section>
+            )}
+          </div>
         </div>
+      </FormModal>
 
-        {user.role !== 'admin' && !isSelf && (
-          <section style={{ ...panel, borderColor: '#FECACA', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 260px' }}>
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#B91C1C' }}>{user.isActive ? 'Deactivate account' : 'Inactive account'}</h2>
-              <div style={{ fontSize: 13, color: C.text2 }}>
-                {user.isActive ? 'They can no longer sign in. Their history stays. An inactive account can then be deleted.' : 'This account cannot sign in. Activate it again, or delete it for good.'}
-              </div>
-            </div>
-            {user.isActive
-              ? <Btn variant="outline" onClick={() => setConfirm('deactivate')} style={{ color: '#B91C1C', borderColor: '#FCA5A5' }}>Deactivate</Btn>
-              : <>
-                <Btn variant="outline" onClick={() => setConfirm('activate')}>Activate</Btn>
-                <Btn variant="danger" onClick={() => setConfirm('delete')}>Delete user</Btn>
-              </>}
-          </section>
-        )}
-      </div>
-
-      {dirty && (
-        <div style={{ position: 'sticky', bottom: 0, margin: '0 32px', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', background: C.white, border: `1px solid ${C.border}`, borderBottom: 0, borderRadius: '12px 12px 0 0', boxShadow: '0 -4px 16px rgba(0,0,0,0.06)' }}>
-          <span style={{ fontSize: 13, color: '#B45309', fontWeight: 600 }}>You have unsaved changes</span>
-          <span style={{ marginLeft: 'auto' }} />
-          <Btn variant="ghost" onClick={() => setDraft(original)} disabled={saving}>Discard</Btn>
-          <Btn onClick={() => void save()} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Btn>
-        </div>
-      )}
-
-      {passwordOpen && <PasswordPanel user={user} onClose={() => setPasswordOpen(false)} />}
+      {passwordOpen && <PasswordModal user={user} onClose={() => setPasswordOpen(false)} />}
       {confirm && (
-        <Modal title={confirm === 'delete' ? 'Delete user' : confirm === 'activate' ? 'Activate user' : 'Deactivate user'} onClose={() => !saving && setConfirm(null)} width={440}>
+        <Modal title={confirm === 'delete' ? 'Delete user' : confirm === 'activate' ? 'Activate user' : 'Deactivate user'} onClose={() => !saving && setConfirm(null)} width={440} closeOnBackdrop={false}>
           <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px', lineHeight: 1.6 }}>
             {confirm === 'delete' ? `${user.email} and their sign-in account will be deleted permanently.`
               : confirm === 'activate' ? `${user.email} will be able to sign in again.`
@@ -292,11 +277,11 @@ export default function UserDetailPage() {
           </div>
         </Modal>
       )}
-    </div>
+    </>
   );
 }
 
-function PasswordPanel({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+function PasswordModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
   const [password, setPassword] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const save = async () => {
@@ -311,12 +296,12 @@ function PasswordPanel({ user, onClose }: { user: AdminUser; onClose: () => void
     } finally { setBusy(false); }
   };
   return (
-    <SidePanel title="Set password" subtitle={user.email} onClose={onClose} busy={busy}
+    <FormModal title="Set password" subtitle={user.email} onClose={onClose} busy={busy} width={460}
       footer={<><span style={{ marginLeft: 'auto' }} /><Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn><Btn onClick={() => void save()} disabled={busy}>{busy ? 'Saving…' : 'Set password'}</Btn></>}>
       <label style={fieldLabel}>New password
         <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} style={input} autoFocus />
         <span style={hint}>At least 6 characters. Tell the user over a private channel; they can change it after signing in.</span>
       </label>
-    </SidePanel>
+    </FormModal>
   );
 }

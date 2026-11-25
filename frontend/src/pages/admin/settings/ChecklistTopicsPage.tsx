@@ -2,7 +2,7 @@ import React from 'react';
 import toast from 'react-hot-toast';
 import { GripVertical, Plus } from 'lucide-react';
 import { Btn, C, Modal } from '../../../components/Common';
-import { AdminHeader, SearchBox, SidePanel, fieldLabel, hint, input, panel } from '../../../components/Admin/AdminUi';
+import { AdminHeader, SearchBox, FormModal, fieldLabel, hint, input, panel } from '../../../components/Admin/AdminUi';
 import { useStore } from '../../../store';
 import { projectChecklistApi } from '../../../services/api';
 import { supabase } from '../../../services/supabase';
@@ -158,7 +158,7 @@ export default function ChecklistTopicsPage({ section, topics, onChanged }: {
       <div style={hint}>Drag topics to change their order within a group.</div>
 
       {editing && (
-        <SidePanel title={isNew ? 'Add topic' : 'Edit topic'} subtitle={section.label} onClose={() => setEditing(null)} busy={busy}
+        <FormModal title={isNew ? 'Add topic' : 'Edit topic'} subtitle={section.label} onClose={() => setEditing(null)} busy={busy}
           footer={<>
             {!isNew && <button type="button" onClick={() => setDeleting(editing)} style={linkBtn('#B91C1C')}>Delete topic</button>}
             <span style={{ marginLeft: 'auto' }} />
@@ -171,11 +171,11 @@ export default function ChecklistTopicsPage({ section, topics, onChanged }: {
           </label>
           {groupSelect}
           {!isNew && usage[editing.id] ? <div style={hint}>{usage[editing.id]} project(s) have recorded progress on this topic.</div> : null}
-        </SidePanel>
+        </FormModal>
       )}
 
       {deleting && (
-        <Modal title="Delete topic" onClose={() => !busy && setDeleting(null)} width={440}>
+        <Modal title="Delete topic" onClose={() => !busy && setDeleting(null)} width={440} closeOnBackdrop={false}>
           <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px', lineHeight: 1.6 }}>
             Delete "{deleting.title}"?{usage[deleting.id] ? ` The progress recorded on ${usage[deleting.id]} project(s) for this topic will also be removed.` : ''} This cannot be undone.
           </p>
