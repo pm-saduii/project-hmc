@@ -8,7 +8,7 @@ import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { issueApi, memberApi, riskApi } from '../../services/api';
 import { C, ProgressBar } from '../Common';
 import { fmtDate, fmtMoney } from '../../utils';
-import { projectHealth, type ProjectHealth } from '../../utils/projectHealth';
+import { isClosedStatus, isHyperCareStatus, projectHealth, type ProjectHealth } from '../../utils/projectHealth';
 import { isMyTask, myIdentityNames } from '../../utils/myTasks';
 import { projectPath } from '../../utils/projectRoutes';
 import type { Issue, Member, Milestone, Project, Risk, Task } from '../../types';
@@ -84,12 +84,8 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
   const in7 = addDays(today, 7);
   const in14 = addDays(today, 14);
 
-  const hyperCareValues = new Set(masterCodes
-    .filter((c) => c.codeType === 'project_status' && c.label === 'Hyper Care')
-    .map((c) => c.codeValue));
-  hyperCareValues.add('Hyper Care');
-  const isHyperCare = (p: Project) => hyperCareValues.has(p.status);
   const statusLabel = (p: Project) => masterCodes.find((c) => c.codeType === 'project_status' && c.codeValue === p.status)?.label || p.status || '—';
+  const isHyperCare = (p: Project) => isHyperCareStatus(p.status, statusLabel(p));
 
   // ── Per-project numbers ───────────────────────────────────────────────────
   const tasksByProject = new Map<string, Task[]>();
@@ -124,7 +120,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
   rows.forEach((r) => {
     r.finished = isHyperCare(r.project)
       || r.health.actual >= 100
-      || /close|complete|done|finish|cancel/i.test(`${r.project.status} ${statusLabel(r.project)}`);
+      || isClosedStatus(r.project.status, statusLabel(r.project));
   });
   const attention = rows
     .filter((r) => (r.finished

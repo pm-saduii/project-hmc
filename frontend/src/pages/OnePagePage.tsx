@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { C } from '../components/Common';
 import ExecutiveOnePage from '../components/Dashboard/ExecutiveOnePage';
 import type { Project } from '../types';
+import { isClosedStatus, isHyperCareStatus } from '../utils/projectHealth';
 
 const F = 'Poppins, sans-serif';
 
@@ -34,7 +35,13 @@ export default function OnePagePage() {
   const statusOf = (p: Project) => masterCodes.find((c) => c.codeType === 'project_status' && c.codeValue === p.status);
   const statusOrder = (p: Project) => statusOf(p)?.sortOrder ?? 999;
   const q = query.trim().toLowerCase();
+  // Running projects only: Hyper Care and closed projects are left out of the list.
+  const isRunning = (p: Project) => {
+    const label = statusOf(p)?.label || '';
+    return !isHyperCareStatus(p.status, label) && !isClosedStatus(p.status, label);
+  };
   const list = [...projects]
+    .filter(isRunning)
     .filter((p) => !q || `${p.code} ${p.name} ${p.client}`.toLowerCase().includes(q))
     .sort((a, b) => statusOrder(a) - statusOrder(b) || String(a.code).localeCompare(String(b.code)));
   const selected = projects.find((p) => p.id === projectId) || null;
