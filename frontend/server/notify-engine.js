@@ -41,7 +41,7 @@ export async function loadData(sb, period) {
     safe(sb.from('budget_reports').select('project_id,period,status').eq('period', period)),
     safe(sb.from('monthly_reports').select('project_id,period,state').eq('period', period)),
     safe(sb.from('methodology_deliverables').select('id,name,active')),
-    safe(sb.from('project_deliverables').select('project_id,deliverable_id,status,due_date')),
+    safe(sb.from('project_deliverables').select('*')), // task_id may not exist yet, so take every column
     safe(sb.from('notification_rules').select('*').order('sort_order')),
     safe(sb.from('project_integrations').select('project_id,teams_webhook_url')),
     safe(sb.from('app_settings').select('key,value')),
@@ -92,8 +92,10 @@ export function buildQueue(data, { today = bangkokToday(), projectIds = null, ap
     if (r3) data.milestones.filter((m) => m.project_id === p.id && m.status !== 'paid' && m.due_date && m.due_date <= addDaysIso(today.iso, r3.days ?? 10))
       .forEach((m) => push('R3', p, pm, [], m.name, m.due_date < today.iso ? `past due (${fmt(m.due_date)}) · ${m.status}` : `due ${fmt(m.due_date)}`));
     const r4 = rule('R4');
-    if (r4) data.pDeliv.filter((d) => d.project_id === p.id && d.due_date && !['signed', 'final', 'not_required'].includes(d.status) && d.due_date <= addDaysIso(today.iso, r4.days ?? 7))
-      .forEach((d) => push('R4', p, pm, [], data.mDeliv.find((x) => x.id === d.deliverable_id)?.name || d.deliverable_id, d.due_date < today.iso ? `past due (${fmt(d.due_date)})` : `due ${fmt(d.due_date)}`));
+    // A deliverable linked to a task is due when the task ends.
+    const dueOf = (d) => (d.task_id && data.tasks.find((t) => t.id === d.task_id)?.end_date) || d.due_date;
+    if (r4) data.pDeliv.filter((d) => d.project_id === p.id && dueOf(d) && !['signed', 'final', 'not_required'].includes(d.status) && dueOf(d) <= addDaysIso(today.iso, r4.days ?? 7))
+      .forEach((d) => push('R4', p, pm, [], data.mDeliv.find((x) => x.id === d.deliverable_id)?.name || d.deliverable_id, dueOf(d) < today.iso ? `past due (${fmt(dueOf(d))})` : `due ${fmt(dueOf(d))}`));
     if (rule('R5')) data.issues.filter((i) => i.project_id === p.id && i.status === 'Blocked')
       .forEach((i) => push('R5', p, pm, [], i.title, i.assigned_to ? `owner: ${i.assigned_to}` : ''));
     const report = data.budget.find((b) => b.project_id === p.id);

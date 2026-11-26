@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Pencil, Trash2, Check, X, SlidersHorizontal } from 'lucide-react';
+import { Plus, Download, Upload, ChevronDown, ZoomIn, ZoomOut, Lock, Unlock, Sparkles, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Pencil, Trash2, Check, X, SlidersHorizontal, FileCheck2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
+import { STATUS_INFO, methodologyApi, type DeliverableStatus } from '../../services/methodology';
 import { Btn, EditableCell, Card, Modal, FormRow, Input, Select, C, ConfirmModal } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, resourceLabel, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
@@ -515,6 +516,18 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   useEffect(() => {
     setLoading(true);
     fetchTasks(projectId).finally(() => setLoading(false));
+  }, [projectId]);
+  // Methodology deliverables linked to tasks, shown as small badges next to the task name
+  const [deliverablesByTask, setDeliverablesByTask] = useState<Record<string, { deliverableId: string; name: string; status: DeliverableStatus }[]>>({});
+  useEffect(() => {
+    let alive = true;
+    void methodologyApi.taskLinks(projectId).then((links) => {
+      if (!alive) return;
+      const map: Record<string, { deliverableId: string; name: string; status: DeliverableStatus }[]> = {};
+      links.forEach((l) => { (map[l.taskId] = map[l.taskId] || []).push(l); });
+      setDeliverablesByTask(map);
+    }).catch(() => undefined);
+    return () => { alive = false; };
   }, [projectId]);
 
   useEffect(() => {
@@ -2515,6 +2528,13 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                             else handleUpdate(rowTask.id, { taskName: v });
                           }}
                         />
+                        {!isNew && (deliverablesByTask[rowTask.id] || []).map((d) => (
+                          <span key={d.deliverableId} title={`Deliverable: ${d.name} · ${STATUS_INFO[d.status]?.label || d.status} (Methodology)`}
+                            style={{ display:'inline-flex', alignItems:'center', gap:3, flexShrink:0, maxWidth:110, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                              fontSize:11, fontWeight:600, padding:'0 6px', borderRadius:999, background:STATUS_INFO[d.status]?.bg || C.bg2, color:STATUS_INFO[d.status]?.fg || C.text2 }}>
+                            <FileCheck2 size={10} style={{ flexShrink:0 }} />{d.name}
+                          </span>
+                        ))}
                       </div>
                     )}
                     {isColumnVisible('duration') && (

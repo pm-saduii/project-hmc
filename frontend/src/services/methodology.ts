@@ -15,6 +15,8 @@ export interface Methodology { phases: MethodPhase[]; steps: MethodStep[]; deliv
 export interface ProjectDeliverable {
   projectId: string; deliverableId: string; status: DeliverableStatus; owner: Owner | null;
   dueDate: string | null; completedDate: string | null; link: string; notes: string; updatedAt: string;
+  /** Task in the project plan this deliverable is produced by (due date and progress come from it). */
+  taskId?: string | null;
   /** Data of the generated sign-off document (company template). */
   form?: Record<string, unknown> | null;
 }
@@ -99,6 +101,17 @@ export const methodologyApi = {
       .upsert({ project_id: projectId, deliverable_id: deliverableId, ...snake(patch as Record<string, unknown>) }, { onConflict: 'project_id,deliverable_id' });
     if (error) throw new Error(error.message);
   },
+  /** Deliverables linked to tasks of a project (for the badge in Tasks). Empty before the link migration. */
+  taskLinks: async (projectId: string): Promise<{ taskId: string; deliverableId: string; name: string; status: DeliverableStatus }[]> => {
+    const [pd, md] = await Promise.all([
+      supabase.from('project_deliverables').select('*').eq('project_id', projectId),
+      supabase.from('methodology_deliverables').select('id,name,short_name'),
+    ]);
+    if (pd.error || md.error) return [];
+    const names = new Map((md.data || []).map((d: { id: string; name: string; short_name: string }) => [d.id, d.short_name || d.name]));
+    return (pd.data || []).filter((r: { task_id?: string | null }) => r.task_id)
+      .map((r: { task_id: string; deliverable_id: string; status: DeliverableStatus }) => ({ taskId: r.task_id, deliverableId: r.deliverable_id, name: names.get(r.deliverable_id) || r.deliverable_id, status: r.status }));
+  },
   setGate: async (projectId: string, phaseId: string, status: 'open' | 'passed', notes = '') => {
     const { error } = await supabase.from('project_phase_gates')
       .upsert({ project_id: projectId, phase_id: phaseId, status, notes }, { onConflict: 'project_id,phase_id' });
@@ -111,3 +124,38 @@ export function currentPhase(phases: MethodPhase[], gates: PhaseGate[]): MethodP
   const passed = new Set(gates.filter((g) => g.status === 'passed').map((g) => g.phaseId));
   return phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder).find((p) => !passed.has(p.id)) || null;
 }
+
+/* ── Linking deliverables to tasks ─────────────────────────────────────── */
+const WORDS_IGNORED = new Set(['the', 'and', 'of', 'for', 'to', 'a', 'an', 'in', 'on', 'with', 'by', 'doc', 'document', 'report', 'plan', '&']);
+const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9\u0E00-\u0E7F]+/g, ' ').split(' ').filter((w) => w.length > 1 && !WORDS_IGNORED.has(w));
+
+/** 0–1 likeness of a task name to a deliverable (full and short name), with a small bonus when the task's phase matches. */
+export function matchScore(d: Pick<MethodDeliverable, 'name' | 'shortName'>, phaseName: string, task: { taskName: string; phase?: string }): number {
+  const t = words(task.taskName);
+  if (!t.length) return 0;
+  const near = (w: string) => t.some((x) => x === w || (x.length > 3 && w.length > 3 && (x.startsWith(w) || w.startsWith(x))));
+  const overlap = (dw: string[]) => (dw.length ? dw.filter(near).length / Math.max(dw.length, Math.min(t.length, dw.length + 2)) : 0);
+  // A one-word short name (UAT, CSS, Training) found as a word in the task name is a strong match.
+  const short = d.shortName.trim();
+  const shortHit = /^[A-Za-z0-9]{2,}$/.test(short) && t.includes(short.toLowerCase()) ? 0.9 : 0;
+  let score = Math.max(shortHit, overlap(words(d.name)), overlap(words(d.shortName)));
+  if (score > 0 && phaseName && task.phase && words(task.phase).some((w) => words(phaseName).includes(w))) score += 0.1;
+  return Math.min(1, score);
+}
+
+/** Best task for each deliverable not linked yet (score at least `min`). */
+export function suggestLinks<T extends { id: string; taskName: string; phase?: string }>(
+  deliverables: MethodDeliverable[], phaseNameOf: (phaseId: string) => string, tasks: T[], min = 0.5,
+): Record<string, { taskId: string; score: number }> {
+  const out: Record<string, { taskId: string; score: number }> = {};
+  deliverables.forEach((d) => {
+    let best: { taskId: string; score: number } | null = null;
+    tasks.forEach((t) => {
+      const score = matchScore(d, phaseNameOf(d.phaseId), t);
+      if (score >= min && (!best || score > best.score)) best = { taskId: t.id, score };
+    });
+    if (best) out[d.id] = best;
+  });
+  return out;
+}
+

@@ -1,6 +1,6 @@
 import React from 'react';
 import toast from 'react-hot-toast';
-import { BookOpen, CheckCircle2, ChevronDown, ChevronRight, Circle, CircleDot, ExternalLink, FileBarChart, FileDown, FileText, LayoutGrid, List, Lock, PenLine, Presentation, Repeat, Timer, Wallet } from 'lucide-react';
+import { BookOpen, CheckCircle2, Link2, Wand2, ChevronDown, ChevronRight, Circle, CircleDot, ExternalLink, FileBarChart, FileDown, FileText, LayoutGrid, List, Lock, PenLine, Presentation, Repeat, Timer, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FormModal } from '../Admin/AdminUi';
 import { projectPath } from '../../utils/projectRoutes';
@@ -8,12 +8,13 @@ import SignoffFormModal from '../Documents/SignoffFormModal';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
 import type { SignoffForm } from '../../utils/companyDocs';
+import type { Task } from '../../types';
 import { Btn, C, Input, Modal } from '../Common';
 import { fmtDate } from '../../utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
 import {
-  OWNER_INFO, STATUS_INFO, currentPhase, isComplete, methodologyApi, statusesFor,
+  OWNER_INFO, STATUS_INFO, currentPhase, isComplete, methodologyApi, statusesFor, suggestLinks,
   type DeliverableStatus, type MethodDeliverable, type Methodology, type Owner, type PhaseGate, type ProjectDeliverable,
 } from '../../services/methodology';
 
@@ -42,6 +43,15 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   const members = useStore((s) => s.members);
   const fetchMembers = useStore((s) => s.fetchMembers);
   React.useEffect(() => { void fetchMembers(projectId).catch(() => undefined); }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Tasks of this project, for linking deliverables to the plan
+  const allTasks = useStore((s) => s.tasks);
+  const fetchTasks = useStore((s) => s.fetchTasks);
+  const updateTask = useStore((s) => s.updateTask);
+  const tasks = React.useMemo(() => allTasks.filter((t) => t.projectId === projectId)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || String(a.wbs).localeCompare(String(b.wbs), undefined, { numeric: true })), [allTasks, projectId]);
+  React.useEffect(() => { if (!allTasks.some((t) => t.projectId === projectId)) void fetchTasks(projectId).catch(() => undefined); }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [finishTask, setFinishTask] = React.useState<{ task: Task; date: string; deliverable: string } | null>(null);
+  const [matching, setMatching] = React.useState(false);
 
   const load = React.useCallback(async () => {
     try {
@@ -85,15 +95,29 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
     try {
       await methodologyApi.saveDeliverableState(projectId, d.id, {
         status: next.status, owner: next.owner, dueDate: next.dueDate || null, completedDate: next.completedDate || null, link: next.link, notes: next.notes,
+        ...('taskId' in patch ? { taskId: next.taskId || null } : {}),
       });
+      return true;
     } catch (e) {
       setState((s) => ({ ...s, [d.id]: prev as ProjectDeliverable }));
-      toast.error(e instanceof Error ? e.message : 'Could not save');
+      const msg = e instanceof Error ? e.message : 'Could not save';
+      toast.error(/task_id/i.test(msg) ? 'Run the migration 2026-12-02-deliverable-task-link.sql to link tasks.' : msg);
+      return false;
     }
   };
-  const changeStatus = (d: MethodDeliverable, status: DeliverableStatus) => {
+  const taskOf = (d: MethodDeliverable): Task | null => {
+    const id = state[d.id]?.taskId;
+    return id ? tasks.find((t) => t.id === id) || null : null;
+  };
+  /** Due date: the linked task's end date, else the date typed here. */
+  const dueOf = (d: MethodDeliverable) => taskOf(d)?.endDate || state[d.id]?.dueDate || '';
+  const changeStatus = async (d: MethodDeliverable, status: DeliverableStatus) => {
     const done = isComplete(status) && status !== 'not_required';
-    void save(d, { status, completedDate: done ? (state[d.id]?.completedDate || today()) : null });
+    const date = done ? (state[d.id]?.completedDate || today()) : null;
+    const ok = await save(d, { status, completedDate: date });
+    // Signed / final: offer to close the linked task too
+    const task = taskOf(d);
+    if (ok && done && date && task && task.status !== 'Done' && canWrite) setFinishTask({ task, date, deliverable: d.shortName || d.name });
   };
 
   const setGate = async (phaseId: string, pass: boolean) => {
@@ -177,16 +201,21 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                             </td>
                             <td style={cell}>
                               {canWrite ? (
-                                <select value={status} onChange={(e) => changeStatus(d, e.target.value as DeliverableStatus)} aria-label={`${d.name} status`}
+                                <select value={status} onChange={(e) => void changeStatus(d, e.target.value as DeliverableStatus)} aria-label={`${d.name} status`}
                                   style={{ ...input, width: '100%', background: info.bg, color: info.fg, fontWeight: 600, borderColor: 'transparent' }}>
                                   {statusesFor(d).map((s) => <option key={s} value={s}>{STATUS_INFO[s].label}</option>)}
                                 </select>
                               ) : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: info.bg, color: info.fg }}>{info.label}</span>}
                             </td>
                             <td style={cell}>
-                              {canWrite
-                                ? <Input type="date" value={st?.dueDate || ''} onChange={(v) => void save(d, { dueDate: v || null })} aria-label={`${d.name} due date`} style={{ minWidth: 130 }} />
-                                : fmtDate(st?.dueDate || '')}
+                              <TaskCell task={taskOf(d)} tasks={tasks} editable={canWrite} label={d.name} onChange={(taskId) => void save(d, { taskId })} />
+                            </td>
+                            <td style={cell}>
+                              {taskOf(d)?.endDate
+                                ? <span title="From the linked task — change it in Tasks">{fmtDate(taskOf(d)!.endDate)}<span style={{ display: 'block', fontSize: 11, color: C.text3 }}>from task</span></span>
+                                : canWrite
+                                  ? <Input type="date" value={st?.dueDate || ''} onChange={(v) => void save(d, { dueDate: v || null })} aria-label={`${d.name} due date`} style={{ minWidth: 130 }} />
+                                  : fmtDate(st?.dueDate || '')}
                             </td>
                             <td style={cell}>
                               {canWrite
@@ -208,6 +237,9 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Project methodology</div>
           <div style={{ fontSize: 13, color: C.text2 }}>{current ? <>Now in <strong style={{ color: '#4338CA' }}>{current.name}</strong></> : 'All phases passed'}</div>
         </div>
+        {canWrite && tasks.length > 0 && (
+          <Btn small variant="outline" onClick={() => setMatching(true)} title="Link deliverables to tasks in the plan"><Wand2 size={14} style={{ marginRight: 6 }} />Link tasks</Btn>
+        )}
         <div role="group" aria-label="View" style={{ display: 'inline-flex', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
           {([['board', 'Board', <LayoutGrid key="b" size={14} />], ['list', 'List', <List key="l" size={14} />]] as const).map(([key, label, icon]) => (
             <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}
@@ -293,8 +325,8 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                             {dels.map((d) => {
                               const info = STATUS_INFO[statusOf(d)];
                               return (
-                                <span key={d.id} title={`${d.name} · ${info.label}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: info.bg, color: info.fg, fontWeight: 600 }}>
-                                  {d.requiresSignoff && <PenLine size={10} />}{d.shortName || d.name}
+                                <span key={d.id} title={`${d.name} · ${info.label}${taskOf(d) ? ` · task ${taskOf(d)!.percentComplete || 0}%` : ''}${dueOf(d) ? ` · due ${fmtDate(dueOf(d))}` : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: info.bg, color: info.fg, fontWeight: 600 }}>
+                                  {d.requiresSignoff && <PenLine size={10} />}{d.shortName || d.name}{taskOf(d) && <Link2 size={10} aria-label="linked to a task" />}
                                 </span>
                               );
                             })}
@@ -373,11 +405,11 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
             {expanded && (
               <div style={{ borderTop: `1px solid ${C.border}` }}>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1120 }}>
                     <thead>
                       <tr>
                         <th style={head}>Deliverable</th><th style={head}>Owner</th><th style={{ ...head, width: 150 }}>Status</th>
-                        <th style={{ ...head, width: 140 }}>Due</th><th style={{ ...head, width: 140 }}>Completed</th><th style={{ ...head, width: 220 }}>Document link</th>
+                        <th style={{ ...head, width: 220 }}>Task</th><th style={{ ...head, width: 140 }}>Due</th><th style={{ ...head, width: 140 }}>Completed</th><th style={{ ...head, width: 220 }}>Document link</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -410,7 +442,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
       </>}
 
       {openStep && (
-        <FormModal title={openStep.name} subtitle={`${phases.find((p) => p.id === openStep.phaseId)?.name || ''} · led by ${openStep.owner}`} onClose={() => setStepOpen(null)} width={1000}
+        <FormModal title={openStep.name} subtitle={`${phases.find((p) => p.id === openStep.phaseId)?.name || ''} · led by ${openStep.owner}`} onClose={() => setStepOpen(null)} width={1180}
           footer={<><span style={{ marginLeft: 'auto' }} /><Btn variant="ghost" onClick={() => setStepOpen(null)}>Close</Btn></>}>
           <div style={{ fontSize: 13, color: C.text }}>{openStep.objective}</div>
           {openStep.activities.length > 0 && (
@@ -418,10 +450,10 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
           )}
           {deliverablesOfStep(openStep.id).length ? (
             <div style={{ overflowX: 'auto', border: `1px solid ${C.border}`, borderRadius: 10 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
                 <thead><tr>
                   <th style={head}>Deliverable</th><th style={head}>Owner</th><th style={{ ...head, width: 150 }}>Status</th>
-                  <th style={{ ...head, width: 140 }}>Due</th><th style={{ ...head, width: 140 }}>Completed</th><th style={{ ...head, width: 200 }}>Document link</th>
+                  <th style={{ ...head, width: 220 }}>Task</th><th style={{ ...head, width: 140 }}>Due</th><th style={{ ...head, width: 140 }}>Completed</th><th style={{ ...head, width: 200 }}>Document link</th>
                 </tr></thead>
                 <tbody>{deliverablesOfStep(openStep.id).map(rowOf)}</tbody>
               </table>
@@ -446,6 +478,41 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
             if (error) { toast.error(/column .*form/i.test(error.message) ? 'Run the migration 2026-11-28-document-forms.sql to save sign-off forms.' : error.message); return false; }
             setState((s) => ({ ...s, [signoffFor.id]: { ...(s[signoffFor.id] || { projectId, deliverableId: signoffFor.id, status: 'planned', owner: null, dueDate: null, completedDate: null, link: '', notes: '', updatedAt: '' }), form: form as unknown as Record<string, unknown> } }));
             return true;
+          }}
+        />
+      )}
+      {finishTask && (
+        <Modal title="Close the linked task?" onClose={() => setFinishTask(null)} width={460} closeOnBackdrop={false}>
+          <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px', lineHeight: 1.6 }}>
+            {finishTask.deliverable} is complete. Mark the task <strong style={{ color: C.text }}>{finishTask.task.wbs} {finishTask.task.taskName}</strong> as Done (100%, finished {fmtDate(finishTask.date)})?
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={() => setFinishTask(null)}>Not now</Btn>
+            <Btn onClick={() => {
+              const { task, date } = finishTask;
+              setFinishTask(null);
+              void updateTask(task.id, { status: 'Done', percentComplete: 100, actualFinish: date })
+                .then(() => toast.success('Task marked Done'))
+                .catch((e) => toast.error(e instanceof Error ? e.message : 'Could not update the task'));
+            }}>Mark Done</Btn>
+          </div>
+        </Modal>
+      )}
+      {matching && (
+        <LinkTasksModal
+          deliverables={phases.flatMap((p) => deliverablesOf(p.id))}
+          phaseNameOf={(id) => phases.find((p) => p.id === id)?.name || ''}
+          linked={Object.fromEntries(Object.values(state).filter((x) => x.taskId).map((x) => [x.deliverableId, x.taskId as string]))}
+          tasks={tasks}
+          onClose={() => setMatching(false)}
+          onApply={async (links) => {
+            let ok = 0;
+            for (const [deliverableId, taskId] of Object.entries(links)) {
+              const d = method.deliverables.find((x) => x.id === deliverableId);
+              if (d && await save(d, { taskId: taskId || null })) ok += 1; else break;
+            }
+            if (ok) toast.success(`${ok} deliverable${ok > 1 ? 's' : ''} updated`);
+            return ok === Object.keys(links).length;
           }}
         />
       )}
@@ -488,5 +555,91 @@ function LinkCell({ value, editable, onSave, label }: { value: string; editable:
         : <span style={{ fontSize: 13, color: C.text3 }}>—</span>}
       {editable && <button type="button" onClick={() => setEditing(true)} style={{ border: 0, background: 'transparent', color: C.primary, fontFamily: F, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{value ? 'Edit' : 'Add'}</button>}
     </span>
+  );
+}
+
+const taskLabel = (t: Task) => `${t.wbs ? `${t.wbs} ` : ''}${t.taskName}`;
+const TASK_STATUS_COLOR: Record<string, string> = { Done: '#047857', 'In Progress': '#4338CA', 'Block/Delay': '#B91C1C', Todo: '#64748B' };
+
+/** Pick the task a deliverable is produced by; shows the task's progress under it. */
+function TaskCell({ task, tasks, editable, label, onChange }: { task: Task | null; tasks: Task[]; editable: boolean; label: string; onChange: (taskId: string | null) => void }) {
+  const progress = task && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+      <div style={{ flex: 1, height: 4, borderRadius: 2, background: C.bg2, overflow: 'hidden', maxWidth: 90 }}>
+        <div style={{ width: `${Math.min(100, task.percentComplete || 0)}%`, height: '100%', background: TASK_STATUS_COLOR[task.status] || C.primary }} />
+      </div>
+      <span style={{ fontSize: 11, color: TASK_STATUS_COLOR[task.status] || C.text2, whiteSpace: 'nowrap' }}>{task.percentComplete || 0}% · {task.status}</span>
+    </div>
+  );
+  if (!editable) return task ? <div><div style={{ fontSize: 13 }}>{taskLabel(task)}</div>{progress}</div> : <span style={{ fontSize: 13, color: C.text3 }}>—</span>;
+  return (
+    <div style={{ minWidth: 0 }}>
+      <select value={task?.id || ''} onChange={(e) => onChange(e.target.value || null)} aria-label={`${label} linked task`} title={task ? taskLabel(task) : 'Not linked'}
+        style={{ height: 30, width: '100%', maxWidth: 220, border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, color: task ? C.text : C.text3, background: C.white }}>
+        <option value="">— Not linked —</option>
+        {tasks.map((t) => <option key={t.id} value={t.id}>{'\u00A0'.repeat(Math.max(0, (t.level || 0) * 2))}{taskLabel(t)}</option>)}
+      </select>
+      {progress}
+    </div>
+  );
+}
+
+/** Suggest a task for each deliverable (by name and phase); the PM checks, changes and applies. */
+function LinkTasksModal({ deliverables, phaseNameOf, linked, tasks, onClose, onApply }: {
+  deliverables: MethodDeliverable[]; phaseNameOf: (phaseId: string) => string; linked: Record<string, string>; tasks: Task[];
+  onClose: () => void; onApply: (links: Record<string, string>) => Promise<boolean>;
+}) {
+  const [onlyUnlinked, setOnlyUnlinked] = React.useState(true);
+  const suggestions = React.useMemo(() => suggestLinks(deliverables.filter((d) => !linked[d.id]), phaseNameOf, tasks), [deliverables, linked, tasks]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [choice, setChoice] = React.useState<Record<string, string>>(() => ({ ...linked, ...Object.fromEntries(Object.entries(suggestions).map(([k, v]) => [k, v.taskId])) }));
+  const [busy, setBusy] = React.useState(false);
+  const rows = deliverables.filter((d) => !onlyUnlinked || !linked[d.id]);
+  const changes = Object.fromEntries(deliverables.filter((d) => (choice[d.id] || '') !== (linked[d.id] || '')).map((d) => [d.id, choice[d.id] || '']));
+  const n = Object.keys(changes).length;
+  const cell: React.CSSProperties = { padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13, verticalAlign: 'middle' };
+  return (
+    <FormModal title="Link deliverables to tasks" subtitle="Suggested by matching names and phases — check each one before applying" onClose={onClose} busy={busy} width={860}
+      footer={<>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text2, cursor: 'pointer' }}>
+          <input type="checkbox" checked={onlyUnlinked} onChange={(e) => setOnlyUnlinked(e.target.checked)} style={{ accentColor: C.primary }} />Only deliverables not linked yet
+        </label>
+        <span style={{ marginLeft: 'auto' }} />
+        <Btn variant="ghost" onClick={onClose} disabled={busy}>Close</Btn>
+        <Btn disabled={!n || busy} onClick={() => { setBusy(true); void onApply(changes).then((ok) => { setBusy(false); if (ok) onClose(); }); }}>{busy ? 'Saving…' : `Apply ${n || ''} change${n === 1 ? '' : 's'}`}</Btn>
+      </>}>
+      {rows.length === 0 ? <div style={{ fontSize: 13, color: C.text3 }}>Every deliverable is linked.</div> : (
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>
+              {['Deliverable', 'Task', ''].map((h, i) => <th key={i} style={{ ...cell, fontSize: 11, fontWeight: 700, color: C.text2, background: '#F8FAFC', textAlign: 'left' }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {rows.map((d) => {
+                const sug = suggestions[d.id];
+                const changed = (choice[d.id] || '') !== (linked[d.id] || '');
+                return (
+                  <tr key={d.id} style={{ background: changed ? '#F8FAFF' : undefined }}>
+                    <td style={cell}>
+                      <div style={{ fontWeight: 600 }}>{d.shortName || d.name}</div>
+                      <div style={{ fontSize: 11, color: C.text3 }}>{phaseNameOf(d.phaseId)}</div>
+                    </td>
+                    <td style={{ ...cell, width: 420 }}>
+                      <select value={choice[d.id] || ''} onChange={(e) => setChoice((c) => ({ ...c, [d.id]: e.target.value }))} aria-label={`${d.name} task`}
+                        style={{ height: 30, width: '100%', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, background: C.white }}>
+                        <option value="">— Not linked —</option>
+                        {tasks.map((t) => <option key={t.id} value={t.id}>{taskLabel(t)}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ ...cell, width: 110, fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>
+                      {linked[d.id] ? (changed ? 'Change' : 'Linked') : sug && choice[d.id] === sug.taskId ? `Suggested · ${Math.round(sug.score * 100)}%` : changed ? 'New' : 'No match'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </FormModal>
   );
 }
