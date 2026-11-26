@@ -113,6 +113,14 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   };
   /** Due date: the linked task's end date, else the date typed here. */
   const dueOf = (d: MethodDeliverable) => taskOf(d)?.endDate || state[d.id]?.dueDate || '';
+  /** Finish date of the linked task once it is done (actual finish, else its end date). */
+  const taskFinishOf = (d: MethodDeliverable): string => {
+    const t = taskOf(d);
+    if (!t || !(t.status === 'Done' || (Number(t.percentComplete) || 0) >= 100)) return '';
+    return String(t.actualFinish || t.endDate || '').slice(0, 10);
+  };
+  /** Completed date: the linked task's finish date when the task is done, else the date typed here. */
+  const completedOf = (d: MethodDeliverable) => taskFinishOf(d) || state[d.id]?.completedDate || '';
   /** The phase's main task in the plan and how far the tasks under it are. */
   const phaseTaskOf = (phaseId: string): Task | null => {
     const id = gates.find((g) => g.phaseId === phaseId)?.taskId;
@@ -123,7 +131,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   const gateReady = (phaseId: string) => deliverablesOf(phaseId).every((d) => isComplete(statusOf(d))) && (phaseTasks(phaseId)?.open.length ?? 0) === 0;
   const changeStatus = async (d: MethodDeliverable, status: DeliverableStatus) => {
     const done = isComplete(status) && status !== 'not_required';
-    const date = done ? (state[d.id]?.completedDate || today()) : null;
+    const date = done ? (taskFinishOf(d) || state[d.id]?.completedDate || today()) : null;
     const ok = await save(d, { status, completedDate: date });
     // Signed / final: offer to close the linked task too
     const task = taskOf(d);
@@ -228,9 +236,11 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                                   : fmtDate(st?.dueDate || '')}
                             </td>
                             <td style={cell}>
-                              {canWrite
-                                ? <Input type="date" value={st?.completedDate || ''} onChange={(v) => void save(d, { completedDate: v || null })} aria-label={`${d.name} completed date`} style={{ minWidth: 130 }} />
-                                : fmtDate(st?.completedDate || '')}
+                              {taskFinishOf(d)
+                                ? <span title="Finish date of the linked task — change it in Tasks">{fmtDate(taskFinishOf(d))}<span style={{ display: 'block', fontSize: 11, color: C.text3 }}>from task</span></span>
+                                : canWrite
+                                  ? <Input type="date" value={st?.completedDate || ''} onChange={(v) => void save(d, { completedDate: v || null })} aria-label={`${d.name} completed date`} style={{ minWidth: 130 }} />
+                                  : fmtDate(st?.completedDate || '')}
                             </td>
                             <td style={cell}>
                               <LinkCell value={st?.link || ''} editable={canWrite} onSave={(link) => void save(d, { link })} label={d.name} />
@@ -486,7 +496,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
           phaseName={phases.find((p) => p.id === signoffFor.phaseId)?.name || ''}
           members={members.filter((m) => m.projectId === projectId)}
           saved={(state[signoffFor.id]?.form as Partial<SignoffForm> | undefined) || null}
-          signedDate={state[signoffFor.id]?.status === 'signed' ? state[signoffFor.id]?.completedDate || null : null}
+          signedDate={state[signoffFor.id]?.status === 'signed' ? completedOf(signoffFor) || null : null}
           canEdit={canWrite}
           onClose={() => setSignoffFor(null)}
           onSave={async (form) => {
