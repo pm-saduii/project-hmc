@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { Btn, EditableCell, Card, Modal, FormRow, Input, Select, C, ConfirmModal } from '../Common';
-import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, resourceInitials, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
+import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, resourceLabel, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Task, ViewMode } from '../../types';
@@ -48,7 +48,7 @@ const COLS: Array<{ id: TaskColumnId; label: string; w: number; canHide: boolean
   { id: 'percentComplete', label: '% Done',        w: 90,  canHide: true },
   { id: 'scheduleStatus',  label: 'Status',        w: 100, canHide: true },
   { id: 'effortManday',    label: 'Effort (MD)',   w: 90,  canHide: true },
-  { id: 'resource',        label: 'Resource',      w: 96,  canHide: true },
+  { id: 'resource',        label: 'Resource',      w: 120, canHide: true },
   { id: 'actions',         label: '',              w: 66,  canHide: true },
 ];
 const MIN_COLUMN_WIDTHS = [44, 220, 56, 92, 110, 110, 110, 64, 76, 72, 64, 50];
@@ -441,6 +441,8 @@ function PctCell({ value, isParent, onSave }: { value: number; isParent: boolean
 
 export default function TasksTab({ projectId, extraActions }: Props) {
   const { tasks, members, activeProject, fetchTasks, createTask, updateTask, reorderTasks, deleteTask, masterCodes } = useStore();
+  // Members of this project: their names in Resource are shown as initials.
+  const projectMembers = useMemo(() => members.filter((m) => m.projectId === projectId), [members, projectId]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView]         = useState<ViewMode>('table');
@@ -2322,7 +2324,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                 </div>
                 {!isExpanded ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: C.text2 }}>
-                    <span title={task.resource || undefined}>{task.resource ? resourceInitials(task.resource) : 'No owner'}</span>
+                    <span title={task.resource || undefined}>{task.resource ? resourceLabel(task.resource, projectMembers) : 'No owner'}</span>
                     <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
                     <span>Predecessor: {formatPredecessorInput(task, projectTasks) || '—'}</span>
                     <span>{Number(task.effortManday || 0).toFixed(3)} MD</span>
@@ -2669,7 +2671,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                       <div style={{ width:renderedColumnWidths[10], minWidth:renderedColumnWidths[10], padding:'0 6px', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
                         <EditableCell
                           value={isNew ? newRow.resource : rowTask.resource}
-                          display={isNew ? undefined : <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>{resourceInitials(rowTask.resource)}</span>}
+                          display={isNew ? undefined : resourceLabel(rowTask.resource, projectMembers)}
                           onSave={(v) => {
                             if (isNew) setNewTaskInsert((prev) => prev ? { ...prev, resource: v } : prev);
                             else handleUpdate(rowTask.id, { resource: v });
@@ -2762,7 +2764,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                     <div style={{ minWidth:0, flex:1 }}>
                       <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{task.taskName || 'Untitled task'}</div>
                       <div style={{ display:'flex', flexWrap:'wrap', gap:8, fontSize:11, color:C.text2 }}>
-                        <span title={task.resource || undefined}>{task.resource ? resourceInitials(task.resource) : 'No owner'}</span>
+                        <span title={task.resource || undefined}>{task.resource ? resourceLabel(task.resource, projectMembers) : 'No owner'}</span>
                         <span>{task.startDate ? isoToDmy(task.startDate) : 'TBD'} — {task.endDate ? isoToDmy(task.endDate) : 'TBD'}</span>
                       </div>
                       {isExpanded && (

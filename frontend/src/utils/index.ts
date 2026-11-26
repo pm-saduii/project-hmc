@@ -247,24 +247,34 @@ export const avatarColor = (name: string): string => {
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return AVT_COLORS[Math.abs(h) % AVT_COLORS.length];
 };
+/** First letter of the first and last name: "somchai khrmkrad" → "SK"; an email uses the part before @. */
+export const nameInitials = (name: string): string => {
+  const words = String(name || '').trim().split('@')[0].split(/[\s._-]+/).filter(Boolean);
+  if (!words.length) return '';
+  return `${words[0].charAt(0)}${words.length > 1 ? words[words.length - 1].charAt(0) : ''}`.toUpperCase();
+};
+
 /**
- * Short form of a task's Resource: first letter of the first and last name, e.g.
- * "somchai khrmkrad" → "SK"; an email uses the part before @ ("somchai.k@x.com" → "SK");
- * several people (comma / semicolon / slash) → "SK, NP".
+ * How a task's Resource is shown: people found in the project's member list (by name, nickname,
+ * Thai name or email) become the initials of their member name ("SK"); anything else, such as a
+ * team name typed by hand ("HMC"), is shown exactly as typed. Several people: "SK, NP".
  */
-export const resourceInitials = (resource: string): string =>
-  String(resource || '')
+export const resourceLabel = (
+  resource: string,
+  members: { name?: string; nickname?: string; thaiName?: string; email?: string }[],
+): string => {
+  const norm = (v?: string) => String(v || '').trim().toLowerCase();
+  return String(resource || '')
     .split(/[,;/]/)
-    .map((person) => {
-      const base = person.trim().split('@')[0];
-      const words = base.split(/[\s._-]+/).filter(Boolean);
-      if (!words.length) return '';
-      const first = words[0].charAt(0);
-      const last = words.length > 1 ? words[words.length - 1].charAt(0) : '';
-      return `${first}${last}`.toUpperCase();
-    })
+    .map((part) => part.trim())
     .filter(Boolean)
+    .map((person) => {
+      const key = norm(person);
+      const member = members.find((m) => [m.name, m.nickname, m.thaiName, m.email].some((v) => norm(v) && norm(v) === key));
+      return member ? nameInitials(member.name || person) || person : person;
+    })
     .join(', ');
+};
 
 export const getInitials = (name: string): string =>
   name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
