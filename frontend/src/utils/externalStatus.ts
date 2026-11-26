@@ -3,9 +3,10 @@
  * Builds the model of the company status-report engine (Implementation Hub "PSR", served from /vendor/hub)
  * from the project's tasks, milestones, issues and risks, so the HTML, PDF and PowerPoint look like the company sample.
  */
-import { addMonths, endOfMonth, format, isValid, parseISO } from 'date-fns';
+import { addMonths, endOfMonth, format, isValid, parseISO, startOfMonth } from 'date-fns';
 import { projectHealth } from './projectHealth';
-import type { Issue, Member, Milestone, Project, Risk, Task } from '../types';
+import { computeBaselineProgress } from './index';
+import type { Issue, Member, Milestone, Project, ProjectProgressSnapshot, Risk, Task } from '../types';
 import type { StatusReport } from '../services/statusReports';
 
 /* ── Half-month periods ─────────────────────────────────────────────── */
@@ -95,6 +96,8 @@ export interface ExternalInput {
   tasks: Task[]; milestones: Milestone[]; issues: Issue[]; risks: Risk[]; members: Member[];
   /** Current phase name (methodology), shown in the header. */
   phaseName: string;
+  /** Saved progress history (actual % over time) for the S-curve. */
+  snapshots?: ProjectProgressSnapshot[];
   today?: Date;
 }
 
@@ -132,18 +135,19 @@ export function buildRaw(input: ExternalInput) {
     });
   });
 
-  // Key milestones: tasks marked "Key milestone" (◆); else zero-length tasks (◆ in the Gantt); else the Milestones tab.
+  // Key milestones: project milestones from tasks (marked "Key milestone", else ◆ one-day tasks), followed by the billing milestones (Milestones tab).
   const flagged = tasks.filter((t) => t.isMilestone);
   const diamonds = flagged.length ? [] : tasks.filter((t) => t.startDate && t.endDate && t.startDate === t.endDate && !kids.has(t.id));
   const fromTasks = (flagged.length ? flagged : diamonds)
     .sort((a, b) => String(a.endDate).localeCompare(String(b.endDate)))
-    .map((t) => ({ id: `K-${t.id}`, name: t.taskName, phase: '', key: true, start: dayOf(t.startDate), end: dayOf(t.endDate), owner: '', override: '',
+    .map((t) => ({ id: `K-${t.id}`, name: t.taskName, phase: '', key: true, start: dayOf(t.startDate), end: dayOf(t.endDate), owner: '', override: '', _grp: 'project',
       _pct: isDone(t) ? 1 : Math.min(1, (Number(t.percentComplete) || 0) / 100) }));
-  const keyMs = fromTasks.length ? fromTasks : [...milestones].sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))).map((m) => {
+  const billing = [...milestones].sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))).map((m) => {
     const t = m.taskId ? tasks.find((x) => x.id === m.taskId) : undefined;
-    return { id: `K-${m.id}`, name: m.name, phase: '', key: true, start: t ? dayOf(t.startDate) : null, end: dayOf(m.dueDate) ?? (t ? dayOf(t.endDate) : null), owner: '', override: '',
+    return { id: `B-${m.id}`, name: `${m.name} · Billing`, phase: '', key: true, start: t ? dayOf(t.startDate) : null, end: dayOf(m.dueDate) ?? (t ? dayOf(t.endDate) : null), owner: '', override: '', _grp: 'billing',
       _pct: m.status === 'billed' || m.status === 'paid' ? 1 : t ? Math.min(1, (Number(t.percentComplete) || 0) / 100) : 0 };
   });
+  const keyMs = [...fromTasks, ...billing];
 
   // Highlights: the PM's text, else tasks finished in the half-month / due in the next one.
   const { start: pStart, end: pEnd } = periodRange(period);
@@ -211,8 +215,9 @@ export function computeModel(psr: PsrApi, input: ExternalInput): PsrModel {
     const s = (m.start as number | null) ?? null; const e = (m.end as number | null) ?? null;
     const planned = plannedAt(rd, s, e);
     const status: Rag = pct >= 1 ? 'Completed' : e != null && rd > e ? 'Delayed' : pct === 0 && (s == null || rd < s) ? 'Not Started' : planned - pct > TOL ? 'At Risk' : pct === 0 ? 'Not Started' : 'On Track';
-    Object.assign(m, { pct, planned, auto: status, status });
+    Object.assign(m, { pct, planned, auto: status, status, grp: src?._grp });
   });
+  (M as Record<string, unknown>).chart = chartData(input, M, rd, rdDate, health.actual);
   return M;
 }
 
@@ -227,5 +232,46 @@ export async function downloadExternalPptx(M: PsrModel): Promise<void> {
   await loadScript('/vendor/hub/status-pptx.js');
   if (!window.PSRPPTX) throw new Error('The PowerPoint engine did not load');
   await window.PSRPPTX.download(M, 'external');
+}
+
+/** Data for the "Progress Overview" page: S-curve (plan vs actual by month), phases plan vs actual, milestones by status. */
+function chartData(input: ExternalInput, M: PsrModel, rd: number, rdDate: Date, actualNow: number) {
+  const { tasks, project } = input;
+  const starts = [project.startDate, ...tasks.map((t) => t.startDate)].map((v) => (v ? parseISO(v) : null)).filter((d): d is Date => !!d && isValid(d));
+  const ends = [project.endDate, ...tasks.map((t) => t.endDate)].map((v) => (v ? parseISO(v) : null)).filter((d): d is Date => !!d && isValid(d));
+  let points: { label: string; iso: string; past: boolean }[] = [];
+  if (starts.length && ends.length) {
+    const first = startOfMonth(new Date(Math.min(...starts.map((d) => d.getTime()))));
+    const last = new Date(Math.max(...ends.map((d) => d.getTime())));
+    for (let m = first; m <= last && points.length < 60; m = addMonths(m, 1)) {
+      const end = endOfMonth(m);
+      const current = UTC(m) <= rd && rd <= UTC(end);
+      const at = current ? rdDate : end;
+      points.push({ label: format(m, 'MMM yy'), iso: format(at, 'yyyy-MM-dd'), past: UTC(at) <= rd });
+    }
+    // keep the chart readable: at most 18 points (always keep the report-date point and the last one)
+    if (points.length > 18) {
+      const step = Math.ceil(points.length / 18);
+      points = points.filter((p, i) => i % step === 0 || i === points.length - 1 || (p.past && !points[i + 1]?.past));
+    }
+  }
+  const plan = points.length ? computeBaselineProgress(tasks, points.map((p) => p.iso)).map((r) => Math.round(r.baselinePercent)) : [];
+  const snaps = [...(input.snapshots || [])].sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
+  const actual = points.map((p, i) => {
+    if (!p.past) return null;
+    const isLastPast = !points[i + 1]?.past;
+    if (isLastPast) return Math.round(actualNow);
+    const s = snaps.filter((x) => x.snapshotDate <= p.iso).pop();
+    return s ? Math.round(Number(s.actualPercent) || 0) : null;
+  });
+  const phases = ((M as Record<string, unknown>).phases as Record<string, unknown>[] || []).map((p) => ({
+    name: String(p.name), planned: Math.round((Number(p.planned) || 0) * 100), actual: Math.round((Number(p.pct) || 0) * 100), status: String(p.status),
+  }));
+  const count = (grp: string) => {
+    const c: Record<string, number> = {};
+    M.milestones.filter((m) => m.key && m.grp === grp).forEach((m) => { c[String(m.status)] = (c[String(m.status)] || 0) + 1; });
+    return c;
+  };
+  return { labels: points.map((p) => p.label), plan, actual, phases, milestones: { project: count('project'), billing: count('billing') } };
 }
 

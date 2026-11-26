@@ -169,28 +169,6 @@
     if (!iss.length) rows.push([cell(""), cell("No open items", { color: K_.mut }), cell(""), cell(""), cell("")]);
     s2.addTable(rows, { x: 0.5, y: iy, w: W - 1.0, colW: [0.35, 5.0, 0.7, 4.6, 1.68], rowH: 0.28, border: { type: "solid", pt: 0.5, color: K_.line }, fill: { color: K_.white }, margin: [3, 6, 3, 6], objectName: "Issues table" });
 
-    // ---------- 3. items for steering
-    var st = h.steerItems(M, mode);
-    if (st.length) {
-      var SPER = 5;
-      for (var p0 = 0; p0 < st.length; p0 += SPER) {
-        var part = st.slice(p0, p0 + SPER);
-        var s3 = content("Items for Steering" + (st.length > SPER ? " (" + (p0 / SPER + 1) + "/" + Math.ceil(st.length / SPER) + ")" : ""), "Status report");
-        var nd = st.filter(function (i) { return i.steer === "Decision"; }).length;
-        chip(s3, nd + "  Decision needed · ขอให้ตัดสินใจ", 0.5, 1.3, 3.4, K_.navy2);
-        chip(s3, (st.length - nd) + "  For acknowledgement · ขอให้รับทราบ", 4.05, 1.3, 3.8, "64748B");
-        var r3 = [[hdr("#", { align: "center" }), hdr("Topic"), hdr("Details / current status"), hdr("Ask from Steering"), hdr("Owner · Due")]];
-        part.forEach(function (i, k) {
-          r3.push([cell(p0 + k + 1, { align: "center", bold: true, color: K_.navy2 }),
-            { text: [{ text: i.steer.toUpperCase() + "\n", options: { fontSize: 8, bold: true, color: i.steer === "Decision" ? K_.navy2 : "64748B" } }, { text: cut(i.text, 120), options: { bold: true } }], options: { fontSize: 10.5, color: K_.ink, valign: "middle" } },
-            cell(cut(i.action, 140), { color: K_.mut, fontSize: 10 }),
-            cell(cut(i.ask || "–", 120), { bold: true, color: K_.navy, fill: { color: "EEF4FD" } }),
-            cell((i.owner || "") + "\n" + (h.fmtD(i.due) || "–"), { fontSize: 9.5 })]);
-        });
-        s3.addTable(r3, { x: 0.5, y: 1.75, w: W - 1.0, colW: [0.45, 3.75, 3.6, 3.3, 1.23], rowH: 0.72, border: { type: "solid", pt: 0.5, color: K_.line }, fill: { color: K_.white }, margin: [4, 7, 4, 7], objectName: "Steering items" });
-      }
-    }
-
     // ---------- 4. key upcoming activities (5-week look-ahead, native shapes)
     (function () {
       var s4 = content("Key Upcoming Activities", "Status report");
@@ -264,6 +242,28 @@
       if (!items.length) s4.addText("ไม่มี Activity ในช่วงนี้ – ใส่ Calendar Label (ชีท Plan คอลัมน์ X)", { x: GX, y: top + hh + 0.1, w: 6, h: 0.3, fontSize: 10, color: K_.mut, margin: 0, isTextBox: true });
     })();
 
+    // ---------- 3. items for steering
+    var st = h.steerItems(M, mode);
+    if (st.length) {
+      var SPER = 5;
+      for (var p0 = 0; p0 < st.length; p0 += SPER) {
+        var part = st.slice(p0, p0 + SPER);
+        var s3 = content("Items for Steering" + (st.length > SPER ? " (" + (p0 / SPER + 1) + "/" + Math.ceil(st.length / SPER) + ")" : ""), "Status report");
+        var nd = st.filter(function (i) { return i.steer === "Decision"; }).length;
+        chip(s3, nd + "  Decision needed · ขอให้ตัดสินใจ", 0.5, 1.3, 3.4, K_.navy2);
+        chip(s3, (st.length - nd) + "  For acknowledgement · ขอให้รับทราบ", 4.05, 1.3, 3.8, "64748B");
+        var r3 = [[hdr("#", { align: "center" }), hdr("Topic"), hdr("Details / current status"), hdr("Ask from Steering"), hdr("Owner · Due")]];
+        part.forEach(function (i, k) {
+          r3.push([cell(p0 + k + 1, { align: "center", bold: true, color: K_.navy2 }),
+            { text: [{ text: i.steer.toUpperCase() + "\n", options: { fontSize: 8, bold: true, color: i.steer === "Decision" ? K_.navy2 : "64748B" } }, { text: cut(i.text, 120), options: { bold: true } }], options: { fontSize: 10.5, color: K_.ink, valign: "middle" } },
+            cell(cut(i.action, 140), { color: K_.mut, fontSize: 10 }),
+            cell(cut(i.ask || "–", 120), { bold: true, color: K_.navy, fill: { color: "EEF4FD" } }),
+            cell((i.owner || "") + "\n" + (h.fmtD(i.due) || "–"), { fontSize: 9.5 })]);
+        });
+        s3.addTable(r3, { x: 0.5, y: 1.75, w: W - 1.0, colW: [0.45, 3.75, 3.6, 3.3, 1.23], rowH: 0.72, border: { type: "solid", pt: 0.5, color: K_.line }, fill: { color: K_.white }, margin: [4, 7, 4, 7], objectName: "Steering items" });
+      }
+    }
+
     // ---------- 5. timeline
     (function () {
       var s5 = content("Overall Project Timeline", "Status report");
@@ -301,6 +301,45 @@
         s5.addShape(pres.ShapeType.rect, { x: rx - 0.012, y: top + hh, w: 0.024, h: rowH * ph.length, fill: { color: "F2B705" }, line: { type: "none" } });
         s5.addText("Today", { shape: pres.ShapeType.roundRect, rectRadius: 0.05, x: rx - 0.3, y: top - 0.2, w: 0.6, h: 0.2, fontSize: 8, bold: true, color: K_.navy, fill: { color: "FFD34D" }, line: { type: "none" }, align: "center", valign: "middle", margin: 0 });
       }
+    })();
+
+    // ---------- 5b. progress overview (native charts: S-curve, phases plan vs actual, milestones by status)
+    if (M.chart) (function () {
+      var C = M.chart, sp = content("Progress Overview", "Status report");
+      var gap = Math.round((P.overallPlanned - P.overall) * 100);
+      var km = M.milestones.filter(function (m) { return m.key; }), kd = km.filter(function (m) { return m.status === "Completed"; }).length;
+      [["PLAN AT REPORT DATE", h.fmtP(P.overallPlanned), h.fmtD(P.rd), K_.navy2],
+       ["ACTUAL", h.fmtP(P.overall), "Overall progress", K_.blue],
+       ["GAP TO PLAN", (gap > 0 ? "−" + gap : "+" + (-gap)) + " pts", gap > 0 ? "Behind plan" : "On or ahead of plan", gap > 15 ? K_.late : gap > 5 ? K_.risk : K_.ok],
+       ["MILESTONES COMPLETED", kd + " / " + km.length, "Project and billing", K_.blue]].forEach(function (t, i) {
+        var x = 0.5 + i * 3.1; card(sp, x, 1.25, 2.95, 0.95, "KPI " + (i + 1));
+        sp.addShape(pres.ShapeType.rect, { x: x, y: 1.25, w: 0.06, h: 0.95, fill: { color: t[3] }, line: { type: "none" } });
+        sp.addText(t[0], { x: x + 0.2, y: 1.3, w: 2.7, h: 0.25, fontSize: 8.5, bold: true, color: K_.mut, charSpacing: 1, margin: 0, isTextBox: true });
+        sp.addText(t[1], { x: x + 0.2, y: 1.52, w: 2.7, h: 0.4, fontSize: 20, bold: true, color: K_.navy, margin: 0, isTextBox: true });
+        sp.addText(t[2], { x: x + 0.2, y: 1.9, w: 2.7, h: 0.25, fontSize: 9, color: K_.mut, margin: 0, isTextBox: true });
+      });
+      // S-curve
+      card(sp, 0.5, 2.35, 6.05, 3.15, "S-curve"); cardTitle(sp, 0.5, 2.35, 6.05, "Overall progress · plan vs actual");
+      var actual = C.actual.map(function (v) { return v == null ? null : v; });
+      sp.addChart(pres.ChartType.line, [{ name: "Plan", labels: C.labels, values: C.plan }, { name: "Actual", labels: C.labels, values: actual }],
+        { x: 0.6, y: 2.75, w: 5.85, h: 2.7, chartColors: ["9FB8DA", "1B4F8F"], lineSize: 2, lineDataSymbol: "circle", lineDataSymbolSize: 5,
+          valAxisMinVal: 0, valAxisMaxVal: 100, valAxisLabelFormatCode: '0"%"', valAxisLabelFontSize: 8, catAxisLabelFontSize: 8, valGridLine: { color: "E6ECF3", size: 0.5 },
+          showLegend: true, legendPos: "t", legendFontSize: 8, displayBlanksAs: "gap", objectName: "S-curve chart" });
+      // phases plan vs actual
+      var ph = C.phases.slice(0, 10);
+      card(sp, 6.75, 2.35, 6.08, 3.15, "Phases"); cardTitle(sp, 6.75, 2.35, 6.08, "Phase progress · actual vs plan");
+      if (ph.length) sp.addChart(pres.ChartType.bar, [{ name: "Plan", labels: ph.map(function (p) { return cut(p.name, 26); }), values: ph.map(function (p) { return p.planned; }) },
+          { name: "Actual", labels: ph.map(function (p) { return cut(p.name, 26); }), values: ph.map(function (p) { return p.actual; }) }],
+        { x: 6.85, y: 2.75, w: 5.9, h: 2.7, barDir: "bar", barGrouping: "clustered", chartColors: ["9FB8DA", "1B4F8F"], catAxisOrientation: "maxMin",
+          valAxisMinVal: 0, valAxisMaxVal: 100, valAxisLabelFormatCode: '0"%"', valAxisLabelFontSize: 8, catAxisLabelFontSize: 8, valGridLine: { color: "E6ECF3", size: 0.5 },
+          showLegend: true, legendPos: "t", legendFontSize: 8, showValue: false, objectName: "Phase chart" });
+      // milestones by status (stacked)
+      card(sp, 0.5, 5.65, 12.33, 1.35, "Milestones by status"); cardTitle(sp, 0.5, 5.65, 12.33, "Milestones by status");
+      var ST = h.STATUS, cats = ["Project milestones", "Billing milestones"], mc = [C.milestones.project || {}, C.milestones.billing || {}];
+      sp.addChart(pres.ChartType.bar, ST.map(function (st) { return { name: st, labels: cats, values: mc.map(function (c) { return c[st] || 0; }) }; }),
+        { x: 0.6, y: 5.95, w: 12.1, h: 1.02, barDir: "bar", barGrouping: "stacked", chartColors: ST.map(function (st) { return SC[st] || K_.ns; }), catAxisOrientation: "maxMin",
+          valAxisHidden: true, valGridLine: { style: "none" }, catAxisLabelFontSize: 9, showLegend: true, legendPos: "r", legendFontSize: 8,
+          showValue: true, dataLabelColor: "FFFFFF", dataLabelFontSize: 8, dataLabelFormatCode: '0;;;', objectName: "Milestone chart" });
     })();
 
     // ---------- 6. key milestones (12 rows per column, 24 per slide)
@@ -1160,7 +1199,11 @@
       zip.file(part, themeXml(x));
       Object.keys(zip.files).forEach(function (n) { if (zip.files[n].dir) delete zip.files[n]; });
       var jobs = Object.keys(zip.files).filter(function (n) { return /\.xml$/.test(n); }).map(function (n) {
-        return zip.file(n).async("string").then(function (s) { if (s.indexOf('<c:crossesAt val="autoZero"/>') >= 0) zip.file(n, s.split('<c:crossesAt val="autoZero"/>').join('<c:crosses val="autoZero"/>')); });
+        return zip.file(n).async("string").then(function (s) {
+          var t = s.split('<c:crossesAt val="autoZero"/>').join('<c:crosses val="autoZero"/>')
+            .replace(/<c:pt idx="\d+"><c:v><\/c:v><\/c:pt>/g, "");   // empty chart points = gaps (S-curve actual after the report date)
+          if (t !== s) zip.file(n, t);
+        });
       });
       return Promise.all(jobs).then(function () { return zip; });
     });

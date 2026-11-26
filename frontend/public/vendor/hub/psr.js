@@ -881,6 +881,56 @@
     return h + footer(M, mode, n) + "</section>";
   }
 
+  // ---------- Progress overview: S-curve plan vs actual · phases plan vs actual · milestones by status
+  var HEX = { "Completed": "#2f6fde", "On Track": "#2e9e6b", "At Risk": "#e0a100", "Delayed": "#d64545", "Not Started": "#94a3b8" };
+  function pageProgress(M, mode, n) {
+    var C = M.chart, P = M.P;
+    var h = '<section class="page">' + header(M, mode, "Progress Overview");
+    // KPI strip
+    var gap = Math.round((P.overallPlanned - P.overall) * 100);
+    var km = M.milestones.filter(function (m) { return m.key; }), kd = km.filter(function (m) { return m.status === "Completed"; }).length;
+    h += '<div class="hero h5" style="grid-template-columns:repeat(4,1fr)">' +
+      '<div class="tile"><div class="tl-k">Plan at report date</div><div class="big">' + fmtP(P.overallPlanned) + '</div><div class="tl-s">' + fmtD(P.rd) + "</div></div>" +
+      '<div class="tile t-prog"><div class="tl-k">Actual</div><div class="big">' + fmtP(P.overall) + '</div><div class="tl-s">Overall progress</div></div>' +
+      '<div class="tile ' + (gap > 15 ? "t-late" : gap > 5 ? "t-risk" : "t-ok") + '"><div class="tl-k">Gap to plan</div><div class="big">' + (gap > 0 ? "−" + gap : "+" + (-gap)) + '<small> pts</small></div><div class="tl-s">' + (gap > 0 ? "Behind plan" : "On or ahead of plan") + "</div></div>" +
+      '<div class="tile t-done"><div class="tl-k">Milestones completed</div><div class="big">' + kd + '<small> / ' + km.length + '</small></div><div class="tl-s">Project and billing</div></div></div>';
+    // S-curve (SVG)
+    var Wd = 520, Ht = 250, L = 36, R = 24, T = 12, B = 30, iw = Wd - L - R, ih = Ht - T - B, N = C.labels.length;
+    var x = function (i) { return L + (N <= 1 ? iw / 2 : i * iw / (N - 1)); }, y = function (v) { return T + ih - v / 100 * ih; };
+    var svg = '<svg viewBox="0 0 ' + Wd + " " + Ht + '" width="100%" style="display:block">';
+    [0, 25, 50, 75, 100].forEach(function (g) { svg += '<line x1="' + L + '" x2="' + (Wd - R) + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="#e6ecf3"/><text x="' + (L - 6) + '" y="' + (y(g) + 3) + '" font-size="9" text-anchor="end" fill="#8796ab">' + g + "%</text>"; });
+    var every = Math.max(1, Math.ceil(N / 9));
+    C.labels.forEach(function (lb, i) { if (i % every === 0 || i === N - 1) svg += '<text x="' + x(i) + '" y="' + (Ht - 10) + '" font-size="9" text-anchor="middle" fill="#8796ab">' + esc(lb) + "</text>"; });
+    var path = function (arr) { var d = "", on = false; arr.forEach(function (v, i) { if (v == null) { on = false; return; } d += (on ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1) + " "; on = true; }); return d; };
+    svg += '<path d="' + path(C.plan) + '" fill="none" stroke="#9fb8da" stroke-width="2.5" stroke-dasharray="6 4"/>';
+    svg += '<path d="' + path(C.actual) + '" fill="none" stroke="#1b4f8f" stroke-width="3"/>';
+    C.actual.forEach(function (v, i) { if (v != null) svg += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="3.5" fill="#1b4f8f"/>'; });
+    var li = -1; C.actual.forEach(function (v, i) { if (v != null) li = i; });
+    if (li >= 0) svg += '<text x="' + (x(li) + 6) + '" y="' + (y(C.actual[li]) - 6) + '" font-size="11" font-weight="700" fill="#0f2a4a">' + C.actual[li] + "%</text>";
+    svg += "</svg>";
+    var legend = '<div class="stack-l" style="margin:0 0 4px"><span><i style="background:#9fb8da"></i>Plan</span><span><i style="background:#1b4f8f"></i>Actual</span></div>';
+    // phases plan vs actual
+    var ph = C.phases.slice(0, 10).map(function (p) {
+      return '<div style="display:grid;grid-template-columns:150px 1fr 74px;gap:8px;align-items:center;margin:0 0 7px">' +
+        '<div class="clamp" style="font-weight:600;font-size:11.5px">' + esc(p.name) + "</div>" +
+        '<div><div style="height:7px;border-radius:4px;background:#e3e9f1;position:relative;margin-bottom:3px"><div style="position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#9fb8da;width:' + p.planned + '%"></div></div>' +
+        '<div style="height:9px;border-radius:5px;background:#e3e9f1;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:' + (HEX[p.status] || "#1b4f8f") + ";width:" + p.actual + '%"></div></div></div>' +
+        '<div style="font-size:10.5px;color:var(--mut);text-align:right">' + p.actual + "% <span style=\"color:var(--soft)\">/ " + p.planned + "%</span></div></div>";
+    }).join("") || '<div class="muted">No phases</div>';
+    h += '<div class="cols2"><div class="card">' + title("Overall progress · plan vs actual") + legend + svg + '</div><div class="card">' + title("Phase progress · actual vs plan") +
+      '<div class="stack-l" style="margin:0 0 8px"><span><i style="background:#9fb8da"></i>Plan at report date</span><span><i style="background:#1b4f8f"></i>Actual (colour = status)</span></div>' + ph + "</div></div>";
+    // milestones by status (project vs billing)
+    var bar = function (label, c) {
+      var tot = 0; STATUS.forEach(function (s) { tot += c[s] || 0; });
+      return '<div style="display:grid;grid-template-columns:150px 1fr 60px;gap:10px;align-items:center;margin:0 0 8px"><b style="font-size:12px">' + label + '</b>' +
+        (tot ? '<div class="stack">' + STATUS.map(function (s) { return c[s] ? '<span class="' + SCLASS[s] + '" style="flex:' + c[s] + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">' + c[s] + "</span>" : ""; }).join("") + "</div>"
+          : '<div class="muted" style="font-size:11px">None</div>') + '<div style="font-size:11px;color:var(--mut);text-align:right">' + tot + " total</div></div>";
+    };
+    h += '<div class="card">' + title("Milestones by status") + bar("Project milestones", C.milestones.project || {}) + bar("Billing milestones", C.milestones.billing || {}) +
+      '<div class="stack-l">' + STATUS.map(function (s) { return '<span><i class="' + SCLASS[s] + '"></i>' + s + "</span>"; }).join("") + "</div></div>";
+    return h + footer(M, mode, n) + "</section>";
+  }
+
   function pageMilestones(M, mode, n) {
     var keyMs = M.milestones.filter(function (m) { return m.key; });
     var half = Math.ceil(keyMs.length / 2);
@@ -1742,9 +1792,12 @@
     if (mode === "cr") return renderCR(M);
     if (mode === "docs") return renderDocs(M);
     mode = mode === "internal" ? "internal" : "external";
-    var pages = [pageSummary];
+    // order: summary · upcoming activities · steering · timeline · progress overview (charts) · key milestones
+    var pages = [pageSummary, pageCalendar];
     if (steerItems(M, mode).length) pages.push(pageSteering);
-    pages.push(pageCalendar, pageTimeline, pageMilestones);
+    pages.push(pageTimeline);
+    if (M.chart) pages.push(pageProgress);
+    pages.push(pageMilestones);
     if (mode === "internal") pages.push(pageBilling, pageActivities);
     return '<div class="psr ' + mode + '">' + pages.map(function (f, i) { return f(M, mode, i + 1); }).join("") + "</div>";
   }

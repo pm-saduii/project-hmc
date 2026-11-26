@@ -41,6 +41,7 @@ export default function ExternalStatusPage() {
   const milestones = useStore((s) => s.milestones);
   const issues = useStore((s) => s.issues);
   const risks = useStore((s) => s.risks);
+  const snapshots = useStore((s) => s.projectProgressSnapshots);
 
   const [query, setQuery] = React.useState('');
   const [states, setStates] = React.useState<Record<string, StatusReport>>({});
@@ -84,7 +85,7 @@ export default function ExternalStatusPage() {
     const s = useStore.getState();
     if (s.activeProject?.id !== selected.id) s.setActiveProject(selected);
     void Promise.allSettled([
-      s.fetchTasks(selected.id), s.fetchMilestones(selected.id), s.fetchIssues(selected.id), s.fetchRisks(selected.id),
+      s.fetchTasks(selected.id), s.fetchMilestones(selected.id), s.fetchIssues(selected.id), s.fetchRisks(selected.id), s.fetchProjectProgressSnapshots(selected.id),
       memberApi.getByProject(selected.id).then((r) => { if (alive) setMembers(r.data); }),
       Promise.all([methodologyApi.load(), methodologyApi.projectState(selected.id)]).then(([m, st]) => {
         if (alive) setPhaseName(currentPhase(m.phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder), st.gates)?.name || labelOf(selected));
@@ -107,8 +108,8 @@ export default function ExternalStatusPage() {
   const model = React.useMemo(() => {
     if (!ready || !selected || !window.PSR) return null;
     const mine = <T extends { projectId: string }>(xs: T[]) => xs.filter((x) => x.projectId === selected.id);
-    return computeModel(window.PSR, { project: selected, period, record, tasks: mine(tasks), milestones: mine(milestones), issues: mine(issues), risks: mine(risks), members, phaseName });
-  }, [ready, selected, period, record, tasks, milestones, issues, risks, members, phaseName]);
+    return computeModel(window.PSR, { project: selected, period, record, tasks: mine(tasks), milestones: mine(milestones), issues: mine(issues), risks: mine(risks), members, phaseName, snapshots: mine(snapshots) });
+  }, [ready, selected, period, record, tasks, milestones, issues, risks, members, phaseName, snapshots]);
   const html = React.useMemo(() => (model && window.PSR ? window.PSR.fullDocument(model, 'external') : ''), [model]);
 
   // Fit the 1123px report pages to the available width
