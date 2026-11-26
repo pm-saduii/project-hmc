@@ -31,6 +31,8 @@ export default function BudgetControlPage() {
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [members, setMembers] = React.useState<Member[]>([]);
   const [reports, setReports] = React.useState<BudgetReport[]>([]);
+  const [reportsPeriod, setReportsPeriod] = React.useState('');
+  const autoAdvanced = React.useRef(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
   const [search, setSearch] = React.useState('');
@@ -42,7 +44,7 @@ export default function BudgetControlPage() {
   const [printing, setPrinting] = React.useState(false);
 
   const loadReports = React.useCallback(async () => {
-    try { setReports(await budgetReportApi.listForPeriod(period)); setError(''); }
+    try { setReports(await budgetReportApi.listForPeriod(period)); setReportsPeriod(period); setError(''); }
     catch (e) { setError(e instanceof Error ? e.message : 'Unable to load reports'); }
   }, [period]);
   React.useEffect(() => {
@@ -74,6 +76,14 @@ export default function BudgetControlPage() {
     })
     .filter((r) => r.snap.budget > 0 || r.report);
   const finishedCount = allRows.filter((r) => r.finished).length;
+  // On first load: when every running project's report for last month is already approved, open the next month.
+  React.useEffect(() => {
+    if (autoAdvanced.current || loading || reportsPeriod !== period || period !== defaultPeriod()) return;
+    autoAdvanced.current = true;
+    const active = allRows.filter((r) => !r.finished);
+    const next = shiftPeriod(period, 1);
+    if (active.length && active.every((r) => r.report?.status === 'approved') && next <= thisMonth) setPeriod(next);
+  });
   const rows = allRows
     .filter((r) => showFinished || !r.finished)
     .filter((r) => !search.trim() || `${r.project.code} ${r.project.name} ${r.project.customerAbbreviation} ${r.pmName}`.toLowerCase().includes(search.trim().toLowerCase()))
