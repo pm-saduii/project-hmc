@@ -1,6 +1,6 @@
 import React from 'react';
 import toast from 'react-hot-toast';
-import { differenceInCalendarDays, format } from 'date-fns';
+import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText } from 'lucide-react';
 import { Btn, C } from '../components/Common';
 import { AdminHeader, F, FormModal, Pill, SearchBox, panel, td, th } from '../components/Admin/AdminUi';
@@ -90,7 +90,6 @@ export default function BudgetControlPage() {
     .sort((a, b) => String(a.project.code).localeCompare(String(b.project.code)));
 
   const due = dueDateOf(period);
-  const daysToDue = differenceInCalendarDays(due, new Date());
   const statusOf = (r: Row): BudgetStatus | 'none' => r.report?.status || 'none';
   const counts = rows.reduce<Record<string, number>>((acc, r) => { const s = statusOf(r); acc[s] = (acc[s] || 0) + 1; return acc; }, {});
   const waitingOnMe = (r: Row) => (role === 'pm' && ['none', 'draft', 'returned'].includes(statusOf(r)))
@@ -119,8 +118,8 @@ export default function BudgetControlPage() {
           <span style={{ fontSize: 13, fontWeight: 600, color: C.text, minWidth: 120, textAlign: 'center' }}>{periodLabel(period)}</span>
           <button type="button" aria-label="Next month" disabled={period >= thisMonth} onClick={() => setPeriod(shiftPeriod(period, 1))} style={navBtn(period >= thisMonth)}><ChevronRight size={16} /></button>
         </div>
-        <span style={{ fontSize: 13, color: daysToDue < 0 ? '#B91C1C' : C.text2 }}>
-          Due {format(due, 'dd/MM/yyyy')} · {daysToDue > 0 ? `in ${daysToDue} day${daysToDue > 1 ? 's' : ''}` : daysToDue === 0 ? 'today' : `${-daysToDue} day${daysToDue < -1 ? 's' : ''} overdue`}
+        <span style={{ fontSize: 13, color: C.text2 }}>
+          Due {format(due, 'dd/MM/yyyy')}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['none', 'draft', 'returned', 'submitted', 'reviewed', 'approved'] as const).filter((s) => counts[s]).map((s) => (
@@ -167,7 +166,6 @@ export default function BudgetControlPage() {
                       const pct = r.snap.budget ? Math.round((r.snap.usedToDate / r.snap.budget) * 100) : 0;
                       const over = pct - r.snap.progress;
                       const s = BUDGET_STATUS[statusOf(r)];
-                      const late = daysToDue < 0 && ['none', 'draft', 'returned'].includes(statusOf(r));
                       return (
                         <tr key={r.project.id} onClick={() => setOpenId(r.project.id)} style={{ cursor: 'pointer', background: picked.has(r.project.id) ? C.primaryBg : waitingOnMe(r) ? '#FFFBEB' : undefined }}>
                           <td style={td} onClick={(e) => e.stopPropagation()}>
@@ -190,7 +188,6 @@ export default function BudgetControlPage() {
                           </td>
                           <td style={td}>
                             <Pill bg={s.bg} fg={s.fg}>{s.label}</Pill>
-                            {late && <div style={{ fontSize: 11, color: '#B91C1C', marginTop: 2 }}>Overdue</div>}
                             {waitingOnMe(r) && <div style={{ fontSize: 11, color: '#B45309', marginTop: 2 }}>Waiting for you</div>}
                           </td>
                           <td style={{ ...td, textAlign: 'right' }}><Btn small variant="outline" onClick={() => setOpenId(r.project.id)}>Open</Btn></td>
