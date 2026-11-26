@@ -19,11 +19,19 @@ const noop = () => undefined;
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const OnePagePage = lazy(() => import('./pages/OnePagePage'));
+const BudgetControlPage = lazy(() => import('./pages/BudgetControlPage'));
+const MethodologyPage = lazy(() => import('./pages/MethodologyPage'));
 const EmailLogsPage = lazy(() => import('./pages/EmailLogsPage'));
 const SettingsLayout = lazy(() => import('./pages/admin/settings/SettingsLayout'));
 const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
 const TimesheetModal = lazy(() => import('./components/Timesheet/TimesheetModal'));
 const SystemNotesModal = lazy(() => import('./components/SystemNotes/SystemNotesModal'));
+
+/** Budget Control is for admins, PMs, account managers and directors. */
+function BudgetGuard({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth();
+  return ['admin', 'pm', 'am', 'director'].includes(profile?.role || '') ? <>{children}</> : <ForbiddenPage />;
+}
 
 function OnePageGuard({ children }: { children: React.ReactNode }) {
   const permissions = useRolePermissions();
@@ -114,6 +122,8 @@ export default function App() {
           <Route index element={portfolio('dashboard')} />
           <Route path="one-page" element={<OnePageGuard>{page(<OnePagePage />)}</OnePageGuard>} />
           <Route path="one-page/:projectId" element={<OnePageGuard>{page(<OnePagePage />)}</OnePageGuard>} />
+          <Route path="budget" element={<BudgetGuard>{page(<BudgetControlPage />)}</BudgetGuard>} />
+          <Route path="methodology" element={page(<MethodologyPage />)} />
           <Route path="projects" element={portfolio('projects')} />
           <Route path="projects/:projectId/*" element={page(<ProjectPage />)} />
           <Route path="my-tasks" element={page(<MyTasksPage />)} />

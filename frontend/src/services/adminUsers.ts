@@ -32,17 +32,19 @@ export interface UserPatch {
 
 export const ROLE_INFO: Record<UserRole, { label: string; description: string; bg: string; fg: string }> = {
   admin: { label: 'Admin', description: 'Everything, including users and system settings', bg: '#EEF2FF', fg: '#4338CA' },
+  director: { label: 'Director', description: 'Sees every project; approves the monthly Budget Control', bg: '#F3E8FF', fg: '#6B21A8' },
+  am: { label: 'Account Manager', description: 'Follows customer accounts; reviews the monthly Budget Control', bg: '#FFEDD5', fg: '#9A3412' },
   pm: { label: 'PM', description: 'Runs projects and writes the monthly report', bg: '#E0F2FE', fg: '#0369A1' },
   member: { label: 'Member', description: 'Works on the projects they belong to', bg: '#F1F5F9', fg: '#334155' },
   client: { label: 'Client', description: 'Customer user; read-only by default', bg: '#FEF3C7', fg: '#92400E' },
 };
-export const ROLE_ORDER: UserRole[] = ['admin', 'pm', 'member', 'client'];
+export const ROLE_ORDER: UserRole[] = ['admin', 'director', 'am', 'pm', 'member', 'client'];
 
 /** Screen access a role gets when no custom permissions are set. */
 export function roleDefaultScreens(role: UserRole): UserScreenPermissions {
   const defaults = getPermissionsByRole(role);
   const visible = new Set<string>([...defaults.visibleProjectTabs, ...(defaults.canViewPortfolioOverview ? ['portfolio-overview'] : [])]);
-  const readOnly = role === 'client';
+  const readOnly = role === 'client' || role === 'director' || role === 'am';
   return Object.fromEntries(USER_SCREEN_OPTIONS.map((s) => [s.id, visible.has(s.id) ? (readOnly ? 'read' : 'full') : 'hidden'])) as UserScreenPermissions;
 }
 

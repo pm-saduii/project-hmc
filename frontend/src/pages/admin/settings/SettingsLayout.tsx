@@ -8,6 +8,7 @@ import type { ProjectChecklistTopic } from '../../../utils/projectChecklist';
 import { SETTINGS_GROUPS, findSection } from './sections';
 import LookupListPage from './LookupListPage';
 import ChecklistTopicsPage from './ChecklistTopicsPage';
+import MethodologySettingsPage from './MethodologySettingsPage';
 import TaskTemplateModal from '../../../components/Setup/TaskTemplateModal';
 
 const noop = () => undefined;
@@ -58,6 +59,7 @@ export default function SettingsLayout() {
       <main style={{ flex: '999 1 560px', minWidth: 0, padding: '24px 32px 32px 8px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {section.kind === 'lookup' && <LookupListPage key={section.path} section={section} />}
         {section.kind === 'checklist' && <ChecklistTopicsPage key={section.path} section={section} topics={topics} onChanged={reloadTopics} />}
+        {section.kind === 'methodology' && <MethodologySettingsPage key={section.path} mode={section.mode} eyebrow={`Settings › ${section.group}`} />}
         {section.kind === 'templates' && <>
           <div style={{ fontSize: 11, color: C.text2, marginBottom: -8 }}>Settings › {section.group} · {section.description}</div>
           <TaskTemplateModal inline only="templates" onClose={noop} />

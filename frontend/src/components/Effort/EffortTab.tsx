@@ -7,6 +7,7 @@ import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { Card, Btn, Modal, FormRow, Input, Select, ConfirmModal, ProgressBar, C, TH, TD } from '../Common';
 import { fmtMoney, fmtMonth } from '../../utils';
 import type { Effort } from '../../types';
+import { STANDARD_LINES, standardLineOf } from '../../utils/budgetControl';
 import { format, addMonths, subMonths } from 'date-fns';
 
 interface Props {
@@ -130,6 +131,18 @@ export default function EffortTab({ projectId, extraActions }: Props) {
   // Mask amounts based on role permissions
   const displayBudgetAmt = permissions.getMaskedAmount(tBudAmt);
 
+  // Budget Control exports to the company template by these standard lines.
+  const missingStandard = STANDARD_LINES.filter((l) => !efforts.some((e) => e.projectId === projectId && standardLineOf(e.module)?.code === l.code));
+  const [addingStandard, setAddingStandard] = React.useState(false);
+  const addStandardLines = async () => {
+    setAddingStandard(true);
+    try {
+      for (const line of missingStandard) await createEffort({ projectId, module: line.name, budgetManday: 0, budgetAmount: 0 } as Partial<Effort>);
+      toast.success(`${missingStandard.length} standard budget line(s) added — fill in their man-days`);
+    } catch { toast.error('Could not add the standard lines'); }
+    finally { setAddingStandard(false); }
+  };
+
   const handleSave = async (form: Partial<Effort>) => {
     try {
       if (form.id) { await updateEffort(form.id, form); toast.success('Task updated'); }
@@ -183,6 +196,12 @@ export default function EffortTab({ projectId, extraActions }: Props) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
         <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
           {extraActions}
+          {missingStandard.length > 0 && (
+            <Btn variant="ghost" onClick={() => void addStandardLines()} disabled={addingStandard} small style={{ width: isMobile ? '100%' : 'auto' }}
+              title={`Add the ${missingStandard.length} Budget Control template lines this project does not have yet`}>
+              {addingStandard ? 'Adding…' : 'Add standard budget lines'}
+            </Btn>
+          )}
           <Btn variant="ghost" onClick={() => setPhaseSummaryOpen(true)} small style={{ width: isMobile ? '100%' : 'auto' }}>Phase Summary</Btn>
           <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Task</Btn>
         </div>

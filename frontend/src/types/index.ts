@@ -246,7 +246,7 @@ export type ViewMode = 'table' | 'split' | 'gantt' | 'kanban';
 export type ProjectStatus = Project['status'];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export type UserRole = 'admin' | 'pm' | 'member' | 'client';
+export type UserRole = 'admin' | 'director' | 'am' | 'pm' | 'member' | 'client';
 
 export interface Profile {
   id: string;

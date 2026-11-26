@@ -7,7 +7,8 @@ export interface LookupSection {
 }
 export interface ChecklistSection { kind: 'checklist'; path: string; label: string; category: ProjectChecklistCategoryId; description: string }
 export interface TemplatesSection { kind: 'templates'; path: string; label: string; description: string }
-export type SettingsSection = LookupSection | ChecklistSection | TemplatesSection;
+export interface MethodologySection { kind: 'methodology'; path: string; label: string; mode: 'phases' | 'deliverables'; description: string }
+export type SettingsSection = LookupSection | ChecklistSection | TemplatesSection | MethodologySection;
 
 export const SETTINGS_GROUPS: { title: string; sections: SettingsSection[] }[] = [
   {
@@ -25,6 +26,13 @@ export const SETTINGS_GROUPS: { title: string; sections: SettingsSection[] }[] =
       { kind: 'lookup', path: 'work-systems', label: 'Work Systems', codeType: 'work_system', noun: 'work system',
         description: 'Systems or modules that group the Setup and Data Migration checklists.',
         usage: [{ table: 'project_checklist_topics', column: 'work_system', label: 'checklist topic' }] },
+    ],
+  },
+  {
+    title: 'Methodology',
+    sections: [
+      { kind: 'methodology', path: 'methodology/phases', label: 'Phases & Gates', mode: 'phases', description: 'The phases of the implementation methodology and their gates.' },
+      { kind: 'methodology', path: 'methodology/deliverables', label: 'Deliverables', mode: 'deliverables', description: 'Documents each phase delivers, with their templates.' },
     ],
   },
   {

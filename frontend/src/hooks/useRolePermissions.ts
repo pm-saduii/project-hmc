@@ -24,7 +24,9 @@ export function useRolePermissions(): RolePermissions & {
     if (Array.isArray(customScreens)) return new Set(customScreens).has(screenId) ? 'full' : 'hidden';
     if (customScreens) return customScreens[screenId] || 'hidden';
     if (screenId === 'portfolio-overview') return permissions.canViewPortfolioOverview ? 'full' : 'hidden';
-    return isRoleTabVisible(screenId, role) ? 'full' : 'hidden';
+    // Directors and account managers only read project screens by default (the database enforces it too).
+    const roleLevel: ScreenAccessLevel = role === 'director' || role === 'am' ? 'read' : 'full';
+    return isRoleTabVisible(screenId, role) ? roleLevel : 'hidden';
   };
   const visibleProjectTabs = USER_SCREEN_IDS
     .filter((screenId) => screenId !== 'portfolio-overview' && getScreenAccess(screenId) !== 'hidden');

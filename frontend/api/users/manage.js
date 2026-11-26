@@ -4,7 +4,7 @@ const USER_SCREEN_IDS = [
   'portfolio-overview', 'tasks', 'summary', 'members', 'ms', 'effort', 'checklists',
   'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'lessons',
 ];
-const ROLES = ['admin', 'pm', 'member', 'client'];
+const ROLES = ['admin', 'director', 'am', 'pm', 'member', 'client'];
 
 export default async function handler(req, res) {
   if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
@@ -50,7 +50,8 @@ export default async function handler(req, res) {
     const role = req.body?.role;
     if (!email || !fullName || !ROLES.includes(role)) return res.status(400).json({ error: 'INVALID_INVITE_DETAILS' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'INVALID_EMAIL' });
-    if (role !== 'admin') {
+    // Admins and directors need not be in a project member list; everyone else must be.
+    if (!['admin', 'director'].includes(role)) {
       const { data: member, error: memberError } = await supabase
         .from('members')
         .select('type')
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
       if (memberError) return res.status(500).json({ error: memberError.message });
       if (!member) return res.status(400).json({ error: 'EMAIL_NOT_ALLOWED' });
       // Customer contacts can only be clients; internal staff can be members or PMs.
-      const allowed = member.type === 'client' ? ['client'] : ['member', 'pm'];
+      const allowed = member.type === 'client' ? ['client'] : ['member', 'pm', 'am', 'director'];
       if (!allowed.includes(role)) return res.status(400).json({ error: 'ROLE_TYPE_MISMATCH' });
     }
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
@@ -68,14 +69,15 @@ export default async function handler(req, res) {
       ...(req.headers.origin ? { redirectTo: `${req.headers.origin}/` } : {}),
     });
     if (error) return res.status(400).json({ error: error.message });
-    if (role === 'admin' && data.user) {
+    // Sign-up only creates member / client profiles, so set any other role here (service role).
+    if (!['member', 'client'].includes(role) && data.user) {
       const { error: profileError } = await supabase.from('profiles').upsert({
         id: data.user.id,
         email,
         full_name: fullName,
-        role: 'admin',
+        role,
         is_active: true,
-        project_access_scope: 'all',
+        project_access_scope: role === 'admin' || role === 'director' ? 'all' : 'member',
         screen_permissions: null,
       }, { onConflict: 'id' });
       if (profileError) {

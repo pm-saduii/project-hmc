@@ -3,7 +3,7 @@
  * Centralized configuration for controlling visibility and access by user role
  */
 
-export type UserRole = 'admin' | 'pm' | 'member' | 'client';
+export type UserRole = 'admin' | 'director' | 'am' | 'pm' | 'member' | 'client';
 
 export interface RolePermissions {
   /** Tab IDs that this role can see in ProjectDetail */
@@ -40,6 +40,18 @@ export const USER_SCREEN_IDS = USER_SCREEN_OPTIONS.map((screen) => screen.id);
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
     visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'checklists', 'lessons', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    maskFinancialAmounts: false,
+    canViewPortfolioOverview: true,
+  },
+  // Director: sees money and approves the monthly Budget Control report; read-only on project screens.
+  director: {
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'checklists', 'lessons', 'cr', 'issues', 'risks', 'activities', 'env', 'onepage', 'report'],
+    maskFinancialAmounts: false,
+    canViewPortfolioOverview: true,
+  },
+  // Account Manager: reviews the monthly Budget Control report; read-only on project screens.
+  am: {
+    visibleProjectTabs: ['tasks', 'summary', 'members', 'ms', 'effort', 'checklists', 'lessons', 'cr', 'issues', 'risks', 'activities', 'onepage', 'report'],
     maskFinancialAmounts: false,
     canViewPortfolioOverview: true,
   },

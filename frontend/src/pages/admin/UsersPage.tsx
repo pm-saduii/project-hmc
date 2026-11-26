@@ -199,7 +199,7 @@ function InvitePanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       </>}>
       <label style={fieldLabel}>Full name<input value={name} onChange={(e) => setName(e.target.value)} style={input} autoFocus /></label>
       <label style={fieldLabel}>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} />
-        <span style={hint}>Except admins, the email must already be in a project's member list.</span>
+        <span style={hint}>Except admins and directors, the email must already be in a project's member list.</span>
       </label>
       <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <legend style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 6 }}>Role</legend>

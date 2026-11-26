@@ -31,7 +31,7 @@ const TAB_LOADERS = [
   () => import('../Table/TasksTab'), () => import('./ProjectSummaryTab'), () => import('../Members/MembersTab'),
   () => import('../Milestones/MilestonesTab'), () => import('../Effort/EffortTab'), () => import('../ChangeRequest/ChangeRequestTab'),
   () => import('../Issues/IssuesTab'), () => import('../RiskRegister/RiskRegisterTab'), () => import('../Activities/ActivitiesTab'),
-  () => import('./ProjectEnvironmentTab'), () => import('./LessonsLearnedTab'),
+  () => import('./ProjectEnvironmentTab'), () => import('./LessonsLearnedTab'), () => import('../Deliverables/DeliverablesTab'),
 ];
 let tabsPreloaded = false;
 function preloadTabs() {
@@ -50,6 +50,7 @@ const RiskRegisterTab = React.lazy(() => import('../RiskRegister/RiskRegisterTab
 const ActivitiesTab = React.lazy(() => import('../Activities/ActivitiesTab'));
 const ProjectEnvironmentTab = React.lazy(() => import('./ProjectEnvironmentTab'));
 const LessonsLearnedTab = React.lazy(() => import('./LessonsLearnedTab'));
+const DeliverablesTab = React.lazy(() => import('../Deliverables/DeliverablesTab'));
 
 interface Props { project: Project; }
 type CopyScope = 'tasks' | 'members' | 'ms' | 'effort' | 'risks';
@@ -574,7 +575,7 @@ export default function ProjectDetail({ project }: Props) {
   const requestedSub = requestedGroup?.subs.find((sub) => sub.key === subParam);
   const shownGroup = requestedSub ? requestedGroup! : (requestedGroup ?? visibleGroups[0]);
   const shownSub = requestedSub ?? shownGroup?.subs[0];
-  const activeTab = !shownSub ? '' : shownSub.key === 'settings' ? 'settings' : shownSub.screen;
+  const activeTab = !shownSub ? '' : shownSub.key === 'settings' || shownSub.key === 'deliverables' ? shownSub.key : shownSub.screen;
   const pathFor = (group: string, sub: string) => `/projects/${encodeURIComponent(project.id)}/${group}/${sub}`;
   useEffect(() => {
     // Missing, unknown or hidden screen in the URL: show the first allowed one instead.
@@ -864,6 +865,7 @@ export default function ProjectDetail({ project }: Props) {
             </div>
           </div>
         )}
+        {activeTab === 'deliverables' && <div style={{ height: '100%', overflowY: 'auto' }}><DeliverablesTab key={project.id} projectId={project.id} /></div>}
         {activeTab === 'lessons' && <div style={{ height: '100%', overflow: 'hidden' }}><LessonsLearnedTab key={project.id} project={project} /></div>}
         {activeTab === 'cr'      && <div style={{ height: '100%', overflowY: 'auto' }}><ChangeRequestTab  projectId={project.id} /></div>}
         {activeTab === 'issues'  && <div style={{ height: '100%', overflowY: 'auto' }}><IssuesTab         projectId={project.id} /></div>}
