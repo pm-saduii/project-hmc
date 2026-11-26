@@ -11,7 +11,7 @@ import { taskApi } from '../../services/api';
 import type { SignoffForm } from '../../utils/companyDocs';
 import type { Task } from '../../types';
 import { Btn, C, Input, Modal } from '../Common';
-import { fmtDate } from '../../utils';
+import { compareWbs, fmtDate } from '../../utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
 import {
@@ -49,7 +49,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   const fetchTasks = useStore((s) => s.fetchTasks);
   const updateTask = useStore((s) => s.updateTask);
   const tasks = React.useMemo(() => allTasks.filter((t) => t.projectId === projectId)
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || String(a.wbs).localeCompare(String(b.wbs), undefined, { numeric: true })), [allTasks, projectId]);
+    .sort((a, b) => compareWbs(String(a.wbs || ''), String(b.wbs || '')) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0)), [allTasks, projectId]);
   React.useEffect(() => { if (!allTasks.some((t) => t.projectId === projectId)) void fetchTasks(projectId).catch(() => undefined); }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [finishTask, setFinishTask] = React.useState<{ task: Task; date: string; deliverable: string } | null>(null);
   const [matching, setMatching] = React.useState(false);
@@ -612,6 +612,11 @@ function LinkCell({ value, editable, onSave, label }: { value: string; editable:
 }
 
 const taskLabel = (t: Task) => `${t.wbs ? `${t.wbs} ` : ''}${t.taskName}`;
+/** Dropdown option in WBS order, indented by depth (1 · 1.1 · 1.1.1). */
+const taskOption = (t: Task) => {
+  const depth = Math.max(0, String(t.wbs || '').split('.').filter(Boolean).length - 1);
+  return <option key={t.id} value={t.id}>{'\u00A0\u00A0\u00A0'.repeat(depth)}{taskLabel(t)}</option>;
+};
 const TASK_STATUS_COLOR: Record<string, string> = { Done: '#047857', 'In Progress': '#4338CA', 'Block/Delay': '#B91C1C', Todo: '#64748B' };
 
 /** Pick the task a deliverable is produced by; shows the task's progress under it. */
@@ -630,7 +635,7 @@ function TaskCell({ task, tasks, editable, label, onChange }: { task: Task | nul
       <select value={task?.id || ''} onChange={(e) => onChange(e.target.value || null)} aria-label={`${label} linked task`} title={task ? taskLabel(task) : 'Not linked'}
         style={{ height: 30, width: '100%', maxWidth: 220, border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, color: task ? C.text : C.text3, background: C.white }}>
         <option value="">— Not linked —</option>
-        {tasks.map((t) => <option key={t.id} value={t.id}>{'\u00A0'.repeat(Math.max(0, (t.level || 0) * 2))}{taskLabel(t)}</option>)}
+        {tasks.map(taskOption)}
       </select>
       {progress}
     </div>
@@ -685,7 +690,7 @@ function LinkTasksModal({ deliverables, phaseNameOf, linked, phases, phaseLinked
                     <select value={phaseChoice[p.id] || ''} onChange={(e) => setPhaseChoice((c) => ({ ...c, [p.id]: e.target.value }))} aria-label={`${p.name} main task`}
                       style={{ height: 30, width: '100%', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, background: C.white }}>
                       <option value="">— Not linked —</option>
-                      {mainTasks.map((t) => <option key={t.id} value={t.id}>{taskLabel(t)}</option>)}
+                      {mainTasks.map(taskOption)}
                     </select>
                   </td>
                   <td style={{ ...cell, width: 110, fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>
@@ -718,7 +723,7 @@ function LinkTasksModal({ deliverables, phaseNameOf, linked, phases, phaseLinked
                       <select value={choice[d.id] || ''} onChange={(e) => setChoice((c) => ({ ...c, [d.id]: e.target.value }))} aria-label={`${d.name} task`}
                         style={{ height: 30, width: '100%', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, background: C.white }}>
                         <option value="">— Not linked —</option>
-                        {tasks.map((t) => <option key={t.id} value={t.id}>{taskLabel(t)}</option>)}
+                        {tasks.map(taskOption)}
                       </select>
                     </td>
                     <td style={{ ...cell, width: 110, fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>
