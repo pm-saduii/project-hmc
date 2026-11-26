@@ -9,7 +9,7 @@ import { useStore } from '../store';
 import { effortApi, memberApi, taskApi } from '../services/api';
 import { BUDGET_STATUS, budgetReportApi, type BudgetReport, type BudgetStatus } from '../services/budgetReports';
 import {
-  buildBudgetSnapshot, defaultPeriod, dueDateOf, exportBudgetPdf, exportBudgetXlsx, periodLabel, shiftPeriod, usedToDate, type BudgetSnapshot,
+  buildBudgetSnapshot, defaultPeriod, dueDateOf, exportBudgetPdf, exportBudgetPdfs, exportBudgetXlsx, type BudgetPdfArgs, periodLabel, shiftPeriod, usedToDate, type BudgetSnapshot,
 } from '../utils/budgetControl';
 import { isClosedStatus, isHyperCareStatus, projectHealth } from '../utils/projectHealth';
 import type { Effort, Member, Project, Task } from '../types';
@@ -37,6 +37,9 @@ export default function BudgetControlPage() {
   const [openId, setOpenId] = React.useState('');
   // Finished projects (Hyper Care, closed, or 100% complete) are hidden unless asked for.
   const [showFinished, setShowFinished] = React.useState(false);
+  // Projects ticked for "Print selected" (one PDF, one project per page)
+  const [picked, setPicked] = React.useState<Set<string>>(new Set());
+  const [printing, setPrinting] = React.useState(false);
 
   const loadReports = React.useCallback(async () => {
     try { setReports(await budgetReportApi.listForPeriod(period)); setError(''); }
@@ -83,6 +86,16 @@ export default function BudgetControlPage() {
   const waitingOnMe = (r: Row) => (role === 'pm' && ['none', 'draft', 'returned'].includes(statusOf(r)))
     || (role === 'am' && statusOf(r) === 'submitted') || (role === 'director' && statusOf(r) === 'reviewed');
   const open = rows.find((r) => r.project.id === openId) || null;
+  const pickedRows = rows.filter((r) => picked.has(r.project.id));
+  const allPicked = rows.length > 0 && pickedRows.length === rows.length;
+  const toggle = (id: string) => setPicked((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const printSelected = async () => {
+    if (!pickedRows.length) return;
+    setPrinting(true);
+    try { await exportBudgetPdfs(pickedRows.map(pdfArgsOf)); }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'PDF export failed'); }
+    finally { setPrinting(false); }
+  };
 
   const noTable = /relation|schema cache/i.test(error);
 
@@ -116,26 +129,40 @@ export default function BudgetControlPage() {
               <input type="checkbox" checked={showFinished} onChange={(e) => setShowFinished(e.target.checked)} style={{ accentColor: C.primary }} />
               Show finished projects{finishedCount ? ` (${finishedCount})` : ''}
             </label>
+            <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+              {pickedRows.length > 0 && <button type="button" onClick={() => setPicked(new Set())} style={{ border: 0, background: 'transparent', color: C.text2, fontSize: 13, cursor: 'pointer', padding: 0 }}>Clear</button>}
+              <Btn small onClick={() => void printSelected()} disabled={!pickedRows.length || printing}>
+                <FileText size={14} style={{ marginRight: 6 }} />{printing ? 'Creating PDF…' : `Print selected${pickedRows.length ? ` (${pickedRows.length})` : ''}`}
+              </Btn>
+            </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
               <thead>
                 <tr>
+                  <th style={{ ...th, width: 36 }}>
+                    <input type="checkbox" aria-label="Select all projects" checked={allPicked} disabled={!rows.length}
+                      ref={(el) => { if (el) el.indeterminate = pickedRows.length > 0 && !allPicked; }}
+                      onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map((r) => r.project.id)))} style={{ accentColor: C.primary }} />
+                  </th>
                   <th style={th}>Project</th><th style={th}>PM</th><th style={{ ...th, textAlign: 'right' }}>Budget (MD)</th>
                   <th style={{ ...th, textAlign: 'right' }}>Used in month</th><th style={{ ...th, textAlign: 'right' }}>Used to date</th>
                   <th style={th}>Used vs progress</th><th style={th}>Status</th><th style={{ ...th, width: 90 }}><span style={{ position: 'absolute', left: -9999 }}>Open</span></th>
                 </tr>
               </thead>
               <tbody>
-                {loading ? <tr><td colSpan={8} style={{ ...td, color: C.text2 }}>Loading…</td></tr>
-                  : rows.length === 0 ? <tr><td colSpan={8} style={{ ...td, color: C.text2 }}>No projects with a man-day budget. Set budgets in each project's Plan › Effort.</td></tr>
+                {loading ? <tr><td colSpan={9} style={{ ...td, color: C.text2 }}>Loading…</td></tr>
+                  : rows.length === 0 ? <tr><td colSpan={9} style={{ ...td, color: C.text2 }}>No projects with a man-day budget. Set budgets in each project's Plan › Effort.</td></tr>
                     : rows.map((r) => {
                       const pct = r.snap.budget ? Math.round((r.snap.usedToDate / r.snap.budget) * 100) : 0;
                       const over = pct - r.snap.progress;
                       const s = BUDGET_STATUS[statusOf(r)];
                       const late = daysToDue < 0 && ['none', 'draft', 'returned'].includes(statusOf(r));
                       return (
-                        <tr key={r.project.id} onClick={() => setOpenId(r.project.id)} style={{ cursor: 'pointer', background: waitingOnMe(r) ? '#FFFBEB' : undefined }}>
+                        <tr key={r.project.id} onClick={() => setOpenId(r.project.id)} style={{ cursor: 'pointer', background: picked.has(r.project.id) ? C.primaryBg : waitingOnMe(r) ? '#FFFBEB' : undefined }}>
+                          <td style={td} onClick={(e) => e.stopPropagation()}>
+                            <input type="checkbox" aria-label={`Select ${r.project.code}`} checked={picked.has(r.project.id)} onChange={() => toggle(r.project.id)} style={{ accentColor: C.primary }} />
+                          </td>
                           <td style={td}>
                             <div style={{ fontWeight: 600 }}>{r.project.code}{r.project.customerAbbreviation ? ` (${r.project.customerAbbreviation})` : ''}</div>
                             <div style={{ fontSize: 11, color: C.text2 }}>{r.project.name}{r.finished && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.text2, background: C.bg2, padding: '0 6px', borderRadius: 999 }}>Finished</span>}</div>
@@ -170,6 +197,12 @@ export default function BudgetControlPage() {
     </div>
   );
 }
+
+/** PDF data for one row: PM (and signature) and Project Advisor come from Members. */
+const pdfArgsOf = (r: Row): BudgetPdfArgs => ({
+  snapshot: r.snap, project: r.project, pmName: r.pm?.name || r.pmName, status: BUDGET_STATUS[r.report?.status || 'none'].label,
+  preparedAt: r.report?.preparedAt || null, pmSignature: r.pm?.signature || '', advisorName: r.advisorName,
+});
 
 const navBtn = (disabled: boolean): React.CSSProperties => ({ width: 28, height: 28, border: 0, background: 'transparent', color: disabled ? C.border2 : C.text2, cursor: disabled ? 'default' : 'pointer', display: 'grid', placeItems: 'center' });
 
@@ -209,10 +242,7 @@ function ReportModal({ row, period, role, onClose, onChanged }: { row: Row; peri
 
   const doPdf = async () => {
     try {
-      await exportBudgetPdf({
-        snapshot: snap, project, pmName: row.pm?.name || pmName, status: BUDGET_STATUS[status].label,
-        preparedAt: report?.preparedAt || null, pmSignature: row.pm?.signature || '', advisorName: row.advisorName,
-      });
+      await exportBudgetPdf(pdfArgsOf(row));
     } catch (e) { toast.error(e instanceof Error ? e.message : 'PDF export failed'); }
   };
 

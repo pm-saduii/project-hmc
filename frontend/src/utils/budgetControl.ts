@@ -142,21 +142,56 @@ export async function exportBudgetXlsx(args: {
  * PDF of the report in the layout of the company template: project details, one row per budget
  * line with man-days used per month, totals, accumulated use against progress, and the three sign-offs.
  */
-export async function exportBudgetPdf(args: {
+export interface BudgetPdfArgs {
   snapshot: BudgetSnapshot; project: Project; pmName: string; status: string;
   preparedAt: string | null;
   /** Project Manager signature from Members (PNG data URL). */
   pmSignature?: string;
   /** Project Advisor from Members ("Reviewed / Approved By"); no signature. */
   advisorName?: string;
-}): Promise<void> {
-  const { snapshot: s, project } = args;
+}
+
+/** One project's report as a PDF. */
+export async function exportBudgetPdf(args: BudgetPdfArgs): Promise<void> {
+  await exportBudgetPdfs([args], `Project Budget control report ${args.project.code || args.project.name} ${args.snapshot.period.replace('-', '')}.pdf`);
+}
+
+/** Several projects' reports in one PDF, each project starting on a new page. */
+export async function exportBudgetPdfs(list: BudgetPdfArgs[], fileName?: string): Promise<void> {
+  if (!list.length) return;
   const [{ default: JsPDF }, { default: autoTable }, { ensurePoppinsFont, hasThai }] = await Promise.all([
     import('jspdf'), import('jspdf-autotable'), import('./pdfFont'),
   ]);
   const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   // Poppins like the app; Sarabun only for text with Thai letters (Poppins has none).
-  const { latin: font, thai: thaiFont, fontFor } = await ensurePoppinsFont(doc);
+  const fonts = await ensurePoppinsFont(doc);
+  const W = doc.internal.pageSize.getWidth();
+  const generated = format(new Date(), 'dd/MM/yyyy HH:mm');
+  list.forEach((args, i) => {
+    if (i > 0) doc.addPage();
+    const first = doc.getNumberOfPages();
+    (doc as unknown as { lastAutoTable?: unknown }).lastAutoTable = undefined;
+    drawBudgetReport(doc, autoTable as never, fonts, hasThai, args);
+    // Footer numbered within each project
+    const last = doc.getNumberOfPages();
+    for (let p = first; p <= last; p += 1) {
+      doc.setPage(p); doc.setFont(fonts.latin, 'normal'); doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
+      doc.text(`${args.project.code || args.project.name} · Generated ${generated} · Page ${p - first + 1} of ${last - first + 1}`, W - 12, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
+    }
+    doc.setPage(last);
+  });
+  doc.save(fileName || `Project Budget control report ${list[0].snapshot.period.replace('-', '')} (${list.length} projects).pdf`);
+}
+
+function drawBudgetReport(
+  doc: import('jspdf').jsPDF,
+  autoTable: (d: import('jspdf').jsPDF, o: Record<string, unknown>) => void,
+  fonts: { latin: string; thai: string; fontFor: (t: unknown) => string },
+  hasThai: (t: unknown) => boolean,
+  args: BudgetPdfArgs,
+): void {
+  const { snapshot: s, project } = args;
+  const { latin: font, thai: thaiFont, fontFor } = fonts;
   const thaiCells = (data: { cell: { text: string[]; styles: { font?: string } } }) => { if (hasThai(data.cell.text.join(' '))) data.cell.styles.font = thaiFont; };
   const W = doc.internal.pageSize.getWidth();
   const navy: [number, number, number] = [19, 40, 76];
@@ -271,10 +306,4 @@ export async function exportBudgetPdf(args: {
     doc.text(`${b.role} · Date ${b.date ? format(new Date(b.date), 'dd/MM/yyyy') : '____/____/______'}`, cx, y + 31, { align: 'center' });
   });
 
-  const pages = doc.getNumberOfPages();
-  for (let i = 1; i <= pages; i += 1) {
-    doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
-    doc.text(`Generated ${format(new Date(), 'dd/MM/yyyy HH:mm')} · Page ${i} of ${pages}`, W - 12, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
-  }
-  doc.save(`Project Budget control report ${project.code || project.name} ${s.period.replace('-', '')}.pdf`);
 }
