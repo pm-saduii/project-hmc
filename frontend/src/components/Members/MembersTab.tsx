@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Avatar, Modal, FormRow, Input, Select, Textarea, ConfirmModal, C, TH, TD } from '../Common';
 import { roleColor } from '../../utils';
+import { imageFileToPng } from '../../utils/imagePng';
 import type { Member, Profile, UserRole } from '../../types';
 import { updateUserRole } from '../../services/api';
 import { supabase } from '../../services/supabase';
@@ -163,8 +164,9 @@ export default function MembersTab({ projectId, extraActions }: Props) {
         if (form.email) await syncMemberEmail(form.email);
       }
       setModal(null);
-    } catch {
-      toast.error('Failed to save');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      toast.error(/signature/i.test(msg) ? 'Run the migration 2026-12-01-member-signature.sql to save signatures.' : 'Failed to save');
     }
   };
 
@@ -362,6 +364,11 @@ export default function MembersTab({ projectId, extraActions }: Props) {
 function MemberModal({ data, currentUserRole, onClose, onSave }: { data: Partial<Member>; currentUserRole: UserRole; onClose: () => void; onSave: (f: Partial<Member>) => void }) {
   const [form, setForm] = useState<Partial<Member>>({ name: '', thaiName: '', nickname: '', role: '', position: '', email: '', tel: '', ext: '', type: 'internal', notes: '', ...data });
   const up = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+  const isPm = /project manager/i.test(form.role ?? '') && form.type !== 'client';
+  const pickSignature = async (file?: File | null) => {
+    if (!file) return;
+    try { up('signature', await imageFileToPng(file, 600, 200)); } catch { toast.error('That image could not be read'); }
+  };
   return (
     <Modal title={form.id ? 'Edit Member' : 'Add Member'} onClose={onClose} width={520}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -393,6 +400,23 @@ function MemberModal({ data, currentUserRole, onClose, onSave }: { data: Partial
       <FormRow label="Tel"><Input type="tel" value={form.tel ?? ''} onChange={v => up('tel', formatPhoneNumber(v))} placeholder="+66-81-234-5678" /></FormRow>
       <FormRow label="Ext"><Input value={form.ext ?? ''} onChange={v => up('ext', v.replace(/[^0-9]/g, '').slice(0, 6))} placeholder="e.g. 123" /></FormRow>
       <FormRow label="Notes"><Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional remarks…" /></FormRow>
+      {isPm && (
+        <FormRow label="Signature">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 180, height: 60, border: `1px dashed ${C.border2}`, borderRadius: 8, background: '#fff', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+              {form.signature
+                ? <img src={form.signature} alt="Signature" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                : <span style={{ fontSize: 11, color: C.text3 }}>No signature</span>}
+            </div>
+            <label style={{ fontSize: 13, color: C.primary, fontWeight: 600, cursor: 'pointer' }}>
+              {form.signature ? 'Change' : 'Upload'}
+              <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={(e) => { void pickSignature(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+            {form.signature && <button type="button" onClick={() => up('signature', '')} style={{ border: 0, background: 'transparent', color: C.text2, fontSize: 13, cursor: 'pointer', padding: 0 }}>Remove</button>}
+          </div>
+          <div style={{ fontSize: 11, color: C.text3, marginTop: 6 }}>Shown under "Prepared By" on the Budget Control report. A PNG with a transparent background looks best.</div>
+        </FormRow>
+      )}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={() => { if (!form.name?.trim()) return; onSave(form); }}>Save</Btn>

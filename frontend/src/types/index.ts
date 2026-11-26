@@ -113,6 +113,7 @@ export interface Member {
   ext: string;
   type: 'internal' | 'client';
   notes: string;         // ← new
+  signature?: string;    // PNG data URL; used for the Project Manager on reports
 }
 
 export interface Milestone {

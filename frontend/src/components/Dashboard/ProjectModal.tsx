@@ -5,6 +5,7 @@ import { taskApi } from '../../services/api';
 import { supabase } from '../../services/supabase';
 import { Modal, FormRow, Input, Select, Textarea, Btn, C } from '../Common';
 import type { Project } from '../../types';
+import { imageFileToPng } from '../../utils/imagePng';
 
 const COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EC4899','#EF4444','#8B5CF6','#F97316'];
 
@@ -89,7 +90,7 @@ export default function ProjectModal({ project, onClose, inline = false }: Props
   const pickLogo = async (file: File | undefined) => {
     if (!file) return;
     if (!/^image\/(png|jpe?g|svg\+xml|webp|gif)$/.test(file.type)) { toast.error('Choose a PNG, JPG, SVG or WebP image'); return; }
-    try { setLogo(await logoToPng(file)); } catch { toast.error('That image could not be read'); }
+    try { setLogo(await imageFileToPng(file, 600, 240)); } catch { toast.error('That image could not be read'); }
   };
 
   const up = <K extends keyof ProjectForm>(key: K, value: ProjectForm[K]) => {
@@ -276,26 +277,4 @@ export default function ProjectModal({ project, onClose, inline = false }: Props
       </div>
     </Modal>
   );
-}
-
-/** Read an image file and return a PNG data URL no larger than 600 × 240 px (keeps the project record small). */
-function logoToPng(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, 600 / (img.naturalWidth || 600), 240 / (img.naturalHeight || 240));
-      const w = Math.max(1, Math.round((img.naturalWidth || 600) * scale));
-      const h = Math.max(1, Math.round((img.naturalHeight || 240) * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no canvas')); return; }
-      ctx.drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/png'));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
-    img.src = url;
-  });
 }

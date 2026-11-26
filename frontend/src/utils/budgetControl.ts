@@ -144,7 +144,11 @@ export async function exportBudgetXlsx(args: {
  */
 export async function exportBudgetPdf(args: {
   snapshot: BudgetSnapshot; project: Project; pmName: string; status: string;
-  preparedAt: string | null; reviewedName: string; reviewedAt: string | null; approvedName: string; approvedAt: string | null;
+  preparedAt: string | null;
+  /** Project Manager signature from Members (PNG data URL). */
+  pmSignature?: string;
+  /** Project Advisor from Members ("Reviewed / Approved By"); no signature. */
+  advisorName?: string;
 }): Promise<void> {
   const { snapshot: s, project } = args;
   const [{ default: JsPDF }, { default: autoTable }, { ensurePoppinsFont, hasThai }] = await Promise.all([
@@ -234,23 +238,37 @@ export async function exportBudgetPdf(args: {
     didParseCell: thaiCells,
   });
 
-  // Sign-offs
+  // Sign-offs: Prepared By (Project Manager, with signature) · Reviewed / Approved By (Project Advisor) ·
+  // Reviewed By (Account Manager, name left blank to fill in by hand).
+  const BH = 34;
   let y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 150) + 5;
-  if (y > doc.internal.pageSize.getHeight() - 32) { doc.addPage(); y = 20; }
-  const boxes: [string, string, string, string | null][] = [
-    ['Prepared By', 'Project Manager', args.preparedAt ? args.pmName : '', args.preparedAt],
-    ['Reviewed By', 'Account Manager', args.reviewedName, args.reviewedAt],
-    ['Approved By', 'Director', args.approvedName, args.approvedAt],
+  if (y > doc.internal.pageSize.getHeight() - BH - 10) { doc.addPage(); y = 20; }
+  const boxes: { title: string; role: string; name: string; signature?: string; date: string | null }[] = [
+    { title: 'Prepared By', role: 'Project Manager', name: args.pmName, signature: args.pmSignature, date: args.preparedAt },
+    { title: 'Reviewed / Approved By', role: 'Project Advisor', name: args.advisorName || '', date: null },
+    { title: 'Reviewed By', role: 'Account Manager', name: '', date: null },
   ];
   const bw = (W - 24 - 16) / 3;
-  boxes.forEach(([title, role, name, at], i) => {
+  boxes.forEach((b, i) => {
     const x = 12 + i * (bw + 8);
-    doc.setDrawColor(203, 213, 225); doc.roundedRect(x, y, bw, 24, 2, 2);
-    doc.setFont(font, 'bold'); doc.setFontSize(8.5); doc.setTextColor(...navy); doc.text(title, x + 4, y + 6);
-    doc.setFont(fontFor(name), 'normal'); doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.text(name || '—', x + bw / 2, y + 14, { align: 'center' });
-    doc.setFont(font, 'normal');
-    doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-    doc.text(`${role}${at ? ` · ${format(new Date(at), 'dd/MM/yyyy')}` : ' · pending'}`, x + bw / 2, y + 20, { align: 'center' });
+    const cx = x + bw / 2;
+    doc.setDrawColor(203, 213, 225); doc.setLineWidth(0.2); doc.roundedRect(x, y, bw, BH, 2, 2);
+    doc.setFont(font, 'bold'); doc.setFontSize(8.5); doc.setTextColor(...navy); doc.text(b.title, x + 4, y + 6);
+    // Signature area (image fitted into 50 × 12 mm) above a signing line
+    if (b.signature && b.signature.startsWith('data:image/')) {
+      try {
+        const p = doc.getImageProperties(b.signature);
+        const k = Math.min(50 / p.width, 12 / p.height);
+        const w = p.width * k; const h = p.height * k;
+        doc.addImage(b.signature, 'PNG', cx - w / 2, y + 20 - h, w, h);
+      } catch { /* unreadable image: leave the line empty */ }
+    }
+    doc.setDrawColor(148, 163, 184); doc.setLineWidth(0.15); doc.line(cx - 30, y + 21, cx + 30, y + 21);
+    const name = b.name.trim();
+    doc.setFont(fontFor(name), 'normal'); doc.setFontSize(9.5); doc.setTextColor(30, 41, 59);
+    doc.text(name ? `( ${name} )` : '( ...................................................... )', cx, y + 26, { align: 'center' });
+    doc.setFont(font, 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
+    doc.text(`${b.role} · Date ${b.date ? format(new Date(b.date), 'dd/MM/yyyy') : '____/____/______'}`, cx, y + 31, { align: 'center' });
   });
 
   const pages = doc.getNumberOfPages();

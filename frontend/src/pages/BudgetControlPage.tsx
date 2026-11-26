@@ -17,7 +17,7 @@ import type { Effort, Member, Project, Task } from '../types';
 const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 });
 const when = (v: string | null) => (v ? format(new Date(v), 'dd/MM/yyyy') : '');
 
-interface Row { project: Project; report: BudgetReport | null; snap: BudgetSnapshot; pmName: string; frozen: boolean; finished: boolean }
+interface Row { project: Project; report: BudgetReport | null; snap: BudgetSnapshot; pmName: string; pm: Member | null; advisorName: string; frozen: boolean; finished: boolean }
 
 /** /budget — the monthly Budget Control report: PM prepares, Account Manager reviews, Director approves (due by the 5th). */
 export default function BudgetControlPage() {
@@ -55,7 +55,9 @@ export default function BudgetControlPage() {
   React.useEffect(() => { void loadReports(); }, [loadReports]);
 
   const statusLabel = (p: Project) => masterCodes.find((c) => c.codeType === 'project_status' && c.codeValue === p.status)?.label || '';
-  const pmOf = (p: Project) => members.find((m) => m.projectId === p.id && /project manager/i.test(m.role) && m.type !== 'client')?.name || '';
+  const pmMemberOf = (p: Project) => members.find((m) => m.projectId === p.id && /project manager/i.test(m.role) && m.type !== 'client') || null;
+  const pmOf = (p: Project) => pmMemberOf(p)?.name || '';
+  const advisorOf = (p: Project) => members.find((m) => m.projectId === p.id && /project advisor/i.test(m.role) && m.type !== 'client')?.name || '';
 
   const allRows: Row[] = projects
     .map((project) => {
@@ -65,7 +67,7 @@ export default function BudgetControlPage() {
       const snap = frozen ? report!.snapshot! : buildBudgetSnapshot(project, efforts.filter((e) => e.projectId === project.id), period, actual);
       const label = statusLabel(project);
       const finished = isClosedStatus(project.status, label) || isHyperCareStatus(project.status, label) || actual >= 100;
-      return { project, report, snap, pmName: report?.preparedName || pmOf(project), frozen, finished };
+      return { project, report, snap, pmName: report?.preparedName || pmOf(project), pm: pmMemberOf(project), advisorName: advisorOf(project), frozen, finished };
     })
     .filter((r) => r.snap.budget > 0 || r.report);
   const finishedCount = allRows.filter((r) => r.finished).length;
@@ -208,9 +210,8 @@ function ReportModal({ row, period, role, onClose, onChanged }: { row: Row; peri
   const doPdf = async () => {
     try {
       await exportBudgetPdf({
-        snapshot: snap, project, pmName, status: BUDGET_STATUS[status].label,
-        preparedAt: report?.preparedAt || null, reviewedName: report?.reviewedName || '', reviewedAt: report?.reviewedAt || null,
-        approvedName: report?.approvedName || '', approvedAt: report?.approvedAt || null,
+        snapshot: snap, project, pmName: row.pm?.name || pmName, status: BUDGET_STATUS[status].label,
+        preparedAt: report?.preparedAt || null, pmSignature: row.pm?.signature || '', advisorName: row.advisorName,
       });
     } catch (e) { toast.error(e instanceof Error ? e.message : 'PDF export failed'); }
   };
