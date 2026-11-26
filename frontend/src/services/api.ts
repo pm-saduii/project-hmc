@@ -748,6 +748,20 @@ export const taskApi = {
     return taskApi.getByProject(projectId);
   },
 
+  /** Replace the baseline of every task with its current plan dates. */
+  resaveBaseline: async (projectId: string): Promise<{ data: Task[] }> => {
+    if (!projectId) throw new Error('MISSING_PROJECT_ID');
+    const canWrite = await checkProjectPermission(projectId, 'write', 'tasks');
+    if (!canWrite) throw new Error('FORBIDDEN');
+    const { data: rows, error } = await supabase.from('tasks').select('id, start_date, end_date').eq('project_id', projectId);
+    if (error) throw new Error(error.message);
+    const results = await Promise.all((rows || []).map((row: any) =>
+      supabase.from('tasks').update({ baseline_start_date: row.start_date || null, baseline_end_date: row.end_date || null }).eq('id', row.id)));
+    const failed = results.find((r) => r.error);
+    if (failed?.error) throw new Error(failed.error.message);
+    return taskApi.getByProject(projectId);
+  },
+
   create: async (t: Partial<Task>): Promise<{ data: Task; allTasks: Task[] }> => {
     const row = objToRow(t as Record<string, unknown>);
         if (row.effort_manday !== undefined) {
@@ -2381,7 +2395,7 @@ export const riskApi = {
 
 // ── Monthly executive reports ───────────────────────────────────────────────
 type MonthlyReportPatch = Partial<Pick<MonthlyReport,
-  'summary' | 'decisions' | 'overallStatus' | 'scheduleStatus' | 'budgetStatus' | 'scopeStatus' | 'paymentStatus'>>;
+  'summary' | 'decisions' | 'externalSummary' | 'clientActions' | 'overallStatus' | 'scheduleStatus' | 'budgetStatus' | 'scopeStatus' | 'paymentStatus'>>;
 
 export const monthlyReportApi = {
   /** One project's report for a month, or null when none was written yet. */

@@ -454,6 +454,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [showExport, setShowExport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [savingBaseline, setSavingBaseline] = useState(false);
+  const [confirmResave, setConfirmResave] = useState(false);
   const [importPreview, setImportPreview] = useState<TaskImportPreview | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
@@ -1771,8 +1772,23 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     requestAnimationFrame(() => { syncing.current = false; });
   }, []);
 
+  const handleResaveBaseline = async () => {
+    setConfirmResave(false);
+    try {
+      setSavingBaseline(true);
+      const result = await taskApi.resaveBaseline(projectId);
+      useStore.setState({ tasks: result.data });
+      toast.success('Baseline replaced with the current plan');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save baseline');
+    } finally {
+      setSavingBaseline(false);
+    }
+  };
+
   const handleSaveBaseline = async () => {
-    if (savingBaseline || hasSavedBaseline) return;
+    if (savingBaseline) return;
+    if (hasSavedBaseline) { setConfirmResave(true); return; }
     try {
       setSavingBaseline(true);
       const result = await taskApi.saveBaselineOnce(projectId);
@@ -2888,11 +2904,22 @@ export default function TasksTab({ projectId, extraActions }: Props) {
             small
             variant="ghost"
             onClick={handleSaveBaseline}
-            disabled={savingBaseline || hasSavedBaseline || projectTasks.length === 0}
-            title={hasSavedBaseline ? 'Baseline already saved' : 'Save baseline once'}
+            disabled={savingBaseline || projectTasks.length === 0}
+            title={hasSavedBaseline ? 'Replace the baseline with the current plan dates' : 'Save the current plan as the baseline'}
           >
-            {savingBaseline ? 'Saving…' : 'Save Baseline'}
+            {savingBaseline ? 'Saving…' : hasSavedBaseline ? 'Re-save Baseline' : 'Save Baseline'}
           </Btn>
+          {confirmResave && (
+            <Modal title="Re-save baseline" onClose={() => setConfirmResave(false)} width={440}>
+              <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px', lineHeight: 1.6 }}>
+                The baseline of every task is replaced with its current start and end dates. Plan-vs-baseline comparisons then start again from today's plan.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <Btn variant="ghost" onClick={() => setConfirmResave(false)}>Cancel</Btn>
+                <Btn onClick={() => void handleResaveBaseline()}>Re-save baseline</Btn>
+              </div>
+            </Modal>
+          )}
           <div style={{ position:'relative' }}>
             <Btn variant="ghost" small onClick={()=>setShowExport(v=>!v)} title="Export">
               <Download size={13} /> <ChevronDown size={11} />

@@ -10,6 +10,8 @@ const OPTIONS: ReportStatus[] = ['on_track', 'at_risk', 'off_track'];
 export interface ReportDraft {
   summary: string;
   decisions: string;
+  externalSummary: string;
+  clientActions: string;
   overallStatus: ReportStatus | null;
   scheduleStatus: ReportStatus | null;
   budgetStatus: ReportStatus | null;
@@ -21,6 +23,8 @@ export function draftFrom(record: MonthlyReport | null): ReportDraft {
   return {
     summary: record?.summary || '',
     decisions: record?.decisions || '',
+    externalSummary: record?.externalSummary || '',
+    clientActions: record?.clientActions || '',
     overallStatus: record?.overallStatus ?? null,
     scheduleStatus: record?.scheduleStatus ?? null,
     budgetStatus: record?.budgetStatus ?? null,
@@ -113,6 +117,26 @@ export default function MonthlyReportEditor({ data, record, previousSummary, bus
             Decisions needed from management <span style={{ fontWeight: 400, color: C.text3 }}>· optional, one per line</span>
           </label>
           {textarea(draft.decisions, (v) => set('decisions', v), 3, 'e.g. Approve moving UAT start to 15 Dec', 'mr-decisions')}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, borderRadius: 12, border: `1px dashed ${C.border2}`, background: '#FAFBFF' }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>External report <span style={{ fontWeight: 400, color: C.text3 }}>· what the customer sees (no man-days, amounts or internal notes)</span></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <label htmlFor="mr-ext-summary" style={{ fontSize: 13, fontWeight: 600 }}>Summary for the customer <span style={{ fontWeight: 400, color: C.text3 }}>· one point per line</span></label>
+              {!draft.externalSummary && draft.summary && (
+                <button type="button" onClick={() => set('externalSummary', draft.summary)}
+                  style={{ border: 0, background: 'transparent', color: C.primary, fontFamily: F, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  Start from the executive summary
+                </button>
+              )}
+            </div>
+            {textarea(draft.externalSummary, (v) => set('externalSummary', v), 4, 'e.g. UAT round 1 completed on plan', 'mr-ext-summary')}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor="mr-client-actions" style={{ fontSize: 13, fontWeight: 600 }}>Actions needed from the customer <span style={{ fontWeight: 400, color: C.text3 }}>· optional, one per line</span></label>
+            {textarea(draft.clientActions, (v) => set('clientActions', v), 3, 'e.g. Confirm the payroll parallel run results by 10 Dec', 'mr-client-actions')}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 10, background: C.primaryBg, fontSize: 13, color: '#3730A3', lineHeight: 1.5 }}>

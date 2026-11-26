@@ -60,7 +60,9 @@ export default function OnePagePage() {
   const monthParam = params.get('month') || '';
   const period = PERIOD_RE.test(monthParam) && monthParam <= thisMonth ? monthParam : thisMonth;
   const setPeriod = (next: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('month', next); return n; }, { replace: true });
-  const withMonth = (path: string) => `${path}?month=${period}`;
+  const audience: 'internal' | 'external' = params.get('view') === 'external' ? 'external' : 'internal';
+  const setAudience = (v: 'internal' | 'external') => setParams((p) => { const n = new URLSearchParams(p); if (v === 'external') n.set('view', 'external'); else n.delete('view'); return n; }, { replace: true });
+  const withMonth = (path: string) => `${path}?month=${period}${audience === 'external' ? '&view=external' : ''}`;
 
   const projects = useStore((s) => s.projects);
   const masterCodes = useStore((s) => s.masterCodes);
@@ -176,15 +178,28 @@ export default function OnePagePage() {
     if (selected) void monthlyReportApi.publishedPeriods(selected.id).then(setPublishedPeriods).catch(() => undefined);
   };
 
+  /** Leave out the external fields while they are empty and the database has no columns for them yet. */
+  const cleanDraft = (draft: ReportDraft): Partial<ReportDraft> => {
+    const hasColumns = !record || 'externalSummary' in record;
+    if (hasColumns || draft.externalSummary.trim() || draft.clientActions.trim()) return draft;
+    const { externalSummary, clientActions, ...rest } = draft;
+    void externalSummary; void clientActions;
+    return rest;
+  };
+  const reportError = (error: unknown, fallback: string) => {
+    const message = error instanceof Error ? error.message : fallback;
+    toast.error(/external_summary|client_actions/i.test(message) ? 'Run the migration 2026-12-05-external-report-and-baseline-fix.sql to save the external report.' : message);
+  };
+
   const saveDraft = async (draft: ReportDraft) => {
     if (!selected) return;
     setBusy(true);
     try {
-      afterChange(await monthlyReportApi.saveDraft(selected.id, period, draft));
+      afterChange(await monthlyReportApi.saveDraft(selected.id, period, cleanDraft(draft)));
       toast.success('Draft saved');
       setEditing(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to save the draft');
+      reportError(error, 'Unable to save the draft');
     } finally { setBusy(false); }
   };
 
@@ -194,8 +209,8 @@ export default function OnePagePage() {
     try {
       // Store the statuses as shown, so the frozen report and the list badge agree.
       const pick = (v: ReportStatus | null, s: ReportStatus) => v ?? s;
-      const patch: ReportDraft = {
-        ...draft,
+      const patch: Partial<ReportDraft> = {
+        ...cleanDraft(draft),
         overallStatus: pick(draft.overallStatus, live.suggested.overall),
         scheduleStatus: pick(draft.scheduleStatus, live.suggested.schedule),
         budgetStatus: pick(draft.budgetStatus, live.suggested.budget),
@@ -206,7 +221,7 @@ export default function OnePagePage() {
       toast.success(`${periodLabel(period)} report published`);
       setEditing(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to publish');
+      reportError(error, 'Unable to publish');
     } finally { setBusy(false); setConfirm(null); }
   };
 
@@ -298,7 +313,22 @@ export default function OnePagePage() {
     report = <div style={{ padding: 32, fontSize: 13, color: C.text2 }}>Loading…</div>;
   } else {
     report = (
+      <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '16px 24px 0' }}>
+        <div role="group" aria-label="Report version" style={{ display: 'inline-flex', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', background: C.white }}>
+          {([['internal', 'Internal'], ['external', 'External (customer)']] as const).map(([key, label]) => (
+            <button key={key} type="button" aria-pressed={audience === key} onClick={() => setAudience(key)}
+              style={{ height: 32, padding: '0 14px', border: 0, cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 600,
+                background: audience === key ? C.primary : C.white, color: audience === key ? '#fff' : C.text2 }}>{label}</button>
+          ))}
+        </div>
+        <span style={{ fontSize: 11, color: C.text3 }}>
+          {audience === 'external' ? 'For the customer: no man-days, amounts, billing or internal decisions.' : 'For management: includes man-days, payment and decisions.'}
+        </span>
+      </div>
       <MonthlyReportView
+        audience={audience}
+        logo={selected.logo}
         data={data}
         record={record}
         showAmounts={showAmounts}
@@ -310,6 +340,7 @@ export default function OnePagePage() {
         onUnpublish={() => setConfirm('unpublish')}
         onOpenPeriod={setPeriod}
       />
+      </>
     );
   }
 

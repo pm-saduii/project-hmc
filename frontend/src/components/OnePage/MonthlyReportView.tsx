@@ -64,9 +64,26 @@ interface Props {
   onPublish: () => void;
   onUnpublish: () => void;
   onOpenPeriod: (period: string) => void;
+  /** internal = management (default); external = for the customer: no man-days, money or internal notes. */
+  audience?: 'internal' | 'external';
+  /** Customer logo (PNG data URL) shown on the external report. */
+  logo?: string;
 }
 
-export default function MonthlyReportView({ data, record, showAmounts, canEdit, busy, publishedPeriods, onEdit, onPublish, onUnpublish, onOpenPeriod }: Props) {
+/** Print only the report (A4 landscape), without the app around it or the buttons. */
+const PRINT_CSS = `
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  body * { visibility: hidden !important; }
+  .one-page-print, .one-page-print * { visibility: visible !important; }
+  .one-page-print { position: absolute !important; left: 0; top: 0; width: 100% !important; padding: 0 !important; }
+  .one-page-print .no-print { display: none !important; }
+  .one-page-print section { break-inside: avoid; }
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff !important; }
+}`;
+
+export default function MonthlyReportView({ data, record, showAmounts, canEdit, busy, publishedPeriods, onEdit, onPublish, onUnpublish, onOpenPeriod, audience = 'internal', logo }: Props) {
+  const ext = audience === 'external';
   const published = record?.state === 'published';
   const prevLabel = format(parseISO(`${shiftPeriod(data.period, -1)}-01`), 'MMMM');
   const monthName = format(parseISO(`${data.period}-01`), 'MMMM');
@@ -93,6 +110,14 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
     { label: 'Open issues', value: String(issues.open), delta: `+${issues.opened} new · ${issues.closed} closed`, deltaFg: C.text2, sub: `${issues.blocked} blocked · ${issues.risksOpen} open risks`, color: issues.blocked ? C.red : C.blue },
     { label: 'Change requests', value: String(cr.inMonth.length), delta: `${cr.approvedManday} md approved in ${monthName}`, deltaFg: C.text2, sub: `${cr.pending} pending review`, color: STATUS_LOOK[effectiveStatus(record, data, 'scope')].dot },
   ];
+  const milestoneKpi = { label: 'Milestones', value: `${data.completed.milestonesAchieved} / ${data.completed.milestonesTotal}`, delta: 'achieved', deltaFg: C.text2,
+    sub: data.timeline.milestones.filter((m) => m.status !== 'paid' && m.status !== 'billed').slice(0, 1).map((m) => `Next: ${m.name}`)[0] || 'All achieved', color: C.blue };
+  const shownKpis = ext ? [kpis[0], kpis[1], milestoneKpi, kpis[4], kpis[5]] : kpis;
+  const areas = ext ? AREAS.filter((a) => a.key === 'schedule' || a.key === 'scope') : AREAS;
+  // External overall: the PM's choice, else the worse of schedule and scope (money and man-days stay internal).
+  const rank: Record<ReportStatus, number> = { on_track: 0, at_risk: 1, off_track: 2 };
+  const overall: ReportStatus = !ext ? effectiveStatus(record, data, 'overall')
+    : record?.overallStatus ?? [effectiveStatus(record, data, 'schedule'), effectiveStatus(record, data, 'scope')].sort((a, b) => rank[b] - rank[a])[0];
 
   // ── Timeline geometry ──────────────────────────────────────────────────
   const tl = data.timeline;
@@ -107,40 +132,43 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
   const asOfPos = pos(data.asOf);
   const asOfDate = toDate(data.asOf)!;
   const msColor = (status: string, date: string) => {
-    if (status === 'paid') return C.green;
+    if (status === 'paid' || (ext && status === 'billed')) return C.green;
     if ((toDate(date)?.getTime() ?? Infinity) < asOfDate.getTime()) return C.red;
     return status === 'billed' ? C.blue : C.text3;
   };
 
-  const summaryLines = lines(record?.summary || '');
-  const decisionLines = lines(record?.decisions || '');
+  const summaryLines = lines((ext ? record?.externalSummary : record?.summary) || '');
+  const decisionLines = lines((ext ? record?.clientActions : record?.decisions) || '');
   const projectTitle = `${data.project.code}${data.project.customerAbbreviation ? ` (${data.project.customerAbbreviation})` : ''}`;
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, fontFamily: F, color: C.text }}>
+    <div className="one-page-print" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, fontFamily: F, color: C.text }}>
+      <style>{PRINT_CSS}</style>
       {/* Header */}
       <section style={{ ...card, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
         <div style={{ flex: '1 1 360px', minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: C.text2 }}>MONTHLY EXECUTIVE REPORT · {periodLabel(data.period).toUpperCase()}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: C.text2 }}>{ext ? 'MONTHLY STATUS REPORT' : 'MONTHLY EXECUTIVE REPORT · INTERNAL'} · {periodLabel(data.period).toUpperCase()}</div>
           <h1 style={{ margin: '4px 0 2px', fontSize: 20, fontWeight: 800 }}>{projectTitle} · {data.project.name}</h1>
           <div style={{ fontSize: 13, color: C.text2 }}>
             {data.project.client || '—'} · Stage: {data.project.status || '—'} · {shortDate(data.project.startDate)} – {shortDate(data.project.endDate)}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <StatusPill status={effectiveStatus(record, data, 'overall')} prefix="Overall: " big />
-          <span style={{ fontSize: 11, fontWeight: 600, color: published ? '#047857' : '#B45309' }}>
+          {ext && logo && logo.startsWith('data:image/') && <img src={logo} alt={`${data.project.client || 'Customer'} logo`} style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain' }} />}
+          <StatusPill status={overall} prefix="Overall: " big />
+          <Btn variant="ghost" className="no-print" onClick={() => window.print()} title="Print this report or save it as PDF">Print / PDF</Btn>
+          <span className="no-print" style={{ fontSize: 11, fontWeight: 600, color: published ? '#047857' : '#B45309' }}>
             {published ? `Published ${record?.publishedAt ? format(new Date(record.publishedAt), 'dd/MM/yyyy') : ''}` : 'Draft · not published'}
           </span>
-          {canEdit && !published && <Btn variant="outline" onClick={onEdit} disabled={busy}>Edit summary</Btn>}
-          {canEdit && !published && <Btn onClick={onPublish} disabled={busy}>Publish {monthName}</Btn>}
-          {canEdit && published && <Btn variant="ghost" onClick={onUnpublish} disabled={busy} title="Back to draft: numbers become live again; the text is kept">Unpublish</Btn>}
+          {canEdit && !published && <Btn variant="outline" className="no-print" onClick={onEdit} disabled={busy}>Edit summary</Btn>}
+          {canEdit && !published && <Btn className="no-print" onClick={onPublish} disabled={busy}>Publish {monthName}</Btn>}
+          {canEdit && published && <Btn variant="ghost" className="no-print" onClick={onUnpublish} disabled={busy} title="Back to draft: numbers become live again; the text is kept">Unpublish</Btn>}
         </div>
       </section>
 
       {/* KPIs */}
       <section aria-label="Key numbers" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-        {kpis.map((k) => (
+        {shownKpis.map((k) => (
           <div key={k.label} style={{ ...card, padding: '14px 16px', borderTop: `3px solid ${k.color}` }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: C.text2 }}>{k.label}</div>
             <div style={{ fontSize: 24, fontWeight: 800, margin: '2px 0' }}>{k.value}</div>
@@ -153,20 +181,20 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
       {/* Summary + status + decisions */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
         <div style={card}>
-          <h3 style={{ ...h3, marginBottom: 10 }}>Executive summary</h3>
+          <h3 style={{ ...h3, marginBottom: 10 }}>{ext ? 'Summary' : 'Executive summary'}</h3>
           {summaryLines.length ? (
             <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, lineHeight: 1.6 }}>
               {summaryLines.map((l, i) => <li key={i}>{l}</li>)}
             </ul>
           ) : (
-            <div style={{ fontSize: 13, color: C.text3 }}>{canEdit ? 'No summary yet. Use "Edit summary" to write 3–5 points for this month.' : 'The PM has not written a summary for this month yet.'}</div>
+            <div style={{ fontSize: 13, color: C.text3 }}>{canEdit ? `No ${ext ? 'customer ' : ''}summary yet. Use "Edit summary" to write 3–5 points for this month.` : 'No summary for this month yet.'}</div>
           )}
         </div>
         <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <h3 style={{ ...h3, marginBottom: 10 }}>Status by area</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-              {AREAS.map((a) => {
+              {areas.map((a) => {
                 const s = STATUS_LOOK[effectiveStatus(record, data, a.key)];
                 return (
                   <div key={a.key} title={statusReason(data, a.key)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: s.bg }}>
@@ -179,7 +207,7 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
             </div>
           </div>
           <div>
-            <h3 style={{ ...h3, marginBottom: 8 }}>Decisions needed from management</h3>
+            <h3 style={{ ...h3, marginBottom: 8 }}>{ext ? `Actions needed from ${data.project.customerAbbreviation || data.project.client || 'the customer'}` : 'Decisions needed from management'}</h3>
             {decisionLines.length ? (
               <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, lineHeight: 1.5 }}>
                 {decisionLines.map((l, i) => <li key={i}>{l}</li>)}
@@ -330,6 +358,30 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
 
       {/* Billing + CR */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
+        {ext ? (
+          <div style={{ ...card, overflowX: 'auto' }}>
+            <h3 style={{ ...h3, marginBottom: 10 }}>Milestones</h3>
+            {data.timeline.milestones.length === 0 ? <div style={{ fontSize: 13, color: C.text3 }}>No milestones.</div> : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead><tr>{['Milestone', 'Date', 'Status'].map((h) => <th key={h} style={{ textAlign: 'left', fontSize: 11, color: C.text2, padding: '6px 8px', borderBottom: `1px solid ${C.border}` }}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {[...data.timeline.milestones].sort((a, b) => a.date.localeCompare(b.date)).map((m, i) => {
+                    const achieved = m.status === 'paid' || m.status === 'billed';
+                    return (
+                      <tr key={i}>
+                        <td style={{ padding: 8, borderBottom: `1px solid ${C.border}` }}>{m.name}</td>
+                        <td style={{ padding: 8, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{shortDate(m.date)}</td>
+                        <td style={{ padding: 8, borderBottom: `1px solid ${C.border}` }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 999, background: achieved ? C.greenBg : C.bg2, color: achieved ? '#047857' : C.text2 }}>{achieved ? 'Achieved' : 'Upcoming'}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : (
         <div style={{ ...card, overflowX: 'auto' }}>
           <h3 style={{ ...h3, marginBottom: 10 }}>Milestones &amp; billing</h3>
           {data.billing.length === 0 ? <div style={{ fontSize: 13, color: C.text3 }}>No milestones.</div> : (
@@ -361,6 +413,7 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
             </table>
           )}
         </div>
+        )}
         <div style={card}>
           <h3 style={{ ...h3, marginBottom: 10 }}>Change requests this month</h3>
           {cr.inMonth.length ? cr.inMonth.map((c, i) => (
@@ -374,7 +427,7 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
         </div>
       </section>
 
-      <footer style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, fontSize: 11, color: C.text3, padding: '0 2px 8px' }}>
+      <footer className="no-print" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, fontSize: 11, color: C.text3, padding: '0 2px 8px' }}>
         <span>
           {published
             ? `Numbers frozen on ${shortDate(data.asOf)} when the report was published`

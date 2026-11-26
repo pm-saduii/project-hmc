@@ -274,6 +274,9 @@ export interface MonthlyReport {
   state: 'draft' | 'published';
   summary: string;
   decisions: string;
+  /** Customer version of the report: summary and the actions needed from the customer. */
+  externalSummary?: string;
+  clientActions?: string;
   overallStatus: ReportStatus | null;
   scheduleStatus: ReportStatus | null;
   budgetStatus: ReportStatus | null;
