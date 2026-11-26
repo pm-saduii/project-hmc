@@ -7,7 +7,8 @@ import { useRolePermissions } from '../../hooks/useRolePermissions';
 import { Card, Btn, Modal, FormRow, Input, Select, ConfirmModal, ProgressBar, C, TH, TD } from '../Common';
 import { fmtMoney, fmtMonth } from '../../utils';
 import type { Effort } from '../../types';
-import { STANDARD_LINES, standardLineOf } from '../../utils/budgetControl';
+import { STANDARD_LINES, reportedEfforts, standardLineOf } from '../../utils/budgetControl';
+import BudgetLinesSection from './BudgetLinesSection';
 import { format, addMonths, subMonths } from 'date-fns';
 
 interface Props {
@@ -17,8 +18,16 @@ interface Props {
 const PHASE_OPTIONS = ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5'];
 
 export default function EffortTab({ projectId, extraActions }: Props) {
-  const { efforts, tasks, masterCodes, fetchEfforts, fetchTasks, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
+  const { efforts: allEfforts, tasks, masterCodes, activeProject, fetchEfforts, fetchTasks, createEffort, updateEffort, updateEffortMonthly, deleteEffort } = useStore();
+  const projectEfforts = allEfforts.filter((e) => e.projectId === projectId);
+  // Budget Control lines (template activities) vs. the older free-form lines, which stay until copied and deleted.
+  const standardEfforts = projectEfforts.filter((e) => standardLineOf(e.module));
+  const efforts = projectEfforts.filter((e) => !standardLineOf(e.module));
+  const counted = reportedEfforts(projectEfforts);
   const permissions = useRolePermissions();
+  const canEdit = permissions.getScreenAccess('effort') === 'full';
+  const [copied, setCopied] = useState<Record<string, string>>({});
+  const [deletingAll, setDeletingAll] = useState(false);
   const [modal, setModal]       = useState<Partial<Effort> | null>(null);
   const [phaseSummaryOpen, setPhaseSummaryOpen] = useState(false);
   const [deleting, setDeleting] = useState<Effort | null>(null);
@@ -122,9 +131,9 @@ export default function EffortTab({ projectId, extraActions }: Props) {
   }, {} as Record<string, { budgetAmount: number; budgetManday: number; usedManday: number; remaining: number }>);
 
   // Totals — all from Efforts table
-  const tBudAmt  = efforts.reduce((s, e) => s + e.budgetAmount, 0);
-  const tBudMD   = efforts.reduce((s, e) => s + (e.budgetManday || 0), 0);
-  const tUsedMD  = efforts.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
+  const tBudAmt  = counted.reduce((s, e) => s + e.budgetAmount, 0);
+  const tBudMD   = counted.reduce((s, e) => s + (e.budgetManday || 0), 0);
+  const tUsedMD  = counted.reduce((s, e) => s + Object.values(e.monthly || {}).reduce((a, v) => a + v, 0), 0);
   const tRem     = tBudMD - tUsedMD;
   const pct      = tBudMD > 0 ? Math.round((tUsedMD / tBudMD) * 100) : 0;
 
@@ -132,7 +141,52 @@ export default function EffortTab({ projectId, extraActions }: Props) {
   const displayBudgetAmt = permissions.getMaskedAmount(tBudAmt);
 
   // Budget Control exports to the company template by these standard lines.
-  const missingStandard = STANDARD_LINES.filter((l) => !efforts.some((e) => e.projectId === projectId && standardLineOf(e.module)?.code === l.code));
+  const missingStandard = STANDARD_LINES.filter((l) => !standardEfforts.some((e) => standardLineOf(e.module)?.code === l.code));
+
+  // Columns of the Budget Control grid: project start → the later of plan end, this month and the last month with data.
+  const currentMonth = format(new Date(), 'yyyy-MM');
+  const budgetMonths = useMemo(() => {
+    const dataMonths = standardEfforts.flatMap((e) => Object.keys(e.monthly || {})).sort();
+    const start = activeProject?.startDate?.slice(0, 7) || dataMonths[0] || format(subMonths(new Date(), 2), 'yyyy-MM');
+    const ends = [activeProject?.endDate?.slice(0, 7) || '', currentMonth, dataMonths[dataMonths.length - 1] || ''].filter(Boolean).sort();
+    const end = ends[ends.length - 1];
+    const out: string[] = [];
+    for (let d = new Date(`${start}-01T00:00:00`); format(d, 'yyyy-MM') <= end && out.length < 48; d = addMonths(d, 1)) out.push(format(d, 'yyyy-MM'));
+    return out;
+  }, [activeProject?.startDate, activeProject?.endDate, standardEfforts.map((e) => Object.keys(e.monthly || {}).join(',')).join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Add an old line's budget and monthly man-days onto a Budget Control line (the old line stays until deleted). */
+  const copyInto = async (from: Effort, targetId: string) => {
+    const target = standardEfforts.find((e) => e.id === targetId);
+    if (!target) return;
+    try {
+      await updateEffort(target.id, { budgetManday: (Number(target.budgetManday) || 0) + (Number(from.budgetManday) || 0) });
+      Object.entries(from.monthly || {}).forEach(([m, v]) => {
+        if (Number(v)) updateEffortMonthly(target.id, m, (Number(target.monthly?.[m]) || 0) + Number(v));
+      });
+      setCopied((c) => ({ ...c, [from.id]: target.module }));
+      toast.success(`Copied into "${target.module}". Delete the old line when you are done.`);
+    } catch { toast.error('Could not copy'); }
+  };
+  const deleteAllOld = async () => {
+    try {
+      for (const e of efforts) await deleteEffort(e.id);
+      toast.success('Previous effort lines deleted');
+    } catch { toast.error('Could not delete every line'); }
+    setDeletingAll(false);
+  };
+  const copySelect = (e: Effort) => (
+    copied[e.id]
+      ? <span title={`Copied into ${copied[e.id]}`} style={{ fontSize: 11, fontWeight: 700, color: '#047857', whiteSpace: 'nowrap' }}>Copied ✓</span>
+      : (
+        <select value="" disabled={!standardEfforts.length} onChange={(ev) => { if (ev.target.value) void copyInto(e, ev.target.value); }}
+          aria-label={`Copy ${e.module} into a Budget Control line`} title={standardEfforts.length ? 'Copy into a Budget Control line' : 'Set up the Budget Control lines first'}
+          style={{ height: 26, maxWidth: 130, border: `1px solid ${C.border}`, borderRadius: 6, fontFamily: 'Poppins, sans-serif', fontSize: 11, color: C.primary, background: C.white }}>
+          <option value="">Copy to…</option>
+          {standardEfforts.map((t) => <option key={t.id} value={t.id}>{t.module}</option>)}
+        </select>
+      )
+  );
   const [addingStandard, setAddingStandard] = React.useState(false);
   const addStandardLines = async () => {
     setAddingStandard(true);
@@ -193,15 +247,37 @@ export default function EffortTab({ projectId, extraActions }: Props) {
         <ProgressBar value={pct} color={pct > 90 ? C.red : pct > 70 ? C.amber : C.primary} height={10} />
       </Card>
 
+      <div style={{ marginBottom: 24 }}>
+        <BudgetLinesSection
+          lines={standardEfforts}
+          months={budgetMonths}
+          currentMonth={currentMonth}
+          canEdit={canEdit}
+          missingCount={missingStandard.length}
+          adding={addingStandard}
+          onAddMissing={() => void addStandardLines()}
+          onBudget={(e, v) => { void updateEffort(e.id, { budgetManday: v }).catch(() => toast.error('Could not save')); }}
+          onMonthly={(e, m, v) => updateEffortMonthly(e.id, m, v)}
+        />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div style={{ flex: '1 1 320px' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Previous effort lines</h3>
+          <div style={{ fontSize: 13, color: C.text2 }}>
+            {efforts.length
+              ? 'Your existing data, unchanged. Use "Copy to…" on each line to move its budget and man-days into a Budget Control line above, then delete the old lines.'
+              : 'No previous lines — everything is in the Budget Control lines above.'}
+          </div>
+        </div>
+        {canEdit && efforts.length > 0 && (
+          <Btn variant="danger" small onClick={() => setDeletingAll(true)}>Delete all previous lines</Btn>
+        )}
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
         <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
           {extraActions}
-          {missingStandard.length > 0 && (
-            <Btn variant="ghost" onClick={() => void addStandardLines()} disabled={addingStandard} small style={{ width: isMobile ? '100%' : 'auto' }}
-              title={`Add the ${missingStandard.length} Budget Control template lines this project does not have yet`}>
-              {addingStandard ? 'Adding…' : 'Add standard budget lines'}
-            </Btn>
-          )}
           <Btn variant="ghost" onClick={() => setPhaseSummaryOpen(true)} small style={{ width: isMobile ? '100%' : 'auto' }}>Phase Summary</Btn>
           <Btn onClick={() => setModal({})} small style={{ width: isMobile ? '100%' : 'auto' }}><Plus size={14} /> Add Task</Btn>
         </div>
@@ -210,7 +286,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
       {/* Effort grid */}
       {efforts.length === 0 ? (
         <Card style={{ padding: 40, textAlign: 'center', color: C.text3 }}>
-          No tasks yet. Click <strong>Add Task</strong> to start tracking effort.
+          No previous effort lines.
         </Card>
       ) : (
         phases.map((phase) => {
@@ -243,7 +319,8 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                             <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{e.module}</div>
                             <div style={{ fontSize: 13, color: C.text2 }}>{e.budgetManday} MD • ฿{fmtMoney(permissions.getMaskedAmount(e.budgetAmount))}</div>
                           </div>
-                          <div style={{ display: 'flex', gap: 6 }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            {canEdit && copySelect(e)}
                             <button onClick={() => setModal(e)} style={{ width: 34, height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: C.primaryBg, border: 'none', borderRadius: 8, color: C.primary, cursor: 'pointer' }}>
                               <Pencil size={16} />
                             </button>
@@ -292,7 +369,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                       {months.map(mo => <col key={mo} style={{ width: 72 }} />)}
                       <col style={{ width: 80 }} />
                       <col style={{ width: 90 }} />
-                      <col style={{ width: 80 }} />
+                      <col style={{ width: 210 }} />
                     </colgroup>
                     <thead>
                       <tr style={{ background: C.bg }}>
@@ -338,7 +415,8 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                             <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.amber, background: '#FFFBEB' }}>{used}</td>
                             <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: rem < 0 ? C.red : C.green, background: rem < 0 ? '#FFF1F2' : '#F0FDF4' }}>{rem}</td>
                             <td style={TD}>
-                              <div style={{ display: 'flex', gap: 5 }}>
+                              <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                                {canEdit && copySelect(e)}
                                 <button onClick={() => setModal(e)} style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
                                   <Pencil size={11} />
                                 </button>
@@ -396,6 +474,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
           </div>
         </Modal>
       )}
+      {deletingAll && <ConfirmModal message={`Delete all ${efforts.length} previous effort line(s)? Make sure each one was copied into the Budget Control lines first. This cannot be undone.`} onConfirm={() => void deleteAllOld()} onCancel={() => setDeletingAll(false)} />}
       {deleting && <ConfirmModal message={`Delete task "${deleting.module}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
 

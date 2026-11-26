@@ -7,6 +7,7 @@ import { addMonths, differenceInCalendarDays, endOfMonth, format, isValid, parse
 import type { ChangeRequest, Effort, Issue, Milestone, Project, ProjectProgressSnapshot, ReportStatus, Risk, Task } from '../types';
 import { compareWbs } from './index';
 import { projectHealth } from './projectHealth';
+import { reportedEfforts } from './budgetControl';
 
 export const REPORT_DATA_VERSION = 1;
 
@@ -124,8 +125,9 @@ export function buildMonthlyReport(input: ReportInputs): MonthlyReportData {
   const previousActual = input.previous?.progress.actual ?? (prevSnapshot ? Math.round(Number(prevSnapshot.actualPercent) || 0) : null);
 
   // ── Manday ──────────────────────────────────────────────────────────────
-  const budget = efforts.reduce((s, e) => s + (Number(e.budgetManday) || 0), 0);
-  const used = efforts.reduce((s, e) => s + Object.entries(e.monthly || {})
+  const counted = reportedEfforts(efforts);
+  const budget = counted.reduce((s, e) => s + (Number(e.budgetManday) || 0), 0);
+  const used = counted.reduce((s, e) => s + Object.entries(e.monthly || {})
     .filter(([month]) => month <= period)
     .reduce((a, [, v]) => a + (Number(v) || 0), 0), 0);
 

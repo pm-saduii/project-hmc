@@ -34,6 +34,17 @@ export function standardLineOf(module: string) {
   return STANDARD_LINES.find((l) => (code && l.code === code) || l.name.toLowerCase() === text.toLowerCase()) || null;
 }
 
+/**
+ * Effort lines that count for reporting. Once any standard line has a budget or man-days,
+ * only standard lines count — older free-form lines are being copied into them and would
+ * otherwise be counted twice. Before that, every line counts.
+ */
+export function reportedEfforts<T extends Pick<Effort, 'module' | 'budgetManday' | 'monthly'>>(efforts: T[]): T[] {
+  const standard = efforts.filter((e) => standardLineOf(e.module));
+  const inUse = standard.some((e) => Number(e.budgetManday) > 0 || Object.values(e.monthly || {}).some((v) => Number(v) > 0));
+  return inUse ? standard : efforts;
+}
+
 export interface BudgetLine { module: string; code: string | null; budget: number; used: Record<string, number> }
 export interface BudgetSnapshot {
   version: 1;
@@ -68,7 +79,7 @@ export function monthWindow(project: Pick<Project, 'startDate'>, period: string)
 
 export function buildBudgetSnapshot(project: Project, efforts: Effort[], period: string, progress: number): BudgetSnapshot {
   const months = monthWindow(project, period);
-  const lines: BudgetLine[] = efforts.map((e) => {
+  const lines: BudgetLine[] = reportedEfforts(efforts).map((e) => {
     const used: Record<string, number> = {};
     Object.entries(e.monthly || {}).forEach(([m, v]) => { if (m <= period && Number(v)) used[m] = round(Number(v)); });
     return { module: e.module, code: standardLineOf(e.module)?.code || null, budget: round(Number(e.budgetManday) || 0), used };
