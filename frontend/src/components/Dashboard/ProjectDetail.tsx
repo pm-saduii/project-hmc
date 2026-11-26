@@ -25,7 +25,20 @@ import {
   type ProjectChecklistTopic,
 } from '../../utils/projectChecklist';
 
-// Each screen (and the PDF / Excel libraries it uses) is downloaded the first time it is opened.
+// Each screen (and the PDF / Excel libraries it uses) is downloaded on its own; preloadTabs()
+// fetches them in the background once the workspace is open, so switching tabs does not flash "Loading…".
+const TAB_LOADERS = [
+  () => import('../Table/TasksTab'), () => import('./ProjectSummaryTab'), () => import('../Members/MembersTab'),
+  () => import('../Milestones/MilestonesTab'), () => import('../Effort/EffortTab'), () => import('../ChangeRequest/ChangeRequestTab'),
+  () => import('../Issues/IssuesTab'), () => import('../RiskRegister/RiskRegisterTab'), () => import('../Activities/ActivitiesTab'),
+  () => import('./ProjectEnvironmentTab'), () => import('./LessonsLearnedTab'),
+];
+let tabsPreloaded = false;
+function preloadTabs() {
+  if (tabsPreloaded) return;
+  tabsPreloaded = true;
+  TAB_LOADERS.forEach((load) => { void load().catch(() => { tabsPreloaded = false; }); });
+}
 const TasksTab = React.lazy(() => import('../Table/TasksTab'));
 const ProjectSummaryTab = React.lazy(() => import('./ProjectSummaryTab'));
 const MembersTab = React.lazy(() => import('../Members/MembersTab'));
@@ -544,6 +557,7 @@ export default function ProjectDetail({ project }: Props) {
   const [copyPassword, setCopyPassword] = useState('');
   const [copying, setCopying] = useState(false);
   const permissions = useRolePermissions();
+  React.useEffect(() => { const t = window.setTimeout(preloadTabs, 1500); return () => window.clearTimeout(t); }, []);
 
   // ── Navigation from the URL: /projects/:projectId/:group/:sub ──────────────
   // The route is /projects/:projectId/*, so group and sub come from the splat.

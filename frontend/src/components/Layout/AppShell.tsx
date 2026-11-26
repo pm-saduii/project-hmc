@@ -83,6 +83,12 @@ export default function AppShell() {
     try { window.localStorage.setItem(SIDEBAR_KEY, String(collapsed)); } catch { /* storage unavailable */ }
   }, [collapsed]);
 
+  // Fetch the project workspace code in the background so opening a project does not show "Loading…" first.
+  React.useEffect(() => {
+    const t = window.setTimeout(() => { void import('../../pages/ProjectPage').catch(() => undefined); }, 2000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   // Close the phone drawer and search after navigating.
   React.useEffect(() => { setDrawerOpen(false); setSearchOpen(false); }, [location.pathname]);
 

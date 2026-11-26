@@ -99,6 +99,8 @@ interface Store {
 // Pending debounced saves for effort monthly cells, keyed by "effortId|yyyy-MM".
 const effortMonthlyTimers = new Map<string, number>();
 
+let projectsRequest: Promise<void> | null = null;
+
 export const useStore = create<Store>((set, get) => ({
   // Track pending save/delete operations globally for minimal UI loading state.
   _pendingMutationCount: 0,
@@ -110,9 +112,15 @@ export const useStore = create<Store>((set, get) => ({
 
   // ── Projects ───────────────────────────────────────────────────────────────
   fetchProjects: async () => {
+    // Callers that ask while a request is running share it instead of starting another.
+    if (projectsRequest) return projectsRequest;
     set({ projectsLoading: true, error: null });
-    try { set({ projects: (await projectApi.getAll()).data, projectsLoading: false }); }
-    catch (e) { set({ error: (e as Error).message, projectsLoading: false }); }
+    projectsRequest = (async () => {
+      try { set({ projects: (await projectApi.getAll()).data, projectsLoading: false }); }
+      catch (e) { set({ error: (e as Error).message, projectsLoading: false }); }
+      finally { projectsRequest = null; }
+    })();
+    return projectsRequest;
   },
   fetchMasterCodes: async () => {
     try {

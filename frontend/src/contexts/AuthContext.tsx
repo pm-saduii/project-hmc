@@ -45,9 +45,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let handledUserId: string | null = null;
     async function handleSession(s: Session | null) {
       setSession(s);
       setUser(s?.user ?? null);
+      const nextUserId = s?.user?.id ?? null;
+      // Token refreshes and tab focus fire auth events for the same user: skip re-linking
+      // memberships and reloading projects/profile, which made pages flash.
+      if (nextUserId && nextUserId === handledUserId) return;
+      handledUserId = nextUserId;
       if (s?.user) {
         await syncProjectMemberships(s.user.email ?? '', s.access_token);
         fetchProjects();

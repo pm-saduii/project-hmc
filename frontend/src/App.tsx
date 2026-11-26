@@ -52,10 +52,9 @@ export default function App() {
   useEffect(() => {
     // Fetch projects and lookup codes if authenticated or if Supabase isn't configured (demo mode).
     // Use user?.id (not user object) to avoid re-fetching on every token refresh (tab switch).
-    if (!configured || user) {
-      fetchProjects();
-      fetchMasterCodes();
-    }
+    // Signed-in users get their projects from AuthContext (after their memberships are linked).
+    if (!configured) fetchProjects();
+    if (!configured || user) fetchMasterCodes();
   }, [fetchProjects, fetchMasterCodes, user?.id, configured]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isDark = theme === 'dark';
@@ -86,7 +85,7 @@ export default function App() {
   }
 
   // Dashboard / Projects show the connection state while the project list loads.
-  const portfolio = (mode: 'dashboard' | 'projects') => (projectsLoading && !error ? (
+  const portfolio = (mode: 'dashboard' | 'projects') => (projectsLoading && !projects.length && !error ? (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
       <div style={{ width: 36, height: 36, border: `3px solid ${C.primary}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       <p style={{ color: isDark ? '#94A3B8' : C.text2, fontSize: 13 }}>Loading projects…</p>
