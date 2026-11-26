@@ -1,6 +1,10 @@
 import React from 'react';
 import toast from 'react-hot-toast';
-import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FileDown, Lock, PenLine } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, FileDown, FileText, Lock, PenLine } from 'lucide-react';
+import SignoffFormModal from '../Documents/SignoffFormModal';
+import { useStore } from '../../store';
+import { supabase } from '../../services/supabase';
+import type { SignoffForm } from '../../utils/companyDocs';
 import { Btn, C, Modal } from '../Common';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
@@ -26,6 +30,11 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   const [error, setError] = React.useState('');
   const [gateBusy, setGateBusy] = React.useState('');
   const [confirmGate, setConfirmGate] = React.useState<{ phaseId: string; pass: boolean } | null>(null);
+  const [signoffFor, setSignoffFor] = React.useState<MethodDeliverable | null>(null);
+  const activeProject = useStore((s) => s.activeProject);
+  const members = useStore((s) => s.members);
+  const fetchMembers = useStore((s) => s.fetchMembers);
+  React.useEffect(() => { void fetchMembers(projectId).catch(() => undefined); }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = React.useCallback(async () => {
     try {
@@ -166,6 +175,12 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                                 {stepName(d.stepId) && <span>{stepName(d.stepId)}</span>}
                                 {d.format && <span>· {d.format}</span>}
                                 {d.templateUrl && <a href={d.templateUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: C.primary, fontWeight: 600 }}><FileDown size={11} />Template</a>}
+                                {d.requiresSignoff && activeProject && (
+                                  <button type="button" onClick={() => setSignoffFor(d)} title="Fill in the company sign-off form and download it as Word"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 3, border: 0, background: 'transparent', padding: 0, color: C.primary, fontWeight: 600, fontFamily: F, fontSize: 11, cursor: 'pointer' }}>
+                                    <FileText size={11} />Sign-off form
+                                  </button>
+                                )}
                               </div>
                             </td>
                             <td style={cell}>
@@ -224,6 +239,25 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
         );
       })}
 
+      {signoffFor && activeProject && (
+        <SignoffFormModal
+          project={activeProject}
+          deliverableName={signoffFor.name}
+          phaseName={phases.find((p) => p.id === signoffFor.phaseId)?.name || ''}
+          members={members.filter((m) => m.projectId === projectId)}
+          saved={(state[signoffFor.id]?.form as Partial<SignoffForm> | undefined) || null}
+          signedDate={state[signoffFor.id]?.status === 'signed' ? state[signoffFor.id]?.completedDate || null : null}
+          canEdit={canWrite}
+          onClose={() => setSignoffFor(null)}
+          onSave={async (form) => {
+            const { error } = await supabase.from('project_deliverables')
+              .upsert({ project_id: projectId, deliverable_id: signoffFor.id, form }, { onConflict: 'project_id,deliverable_id' });
+            if (error) { toast.error(/column .*form/i.test(error.message) ? 'Run the migration 2026-11-28-document-forms.sql to save sign-off forms.' : error.message); return false; }
+            setState((s) => ({ ...s, [signoffFor.id]: { ...(s[signoffFor.id] || { projectId, deliverableId: signoffFor.id, status: 'planned', owner: null, dueDate: null, completedDate: null, link: '', notes: '', updatedAt: '' }), form: form as unknown as Record<string, unknown> } }));
+            return true;
+          }}
+        />
+      )}
       {confirmGate && (
         <Modal title={confirmGate.pass ? 'Pass phase gate' : 'Reopen phase gate'} onClose={() => !gateBusy && setConfirmGate(null)} width={440} closeOnBackdrop={false}>
           <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px', lineHeight: 1.6 }}>

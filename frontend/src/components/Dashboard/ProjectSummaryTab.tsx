@@ -391,6 +391,14 @@ export default function ProjectSummaryTab({ project }: Props) {
           <Btn variant="ghost" onClick={exportXLSX} small>Export Excel</Btn>
           <Btn variant="ghost" onClick={exportGraphImage} small>Export Image</Btn>
           <Btn variant="ghost" onClick={exportPDF} small>Export PDF</Btn>
+          <Btn variant="ghost" small title="Weekly External Status Report (PowerPoint)" onClick={() => {
+            const st = useStore.getState();
+            const mine = <T extends { projectId: string }>(list: T[]) => list.filter((x) => x.projectId === project.id);
+            void import('../../utils/statusPptx').then(({ downloadWeeklyStatus }) => downloadWeeklyStatus({
+              project, tasks: mine(st.tasks), milestones: mine(st.milestones), issues: mine(st.issues), risks: mine(st.risks),
+              changeRequests: mine(st.changeRequests), members: mine(st.members),
+            })).catch((e) => toast.error(e instanceof Error ? e.message : 'Could not create the PowerPoint'));
+          }}>Weekly status (PPT)</Btn>
           <Btn variant="primary" onClick={saveAll} small disabled={!rows.some((r) => r.dirty) || refreshing || savingSnapshot !== null}>Save all</Btn>
         </div>
       </div>

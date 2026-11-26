@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import CrFormModal from '../Documents/CrFormModal';
+import { useRolePermissions } from '../../hooks/useRolePermissions';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Modal, FormRow, Input, Select, Textarea, ConfirmModal, C, TH, TD } from '../Common';
@@ -13,7 +15,9 @@ interface Props { projectId: string; }
 type CRWithItems = ChangeRequest & { items: CRItem[] };
 
 export default function ChangeRequestTab({ projectId }: Props) {
-  const { changeRequests, members, fetchCRs, fetchMembers, createCR, updateCR, deleteCR } = useStore();
+  const { changeRequests, members, activeProject, fetchCRs, fetchMembers, createCR, updateCR, deleteCR } = useStore();
+  const permissions = useRolePermissions();
+  const [formFor, setFormFor] = useState<CRWithItems | null>(null);
   const [modal, setModal]       = useState<Partial<CRWithItems> | null>(null);
   const [deleting, setDeleting] = useState<CRWithItems | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -96,6 +100,10 @@ export default function ChangeRequestTab({ projectId }: Props) {
               </div>
               <Badge bg={ss.bg} color={ss.color}>{cr.status}</Badge>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                <button onClick={e => { e.stopPropagation(); setFormFor(cr); }} title="Change Request Form (Word)"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 8px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
+                  <FileText size={11} />CR form
+                </button>
                 <button onClick={e => { e.stopPropagation(); setModal(cr); }}
                   style={{ background: C.primaryBg, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: C.primary, cursor: 'pointer', fontWeight: 600 }}>
                   <Pencil size={11} />
@@ -133,6 +141,11 @@ export default function ChangeRequestTab({ projectId }: Props) {
 
       {modal !== null && <CRModal data={modal} onClose={() => setModal(null)} onSave={handleSave} />}
       {deleting && <ConfirmModal message={`Delete CR "${deleting.crId}"?`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
+      {formFor && activeProject && (
+        <CrFormModal cr={formFor} project={activeProject} members={members.filter((m) => m.projectId === projectId)}
+          canEdit={permissions.getScreenAccess('cr') === 'full'} onClose={() => setFormFor(null)}
+          onSaved={() => { void fetchCRs(projectId); }} />
+      )}
     </div>
   );
 }

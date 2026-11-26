@@ -15,6 +15,8 @@ export interface Methodology { phases: MethodPhase[]; steps: MethodStep[]; deliv
 export interface ProjectDeliverable {
   projectId: string; deliverableId: string; status: DeliverableStatus; owner: Owner | null;
   dueDate: string | null; completedDate: string | null; link: string; notes: string; updatedAt: string;
+  /** Data of the generated sign-off document (company template). */
+  form?: Record<string, unknown> | null;
 }
 export interface PhaseGate { projectId: string; phaseId: string; status: 'open' | 'passed'; passedAt: string | null; passedBy: string | null; notes: string }
 
