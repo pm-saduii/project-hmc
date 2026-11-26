@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Modal, FormRow, Input, Select, Textarea, ConfirmModal, C, TH, TD } from '../Common';
+import ExternalFields from './ExternalFields';
 import { fmtDate, PROCESS_STATUS_STYLE, todayISO } from '../../utils';
 import type { Issue } from '../../types';
 
@@ -180,6 +181,7 @@ function IssueModal({ data, memberNames, onClose, onSave }: { data: Partial<Issu
       </div>
       <FormRow label="Resolved Date"><Input type="date" value={form.resolvedDate ?? ''} onChange={v => up('resolvedDate', v)} /></FormRow>
       <FormRow label="Notes"><Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional notes…" /></FormRow>
+      <ExternalFields value={form} withAction onChange={(k, v) => setForm(p => ({ ...p, [k]: v }))} />
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={() => { if (!form.title?.trim()) return; onSave(form); }}>Save</Btn>

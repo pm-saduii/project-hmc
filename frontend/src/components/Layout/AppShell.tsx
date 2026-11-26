@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { parseISO, isValid } from 'date-fns';
 import {
   Bell, BellRing, BookOpen, ChevronDown, Clock3, FileText, FolderKanban, Wallet, LayoutDashboard, ListChecks, LogOut, Mail, Menu, Moon, PanelLeftClose,
-  PanelLeftOpen, Search, Settings, StickyNote, Sun, Users, X,
+  PanelLeftOpen, Presentation, Search, Settings, StickyNote, Sun, Users, X,
 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +20,7 @@ type NavItem = { to: string; label: string; icon: React.ReactNode; end?: boolean
 const WORKSPACE_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} />, end: true },
   { to: '/one-page', label: 'One Page', icon: <FileText size={18} /> },
+  { to: '/external-status', label: 'External Status', icon: <Presentation size={18} /> },
   { to: '/projects', label: 'Projects', icon: <FolderKanban size={18} /> },
   { to: '/my-tasks', label: 'My Tasks', icon: <ListChecks size={18} /> },
   { to: '/budget', label: 'Budget Control', icon: <Wallet size={18} /> },
@@ -64,7 +65,7 @@ export default function AppShell() {
   const permissions = useRolePermissions();
   // One Page follows the project "onepage" screen permission.
   const canBudget = ['admin', 'pm', 'am', 'director'].includes(profile?.role || '');
-  const workspaceItems = WORKSPACE_ITEMS.filter((item) => (item.to !== '/one-page' || permissions.isTabVisible('onepage')) && (!['/budget', '/notifications'].includes(item.to) || canBudget));
+  const workspaceItems = WORKSPACE_ITEMS.filter((item) => (!['/one-page', '/external-status'].includes(item.to) || permissions.isTabVisible('onepage')) && (!['/budget', '/notifications'].includes(item.to) || canBudget));
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   const searchPages = React.useMemo(
     () => [...workspaceItems, ...(isAdmin ? ADMIN_ITEMS : [])].map(({ to, label }) => ({ to, label })),
@@ -227,7 +228,7 @@ export default function AppShell() {
           display: 'flex', flexShrink: 0, background: surface, borderTop: `1px solid ${border}`,
           paddingBottom: 'env(safe-area-inset-bottom)', fontFamily: F,
         }}>
-          {workspaceItems.filter((item) => !['/one-page', '/budget', '/methodology', '/notifications'].includes(item.to)).map((item) => (
+          {workspaceItems.filter((item) => !['/one-page', '/external-status', '/budget', '/methodology', '/notifications'].includes(item.to)).map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end}
               style={({ isActive }) => ({
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56,

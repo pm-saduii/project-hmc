@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Modal, FormRow, Input, Select, Textarea, ConfirmModal, ProgressBar, C, TH, TD, MILESTONE_STATUS } from '../Common';
-import { fmtDate, fmtMoney, isoToDmy, dmyToIso } from '../../utils';
+import { compareWbs, fmtDate, fmtMoney, isoToDmy, dmyToIso } from '../../utils';
 import type { Milestone } from '../../types';
 
 const PHASES = [
@@ -340,6 +340,10 @@ export default function MilestonesTab({ projectId, extraActions }: Props) {
 function MilestoneModal({ data, phaseBudgetByPhase, isMobile, onClose, onSave }: { data: Partial<Milestone>; phaseBudgetByPhase: Record<string, number>; isMobile: boolean; onClose: () => void; onSave: (f: Partial<Milestone>) => void }) {
   const [form, setForm] = useState<Partial<Milestone>>({ phase: 'Phase 1', name: '', percent: 0, amount: 0, phaseAmount: 0, dueDate: '', billingDate: '', notes: '', status: 'pending', ...data });
   const up = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
+  // Task whose progress the milestone follows (External Status · Key Milestone Tracker)
+  const allTasks = useStore(s => s.tasks);
+  const projectId = useStore(s => s.activeProject?.id) || data.projectId;
+  const taskOptions = allTasks.filter(t => t.projectId === projectId).sort((a, b) => compareWbs(String(a.wbs || ''), String(b.wbs || '')));
 
   useEffect(() => {
     const phaseKey = form.phase || '';
@@ -416,6 +420,14 @@ function MilestoneModal({ data, phaseBudgetByPhase, isMobile, onClose, onSave }:
             options={[{ value: 'pending', label: 'Pending' }, { value: 'billed', label: 'Billed' }, { value: 'paid', label: 'Paid' }]} />
         </FormRow>
       </div>
+      <FormRow label="Progress follows task">
+        <select value={form.taskId || ''} onChange={e => setForm(p => ({ ...p, taskId: e.target.value || null }))} aria-label="Linked task"
+          style={{ width: '100%', height: 38, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '0 10px', fontFamily: 'Poppins, sans-serif', fontSize: 13, color: C.text, background: C.white }}>
+          <option value="">— None (Billed / Paid = complete) —</option>
+          {taskOptions.map(t => <option key={t.id} value={t.id}>{'\u00A0\u00A0\u00A0'.repeat(Math.max(0, String(t.wbs || '').split('.').length - 1))}{t.wbs} {t.taskName}</option>)}
+        </select>
+        <div style={{ fontSize: 11, color: C.text3, marginTop: 4 }}>Used for progress and status on the External Status report (Key Milestone Tracker).</div>
+      </FormRow>
       <FormRow label="Notes">
         <Textarea value={form.notes ?? ''} onChange={v => up('notes', v)} rows={2} placeholder="Additional notes…" />
       </FormRow>

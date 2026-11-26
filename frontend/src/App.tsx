@@ -19,6 +19,7 @@ const noop = () => undefined;
 const ProjectPage = lazy(() => import('./pages/ProjectPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const OnePagePage = lazy(() => import('./pages/OnePagePage'));
+const ExternalStatusPage = lazy(() => import('./pages/ExternalStatusPage'));
 const BudgetControlPage = lazy(() => import('./pages/BudgetControlPage'));
 const MethodologyPage = lazy(() => import('./pages/MethodologyPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
@@ -123,6 +124,8 @@ export default function App() {
           <Route index element={portfolio('dashboard')} />
           <Route path="one-page" element={<OnePageGuard>{page(<OnePagePage />)}</OnePageGuard>} />
           <Route path="one-page/:projectId" element={<OnePageGuard>{page(<OnePagePage />)}</OnePageGuard>} />
+          <Route path="external-status" element={<OnePageGuard>{page(<ExternalStatusPage />)}</OnePageGuard>} />
+          <Route path="external-status/:projectId" element={<OnePageGuard>{page(<ExternalStatusPage />)}</OnePageGuard>} />
           <Route path="budget" element={<BudgetGuard>{page(<BudgetControlPage />)}</BudgetGuard>} />
           <Route path="methodology" element={page(<MethodologyPage />)} />
           <Route path="notifications" element={<BudgetGuard>{page(<NotificationsPage />)}</BudgetGuard>} />

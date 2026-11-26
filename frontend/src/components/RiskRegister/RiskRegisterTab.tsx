@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { Card, Btn, Badge, Modal, FormRow, Input, Select, Textarea, ConfirmModal, C, TH, TD } from '../Common';
+import ExternalFields from '../Issues/ExternalFields';
 import { fmtDate, RISK_LEVEL_COLOR, todayISO } from '../../utils';
 import type { Risk } from '../../types';
 
@@ -191,6 +192,7 @@ function RiskForm({ data, memberOptions, onClose, onSave }: { data: Partial<Risk
         </></FormRow>
       </div>
       <FormRow label="Mitigation Plan"><Textarea value={form.mitigation ?? ''} onChange={v => up('mitigation', v)} rows={4} placeholder="How to mitigate this risk…" /></FormRow>
+      <ExternalFields value={form} onChange={(k, v) => setForm(p => ({ ...p, [k]: v }))} />
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         <Btn onClick={() => { if (!form.title?.trim()) return; onSave(form); }}>Save</Btn>

@@ -128,6 +128,8 @@ export interface Milestone {
   billingDate: string;
   notes: string;
   status: 'pending' | 'billed' | 'paid';
+  /** Task whose progress this milestone follows (External Status · Key Milestone Tracker). */
+  taskId?: string | null;
 }
 
 export interface Effort {
@@ -197,6 +199,15 @@ export interface Issue {
   status: 'Open' | 'In Progress' | 'Resolved' | 'Blocked';
   resolvedDate: string;
   notes: string;
+  // External Status Report
+  dueDate?: string | null;
+  /** S Scope · T Time · C Cost · Q Quality, e.g. "T,Q". */
+  impactArea?: string;
+  nextAction?: string;
+  visibility?: 'External' | 'Internal';
+  /** '' · Decision · Acknowledge – shown on "Items for Steering". */
+  steering?: string;
+  steeringAsk?: string;
 }
 
 // ── Risk ──────────────────────────────────────────────────────────────────────
@@ -211,6 +222,11 @@ export interface Risk {
   mitigation: string;
   owner: string;
   status: 'Monitoring' | 'Mitigating' | 'Closed';
+  dueDate?: string | null;
+  impactArea?: string;
+  visibility?: 'External' | 'Internal';
+  steering?: string;
+  steeringAsk?: string;
 }
 
 export interface Activity {
