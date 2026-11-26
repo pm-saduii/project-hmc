@@ -80,7 +80,10 @@ export function FormModal({ title, subtitle, onClose, children, footer, busy, wi
             <X size={16} />
           </button>
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
+        {/* Scroll area; the inner column is not height-limited, so tall content scrolls instead of being squashed. */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>{children}</div>
+        </div>
         <div style={{ padding: '14px 22px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>{footer}</div>
       </div>
     </div>

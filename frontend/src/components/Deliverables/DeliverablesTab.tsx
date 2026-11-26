@@ -642,100 +642,157 @@ function TaskCell({ task, tasks, editable, label, onChange }: { task: Task | nul
   );
 }
 
-/** Suggest a task for each deliverable (by name and phase); the PM checks, changes and applies. */
-function LinkTasksModal({ deliverables, phaseNameOf, linked, phases, phaseLinked, tasks, onClose, onApply }: {
+/**
+ * Link deliverables and phases to tasks: pick an item on the left, then click a task in the plan on the right.
+ * Phases link to a main (top-level) task; the gate checks every task under it.
+ */
+export function LinkTasksModal({ deliverables, phaseNameOf, linked, phases, phaseLinked, tasks, onClose, onApply }: {
   deliverables: MethodDeliverable[]; phaseNameOf: (phaseId: string) => string; linked: Record<string, string>;
   phases: MethodPhase[]; phaseLinked: Record<string, string>; tasks: Task[];
   onClose: () => void; onApply: (links: Record<string, string>, phaseLinks: Record<string, string>) => Promise<boolean>;
 }) {
-  // Phases link to a main (top-level) task, suggested by name
-  const mainTasks = tasks.filter((t) => !t.parentId);
-  const phaseSuggest = React.useMemo(() => Object.fromEntries(phases.filter((p) => !phaseLinked[p.id]).flatMap((p) => {
-    let best: { taskId: string; score: number } | null = null;
-    mainTasks.forEach((t) => { const sc = matchScore({ name: p.name, shortName: '' }, '', t); if (sc >= 0.5 && (!best || sc > best.score)) best = { taskId: t.id, score: sc }; });
-    return best ? [[p.id, best]] : [];
-  })) as Record<string, { taskId: string; score: number }>, [phases, phaseLinked, tasks]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [phaseChoice, setPhaseChoice] = React.useState<Record<string, string>>(() => ({ ...phaseLinked, ...Object.fromEntries(Object.entries(phaseSuggest).map(([k, v]) => [k, v.taskId])) }));
-  const phaseChanges = Object.fromEntries(phases.filter((p) => (phaseChoice[p.id] || '') !== (phaseLinked[p.id] || '')).map((p) => [p.id, phaseChoice[p.id] || '']));
-  const phaseRows = phases;
-  const [onlyUnlinked, setOnlyUnlinked] = React.useState(true);
-  const suggestions = React.useMemo(() => suggestLinks(deliverables.filter((d) => !linked[d.id]), phaseNameOf, tasks), [deliverables, linked, tasks]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [choice, setChoice] = React.useState<Record<string, string>>(() => ({ ...linked, ...Object.fromEntries(Object.entries(suggestions).map(([k, v]) => [k, v.taskId])) }));
+  type Item = { key: string; kind: 'phase' | 'deliverable'; id: string; name: string; sub: string };
+  const mainTasks = React.useMemo(() => tasks.filter((t) => !t.parentId), [tasks]);
+  // Suggestions for items not linked yet
+  const suggestions = React.useMemo(() => {
+    const out: Record<string, { taskId: string; score: number }> = {};
+    Object.entries(suggestLinks(deliverables.filter((d) => !linked[d.id]), phaseNameOf, tasks)).forEach(([id, v]) => { out[`d:${id}`] = v; });
+    phases.filter((p) => !phaseLinked[p.id]).forEach((p) => {
+      let best: { taskId: string; score: number } | null = null;
+      mainTasks.forEach((t) => { const sc = matchScore({ name: p.name, shortName: '' }, '', t); if (sc >= 0.5 && (!best || sc > best.score)) best = { taskId: t.id, score: sc }; });
+      if (best) out[`p:${p.id}`] = best;
+    });
+    return out;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const original: Record<string, string> = React.useMemo(() => ({
+    ...Object.fromEntries(Object.entries(phaseLinked).map(([k, v]) => [`p:${k}`, v])),
+    ...Object.fromEntries(Object.entries(linked).map(([k, v]) => [`d:${k}`, v])),
+  }), [linked, phaseLinked]);
+  const [choice, setChoice] = React.useState<Record<string, string>>(() => ({ ...original, ...Object.fromEntries(Object.entries(suggestions).map(([k, v]) => [k, v.taskId])) }));
+  const [onlyUnlinked, setOnlyUnlinked] = React.useState(false);
+  const [query, setQuery] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const rows = deliverables.filter((d) => !onlyUnlinked || !linked[d.id]);
-  const changes = Object.fromEntries(deliverables.filter((d) => (choice[d.id] || '') !== (linked[d.id] || '')).map((d) => [d.id, choice[d.id] || '']));
-  const n = Object.keys(changes).length + Object.keys(phaseChanges).length;
-  const cell: React.CSSProperties = { padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13, verticalAlign: 'middle' };
+
+  const items: Item[] = React.useMemo(() => phases.flatMap((p) => [
+    { key: `p:${p.id}`, kind: 'phase' as const, id: p.id, name: p.name, sub: 'Phase → main task' },
+    ...deliverables.filter((d) => d.phaseId === p.id).map((d) => ({ key: `d:${d.id}`, kind: 'deliverable' as const, id: d.id, name: d.shortName || d.name, sub: d.name })),
+  ]), [phases, deliverables]);
+  const visible = items.filter((it) => !onlyUnlinked || !original[it.key]);
+  const [selected, setSelected] = React.useState<string>(() => (items.find((it) => !original[it.key]) || items[0])?.key || '');
+  const sel = items.find((it) => it.key === selected) || null;
+
+  const changes = Object.keys({ ...original, ...choice }).filter((k) => (choice[k] || '') !== (original[k] || ''));
+  const taskById = React.useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+  const usedBy = React.useMemo(() => {
+    const m = new Map<string, string[]>();
+    items.forEach((it) => { const t = choice[it.key]; if (t) m.set(t, [...(m.get(t) || []), it.name]); });
+    return m;
+  }, [choice, items]);
+
+  const assign = (taskId: string) => {
+    if (!sel) return;
+    setChoice((c) => ({ ...c, [sel.key]: taskId }));
+    // move on to the next item in the list
+    const i = visible.findIndex((it) => it.key === sel.key);
+    if (taskId && i >= 0 && i < visible.length - 1) setSelected(visible[i + 1].key);
+  };
+  const apply = () => {
+    const links: Record<string, string> = {}; const phaseLinks: Record<string, string> = {};
+    changes.forEach((k) => { if (k.startsWith('d:')) links[k.slice(2)] = choice[k] || ''; else phaseLinks[k.slice(2)] = choice[k] || ''; });
+    setBusy(true);
+    void onApply(links, phaseLinks).then((ok) => { setBusy(false); if (ok) onClose(); });
+  };
+
+  const q = query.trim().toLowerCase();
+  const taskList = tasks.filter((t) => !q || taskLabel(t).toLowerCase().includes(q));
+  const tag = (it: Item) => {
+    const now = choice[it.key] || ''; const was = original[it.key] || '';
+    if (now !== was) return now ? (suggestions[it.key]?.taskId === now && !was ? { text: `Suggested ${Math.round(suggestions[it.key].score * 100)}%`, fg: '#B45309', bg: '#FFFBEB' } : { text: 'Changed', fg: C.primary, bg: C.primaryBg }) : { text: 'Unlink', fg: '#B91C1C', bg: '#FEF2F2' };
+    return now ? { text: 'Linked', fg: '#047857', bg: C.greenBg } : { text: 'Not linked', fg: C.text3, bg: C.bg2 };
+  };
+  const colHead: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${C.border}`, background: '#F8FAFC', fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.04em', flexShrink: 0 };
+  const col: React.CSSProperties = { display: 'flex', flexDirection: 'column', minHeight: 0, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' };
+
   return (
-    <FormModal title="Link deliverables to tasks" subtitle="Suggested by matching names and phases — check each one before applying" onClose={onClose} busy={busy} width={860}
+    <FormModal title="Link tasks" subtitle="Pick a phase or deliverable on the left, then click its task on the right" onClose={onClose} busy={busy} width={1160}
       footer={<>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text2, cursor: 'pointer' }}>
-          <input type="checkbox" checked={onlyUnlinked} onChange={(e) => setOnlyUnlinked(e.target.checked)} style={{ accentColor: C.primary }} />Only deliverables not linked yet
-        </label>
+        <span style={{ fontSize: 11, color: C.text2 }}>Suggestions are pre-filled from matching names — check them before applying.</span>
         <span style={{ marginLeft: 'auto' }} />
         <Btn variant="ghost" onClick={onClose} disabled={busy}>Close</Btn>
-        <Btn disabled={!n || busy} onClick={() => { setBusy(true); void onApply(changes, phaseChanges).then((ok) => { setBusy(false); if (ok) onClose(); }); }}>{busy ? 'Saving…' : `Apply ${n || ''} change${n === 1 ? '' : 's'}`}</Btn>
+        <Btn disabled={!changes.length || busy} onClick={apply}>{busy ? 'Saving…' : `Apply ${changes.length || ''} change${changes.length === 1 ? '' : 's'}`}</Btn>
       </>}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.04em' }}>PHASES → MAIN TASK <span style={{ fontWeight: 400 }}>(the gate checks every task under it)</span></div>
-      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>
-            {phaseRows.map((p) => {
-              const sug = phaseSuggest[p.id];
-              const changed = (phaseChoice[p.id] || '') !== (phaseLinked[p.id] || '');
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.2fr)', gap: 12, height: 'min(64vh, 680px)' }}>
+        {/* Left: phases and deliverables */}
+        <div style={col}>
+          <div style={colHead}>
+            <span style={{ flex: 1 }}>PHASES &amp; DELIVERABLES</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, letterSpacing: 0, cursor: 'pointer' }}>
+              <input type="checkbox" checked={onlyUnlinked} onChange={(e) => setOnlyUnlinked(e.target.checked)} style={{ accentColor: C.primary }} />Not linked only
+            </label>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            {visible.map((it) => {
+              const t = taskById.get(choice[it.key] || '');
+              const tg = tag(it);
+              const active = it.key === selected;
               return (
-                <tr key={p.id} style={{ background: changed ? '#F8FAFF' : undefined }}>
-                  <td style={{ ...cell, fontWeight: 600 }}>{p.name}</td>
-                  <td style={{ ...cell, width: 420 }}>
-                    <select value={phaseChoice[p.id] || ''} onChange={(e) => setPhaseChoice((c) => ({ ...c, [p.id]: e.target.value }))} aria-label={`${p.name} main task`}
-                      style={{ height: 30, width: '100%', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, background: C.white }}>
-                      <option value="">— Not linked —</option>
-                      {mainTasks.map(taskOption)}
-                    </select>
-                  </td>
-                  <td style={{ ...cell, width: 110, fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>
-                    {phaseLinked[p.id] ? (changed ? 'Change' : 'Linked') : sug && phaseChoice[p.id] === sug.taskId ? `Suggested · ${Math.round(sug.score * 100)}%` : changed ? 'New' : 'No match'}
-                  </td>
-                </tr>
+                <button key={it.key} type="button" onClick={() => setSelected(it.key)}
+                  style={{ width: '100%', textAlign: 'left', display: 'block', border: 0, borderBottom: `1px solid ${C.bg2}`, cursor: 'pointer', fontFamily: F,
+                    padding: it.kind === 'phase' ? '10px 12px' : '8px 12px 8px 26px',
+                    background: active ? C.primaryBg : it.kind === 'phase' ? '#F8FAFC' : C.white, boxShadow: active ? `inset 3px 0 0 ${C.primary}` : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: it.kind === 'phase' ? 700 : 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={it.sub}>
+                      {it.kind === 'phase' ? it.name.toUpperCase() : it.name}
+                    </span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: tg.fg, background: tg.bg, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap' }}>{tg.text}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: t ? C.text2 : C.text3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {t ? <>→ {taskLabel(t)}</> : it.kind === 'phase' ? 'No main task' : 'No task'}
+                  </div>
+                </button>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.04em' }}>DELIVERABLES → TASK</div>
-      {rows.length === 0 ? <div style={{ fontSize: 13, color: C.text3 }}>Every deliverable is linked.</div> : (
-        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>
-              {['Deliverable', 'Task', ''].map((h, i) => <th key={i} style={{ ...cell, fontSize: 11, fontWeight: 700, color: C.text2, background: '#F8FAFC', textAlign: 'left' }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {rows.map((d) => {
-                const sug = suggestions[d.id];
-                const changed = (choice[d.id] || '') !== (linked[d.id] || '');
-                return (
-                  <tr key={d.id} style={{ background: changed ? '#F8FAFF' : undefined }}>
-                    <td style={cell}>
-                      <div style={{ fontWeight: 600 }}>{d.shortName || d.name}</div>
-                      <div style={{ fontSize: 11, color: C.text3 }}>{phaseNameOf(d.phaseId)}</div>
-                    </td>
-                    <td style={{ ...cell, width: 420 }}>
-                      <select value={choice[d.id] || ''} onChange={(e) => setChoice((c) => ({ ...c, [d.id]: e.target.value }))} aria-label={`${d.name} task`}
-                        style={{ height: 30, width: '100%', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, background: C.white }}>
-                        <option value="">— Not linked —</option>
-                        {tasks.map(taskOption)}
-                      </select>
-                    </td>
-                    <td style={{ ...cell, width: 110, fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>
-                      {linked[d.id] ? (changed ? 'Change' : 'Linked') : sug && choice[d.id] === sug.taskId ? `Suggested · ${Math.round(sug.score * 100)}%` : changed ? 'New' : 'No match'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+            {!visible.length && <div style={{ padding: 16, fontSize: 13, color: C.text3 }}>Everything is linked.</div>}
+          </div>
         </div>
-      )}
+
+        {/* Right: the plan */}
+        <div style={col}>
+          <div style={colHead}>
+            <span style={{ whiteSpace: 'nowrap' }}>TASKS (WBS)</span>
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tasks" aria-label="Search tasks"
+              style={{ flex: 1, minWidth: 0, height: 28, border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 8px', fontFamily: F, fontSize: 13, fontWeight: 400, letterSpacing: 0, background: C.white }} />
+          </div>
+          {sel && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.text2, flexShrink: 0 }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Linking <strong style={{ color: C.text }}>{sel.name}</strong>{sel.kind === 'phase' ? ' — main tasks only' : ''}
+              </span>
+              {choice[sel.key] && <button type="button" onClick={() => assign('')} style={{ border: 0, background: 'transparent', color: '#B91C1C', fontFamily: F, fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Unlink</button>}
+            </div>
+          )}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            {taskList.map((t) => {
+              const depth = Math.max(0, String(t.wbs || '').split('.').filter(Boolean).length - 1);
+              const disabled = !sel || (sel.kind === 'phase' && !!t.parentId);
+              const picked = !!sel && choice[sel.key] === t.id;
+              const users = usedBy.get(t.id) || [];
+              return (
+                <button key={t.id} type="button" disabled={disabled} onClick={() => assign(t.id)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left', border: 0, borderBottom: `1px solid ${C.bg2}`, fontFamily: F,
+                    padding: `6px 12px 6px ${12 + depth * 18}px`, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1,
+                    background: picked ? C.primaryBg : C.white, boxShadow: picked ? `inset 3px 0 0 ${C.primary}` : 'none' }}>
+                  <span style={{ fontSize: 11, color: C.text3, minWidth: 34 }}>{t.wbs}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: depth === 0 ? 700 : 400, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.taskName}</span>
+                  {users.length > 0 && <span title={users.join(', ')} style={{ fontSize: 10, fontWeight: 700, color: C.primary, background: C.primaryBg, padding: '1px 6px', borderRadius: 999, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{users.join(', ')}</span>}
+                  {picked && <CheckCircle2 size={14} color={C.primary} />}
+                </button>
+              );
+            })}
+            {!taskList.length && <div style={{ padding: 16, fontSize: 13, color: C.text3 }}>No tasks match.</div>}
+          </div>
+        </div>
+      </div>
     </FormModal>
   );
 }
