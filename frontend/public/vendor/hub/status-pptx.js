@@ -303,43 +303,39 @@
       }
     })();
 
-    // ---------- 5b. progress overview (native charts: S-curve, phases plan vs actual, milestones by status)
+    // ---------- 5b. progress overview (one column: S-curve with monthly values + plan/actual/gap table · phases · milestones)
     if (M.chart) (function () {
-      var C = M.chart, sp = content("Progress Overview", "Status report");
-      var gap = Math.round((P.overallPlanned - P.overall) * 100);
-      var km = M.milestones.filter(function (m) { return m.key; }), kd = km.filter(function (m) { return m.status === "Completed"; }).length;
-      [["PLAN AT REPORT DATE", h.fmtP(P.overallPlanned), h.fmtD(P.rd), K_.navy2],
-       ["ACTUAL", h.fmtP(P.overall), "Overall progress", K_.blue],
-       ["GAP TO PLAN", (gap > 0 ? "−" + gap : "+" + (-gap)) + " pts", gap > 0 ? "Behind plan" : "On or ahead of plan", gap > 15 ? K_.late : gap > 5 ? K_.risk : K_.ok],
-       ["MILESTONES COMPLETED", kd + " / " + km.length, "Project and billing", K_.blue]].forEach(function (t, i) {
-        var x = 0.5 + i * 3.1; card(sp, x, 1.25, 2.95, 0.95, "KPI " + (i + 1));
-        sp.addShape(pres.ShapeType.rect, { x: x, y: 1.25, w: 0.06, h: 0.95, fill: { color: t[3] }, line: { type: "none" } });
-        sp.addText(t[0], { x: x + 0.2, y: 1.3, w: 2.7, h: 0.25, fontSize: 8.5, bold: true, color: K_.mut, charSpacing: 1, margin: 0, isTextBox: true });
-        sp.addText(t[1], { x: x + 0.2, y: 1.52, w: 2.7, h: 0.4, fontSize: 20, bold: true, color: K_.navy, margin: 0, isTextBox: true });
-        sp.addText(t[2], { x: x + 0.2, y: 1.9, w: 2.7, h: 0.25, fontSize: 9, color: K_.mut, margin: 0, isTextBox: true });
-      });
-      // S-curve
-      card(sp, 0.5, 2.35, 6.05, 3.15, "S-curve"); cardTitle(sp, 0.5, 2.35, 6.05, "Overall progress · plan vs actual");
-      var actual = C.actual.map(function (v) { return v == null ? null : v; });
-      sp.addChart(pres.ChartType.line, [{ name: "Plan", labels: C.labels, values: C.plan }, { name: "Actual", labels: C.labels, values: actual }],
-        { x: 0.6, y: 2.75, w: 5.85, h: 2.7, chartColors: ["9FB8DA", "1B4F8F"], lineSize: 2, lineDataSymbol: "circle", lineDataSymbolSize: 5,
+      var C = M.chart, sp = content("Progress Overview", "Status report"), N = C.labels.length, FW = W - 1.0;
+      card(sp, 0.5, 1.2, FW, 3.62, "S-curve"); cardTitle(sp, 0.5, 1.2, FW, "Overall progress · plan vs actual by month");
+      sp.addChart(pres.ChartType.line, [{ name: "Plan", labels: C.labels, values: C.plan }, { name: "Actual", labels: C.labels, values: C.actual }],
+        { x: 0.6, y: 1.5, w: FW - 0.2, h: 2.3, chartColors: ["9FB8DA", "1B4F8F"], lineSize: 2, lineDataSymbol: "circle", lineDataSymbolSize: 6,
           valAxisMinVal: 0, valAxisMaxVal: 100, valAxisLabelFormatCode: '0"%"', valAxisLabelFontSize: 8, catAxisLabelFontSize: 8, valGridLine: { color: "E6ECF3", size: 0.5 },
+          showValue: true, dataLabelFormatCode: '0"%"', dataLabelPosition: "t", dataLabelFontSize: 8, dataLabelColor: "0F2A4A",
           showLegend: true, legendPos: "t", legendFontSize: 8, displayBlanksAs: "gap", objectName: "S-curve chart" });
-      // phases plan vs actual
+      // month table under the chart
+      var lw = 0.9, cw = (FW - 0.3 - lw) / Math.max(N, 1), f = function (v) { return v == null ? "–" : v + "%"; };
+      var rowsT = [[cell("", { fill: { color: K_.sky } })].concat(C.labels.map(function (l) { return cell(l, { align: "center", bold: true, fontSize: 8, color: K_.navy, fill: { color: K_.sky } }); })),
+        [cell("Plan", { bold: true, fontSize: 8.5, color: "6F8BB0" })].concat(C.plan.map(function (v) { return cell(f(v), { align: "center", fontSize: 8.5, color: "6F8BB0" }); })),
+        [cell("Actual", { bold: true, fontSize: 8.5, color: K_.navy })].concat(C.actual.map(function (v) { return cell(f(v), { align: "center", fontSize: 8.5, bold: true, color: K_.navy }); })),
+        [cell("Gap", { bold: true, fontSize: 8.5, color: K_.mut })].concat(C.actual.map(function (a, k) { var p = C.plan[k];
+          if (a == null || p == null) return cell("–", { align: "center", fontSize: 8.5, color: K_.mut });
+          var g = a - p; return cell((g > 0 ? "+" : "") + g, { align: "center", fontSize: 8.5, bold: true, color: g < 0 ? K_.late : g > 0 ? K_.ok : K_.mut }); }))];
+      sp.addTable(rowsT, { x: 0.65, y: 3.86, w: FW - 0.3, colW: [lw].concat(C.labels.map(function () { return cw; })), rowH: 0.22, border: { type: "solid", pt: 0.5, color: K_.line }, margin: [1, 2, 1, 2], objectName: "Monthly plan vs actual" });
+      // phases actual vs plan
       var ph = C.phases.slice(0, 10);
-      card(sp, 6.75, 2.35, 6.08, 3.15, "Phases"); cardTitle(sp, 6.75, 2.35, 6.08, "Phase progress · actual vs plan");
-      if (ph.length) sp.addChart(pres.ChartType.bar, [{ name: "Plan", labels: ph.map(function (p) { return cut(p.name, 26); }), values: ph.map(function (p) { return p.planned; }) },
-          { name: "Actual", labels: ph.map(function (p) { return cut(p.name, 26); }), values: ph.map(function (p) { return p.actual; }) }],
-        { x: 6.85, y: 2.75, w: 5.9, h: 2.7, barDir: "bar", barGrouping: "clustered", chartColors: ["9FB8DA", "1B4F8F"], catAxisOrientation: "maxMin",
-          valAxisMinVal: 0, valAxisMaxVal: 100, valAxisLabelFormatCode: '0"%"', valAxisLabelFontSize: 8, catAxisLabelFontSize: 8, valGridLine: { color: "E6ECF3", size: 0.5 },
-          showLegend: true, legendPos: "t", legendFontSize: 8, showValue: false, objectName: "Phase chart" });
+      card(sp, 0.5, 4.92, FW, 1.38, "Phases"); cardTitle(sp, 0.5, 4.92, FW, "Phase progress · actual vs plan");
+      if (ph.length) sp.addChart(pres.ChartType.bar, [{ name: "Plan", labels: ph.map(function (p) { return cut(p.name, 34); }), values: ph.map(function (p) { return p.planned; }) },
+          { name: "Actual", labels: ph.map(function (p) { return cut(p.name, 34); }), values: ph.map(function (p) { return p.actual; }) }],
+        { x: 0.6, y: 5.2, w: FW - 0.2, h: 1.08, barDir: "bar", barGrouping: "clustered", chartColors: ["9FB8DA", "1B4F8F"], catAxisOrientation: "maxMin",
+          valAxisMinVal: 0, valAxisMaxVal: 100, valAxisHidden: true, valGridLine: { style: "none" }, catAxisLabelFontSize: 7.5,
+          showValue: true, dataLabelFormatCode: '0"%"', dataLabelFontSize: 7, showLegend: true, legendPos: "r", legendFontSize: 8, objectName: "Phase chart" });
       // milestones by status (stacked)
-      card(sp, 0.5, 5.65, 12.33, 1.35, "Milestones by status"); cardTitle(sp, 0.5, 5.65, 12.33, "Milestones by status");
+      card(sp, 0.5, 6.38, FW, 0.68, "Milestones by status");
       var ST = h.STATUS, cats = ["Project milestones", "Billing milestones"], mc = [C.milestones.project || {}, C.milestones.billing || {}];
       sp.addChart(pres.ChartType.bar, ST.map(function (st) { return { name: st, labels: cats, values: mc.map(function (c) { return c[st] || 0; }) }; }),
-        { x: 0.6, y: 5.95, w: 12.1, h: 1.02, barDir: "bar", barGrouping: "stacked", chartColors: ST.map(function (st) { return SC[st] || K_.ns; }), catAxisOrientation: "maxMin",
-          valAxisHidden: true, valGridLine: { style: "none" }, catAxisLabelFontSize: 9, showLegend: true, legendPos: "r", legendFontSize: 8,
-          showValue: true, dataLabelColor: "FFFFFF", dataLabelFontSize: 8, dataLabelFormatCode: '0;;;', objectName: "Milestone chart" });
+        { x: 0.6, y: 6.4, w: FW - 0.2, h: 0.64, barDir: "bar", barGrouping: "stacked", chartColors: ST.map(function (st) { return SC[st] || K_.ns; }), catAxisOrientation: "maxMin",
+          valAxisHidden: true, valGridLine: { style: "none" }, catAxisLabelFontSize: 8, showLegend: true, legendPos: "r", legendFontSize: 7.5,
+          showValue: true, dataLabelColor: "FFFFFF", dataLabelFontSize: 7.5, dataLabelFormatCode: '0;;;', objectName: "Milestone chart" });
     })();
 
     // ---------- 6. key milestones (12 rows per column, 24 per slide)

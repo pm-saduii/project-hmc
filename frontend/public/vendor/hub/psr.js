@@ -884,45 +884,54 @@
   // ---------- Progress overview: S-curve plan vs actual · phases plan vs actual · milestones by status
   var HEX = { "Completed": "#2f6fde", "On Track": "#2e9e6b", "At Risk": "#e0a100", "Delayed": "#d64545", "Not Started": "#94a3b8" };
   function pageProgress(M, mode, n) {
-    var C = M.chart, P = M.P;
+    var C = M.chart;
     var h = '<section class="page">' + header(M, mode, "Progress Overview");
-    // KPI strip
-    var gap = Math.round((P.overallPlanned - P.overall) * 100);
-    var km = M.milestones.filter(function (m) { return m.key; }), kd = km.filter(function (m) { return m.status === "Completed"; }).length;
-    h += '<div class="hero h5" style="grid-template-columns:repeat(4,1fr)">' +
-      '<div class="tile"><div class="tl-k">Plan at report date</div><div class="big">' + fmtP(P.overallPlanned) + '</div><div class="tl-s">' + fmtD(P.rd) + "</div></div>" +
-      '<div class="tile t-prog"><div class="tl-k">Actual</div><div class="big">' + fmtP(P.overall) + '</div><div class="tl-s">Overall progress</div></div>' +
-      '<div class="tile ' + (gap > 15 ? "t-late" : gap > 5 ? "t-risk" : "t-ok") + '"><div class="tl-k">Gap to plan</div><div class="big">' + (gap > 0 ? "−" + gap : "+" + (-gap)) + '<small> pts</small></div><div class="tl-s">' + (gap > 0 ? "Behind plan" : "On or ahead of plan") + "</div></div>" +
-      '<div class="tile t-done"><div class="tl-k">Milestones completed</div><div class="big">' + kd + '<small> / ' + km.length + '</small></div><div class="tl-s">Project and billing</div></div></div>';
-    // S-curve (SVG)
-    var Wd = 520, Ht = 250, L = 36, R = 24, T = 12, B = 30, iw = Wd - L - R, ih = Ht - T - B, N = C.labels.length;
+    // S-curve (full width) with the value of every month and the gap between plan and actual
+    var Wd = 1040, Ht = 250, L = 40, R = 24, T = 18, B = 26, iw = Wd - L - R, ih = Ht - T - B, N = C.labels.length;
     var x = function (i) { return L + (N <= 1 ? iw / 2 : i * iw / (N - 1)); }, y = function (v) { return T + ih - v / 100 * ih; };
     var svg = '<svg viewBox="0 0 ' + Wd + " " + Ht + '" width="100%" style="display:block">';
     [0, 25, 50, 75, 100].forEach(function (g) { svg += '<line x1="' + L + '" x2="' + (Wd - R) + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="#e6ecf3"/><text x="' + (L - 6) + '" y="' + (y(g) + 3) + '" font-size="9" text-anchor="end" fill="#8796ab">' + g + "%</text>"; });
-    var every = Math.max(1, Math.ceil(N / 9));
-    C.labels.forEach(function (lb, i) { if (i % every === 0 || i === N - 1) svg += '<text x="' + x(i) + '" y="' + (Ht - 10) + '" font-size="9" text-anchor="middle" fill="#8796ab">' + esc(lb) + "</text>"; });
+    C.labels.forEach(function (lb, i) { svg += '<text x="' + x(i) + '" y="' + (Ht - 8) + '" font-size="9.5" text-anchor="middle" fill="#5b6b82">' + esc(lb) + "</text>"; });
     var path = function (arr) { var d = "", on = false; arr.forEach(function (v, i) { if (v == null) { on = false; return; } d += (on ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1) + " "; on = true; }); return d; };
+    // gap bars between plan and actual
+    C.actual.forEach(function (a, i) { var p = C.plan[i]; if (a == null || p == null || a === p) return;
+      svg += '<line x1="' + x(i) + '" x2="' + x(i) + '" y1="' + y(p) + '" y2="' + y(a) + '" stroke="' + (a < p ? "#d64545" : "#2e9e6b") + '" stroke-width="6" stroke-opacity=".22" stroke-linecap="round"/>'; });
     svg += '<path d="' + path(C.plan) + '" fill="none" stroke="#9fb8da" stroke-width="2.5" stroke-dasharray="6 4"/>';
     svg += '<path d="' + path(C.actual) + '" fill="none" stroke="#1b4f8f" stroke-width="3"/>';
-    C.actual.forEach(function (v, i) { if (v != null) svg += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="3.5" fill="#1b4f8f"/>'; });
-    var li = -1; C.actual.forEach(function (v, i) { if (v != null) li = i; });
-    if (li >= 0) svg += '<text x="' + (x(li) + 6) + '" y="' + (y(C.actual[li]) - 6) + '" font-size="11" font-weight="700" fill="#0f2a4a">' + C.actual[li] + "%</text>";
+    C.plan.forEach(function (p, i) { if (p == null) return; var a = C.actual[i], above = a == null || p >= a;
+      svg += '<circle cx="' + x(i) + '" cy="' + y(p) + '" r="3" fill="#fff" stroke="#9fb8da" stroke-width="2"/>' +
+        (!above && p < 8 ? '<text x="' + (x(i) + 7) + '" y="' + (y(p) - 3) + '" font-size="9.5" text-anchor="start" fill="#6f8bb0">' + p + "%</text>"   // too close to the axis: label to the right
+          : '<text x="' + x(i) + '" y="' + (y(p) + (above ? -8 : 15)) + '" font-size="9.5" text-anchor="middle" fill="#6f8bb0">' + p + "%</text>"); });
+    C.actual.forEach(function (a, i) { if (a == null) return; var p = C.plan[i], above = p == null || a > p;
+      svg += '<circle cx="' + x(i) + '" cy="' + y(a) + '" r="4" fill="#1b4f8f"/>' +
+        '<text x="' + x(i) + '" y="' + (y(a) + (above ? -9 : 16)) + '" font-size="10.5" font-weight="700" text-anchor="middle" fill="#0f2a4a">' + a + "%</text>"; });
     svg += "</svg>";
-    var legend = '<div class="stack-l" style="margin:0 0 4px"><span><i style="background:#9fb8da"></i>Plan</span><span><i style="background:#1b4f8f"></i>Actual</span></div>';
-    // phases plan vs actual
+    // month table: plan · actual · gap
+    var cellW = 'style="text-align:center;padding:3px 2px"';
+    var tbl = '<table style="table-layout:fixed;margin-top:4px"><tbody>' +
+      '<tr><td style="width:70px;font-weight:700;color:#6f8bb0;padding:3px 6px">Plan</td>' + C.plan.map(function (v) { return "<td " + cellW + ">" + (v == null ? "–" : v + "%") + "</td>"; }).join("") + "</tr>" +
+      '<tr><td style="font-weight:700;color:#0f2a4a;padding:3px 6px">Actual</td>' + C.actual.map(function (v) { return "<td " + cellW + "><b>" + (v == null ? "–" : v + "%") + "</b></td>"; }).join("") + "</tr>" +
+      '<tr><td style="font-weight:700;color:var(--mut);padding:3px 6px">Gap</td>' + C.actual.map(function (a, i) { var p = C.plan[i]; if (a == null || p == null) return "<td " + cellW + ">–</td>";
+        var g = a - p; return '<td style="text-align:center;padding:3px 2px;font-weight:700;color:' + (g < 0 ? "#d64545" : g > 0 ? "#2e9e6b" : "#5b6b82") + '">' + (g > 0 ? "+" : "") + g + "</td>"; }).join("") + "</tr></tbody></table>";
+    var legend = '<div class="stack-l" style="margin:0 0 2px"><span><i style="background:#9fb8da"></i>Plan</span><span><i style="background:#1b4f8f"></i>Actual</span>' +
+      '<span><i style="background:#f5cfcf"></i>Behind plan</span><span><i style="background:#cdeadb"></i>Ahead of plan</span></div>';
+    h += '<div class="card">' + title("Overall progress · plan vs actual by month") + legend + svg + tbl + "</div>";
+    // phases: actual vs plan (one line each)
     var ph = C.phases.slice(0, 10).map(function (p) {
-      return '<div style="display:grid;grid-template-columns:150px 1fr 74px;gap:8px;align-items:center;margin:0 0 7px">' +
+      var g = p.actual - p.planned;
+      return '<div style="display:grid;grid-template-columns:230px 1fr 150px;gap:12px;align-items:center;margin:0 0 6px">' +
         '<div class="clamp" style="font-weight:600;font-size:11.5px">' + esc(p.name) + "</div>" +
-        '<div><div style="height:7px;border-radius:4px;background:#e3e9f1;position:relative;margin-bottom:3px"><div style="position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#9fb8da;width:' + p.planned + '%"></div></div>' +
-        '<div style="height:9px;border-radius:5px;background:#e3e9f1;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:' + (HEX[p.status] || "#1b4f8f") + ";width:" + p.actual + '%"></div></div></div>' +
-        '<div style="font-size:10.5px;color:var(--mut);text-align:right">' + p.actual + "% <span style=\"color:var(--soft)\">/ " + p.planned + "%</span></div></div>";
+        '<div style="position:relative;height:12px;border-radius:6px;background:#e3e9f1">' +
+          '<div style="position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:' + (HEX[p.status] || "#1b4f8f") + ";width:" + p.actual + '%"></div>' +
+          '<div title="Plan" style="position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;background:#0f2a4a;left:calc(' + p.planned + '% - 1px)"></div></div>' +
+        '<div style="font-size:11px;color:var(--mut);text-align:right"><b style="color:var(--ink)">' + p.actual + '%</b> / plan ' + p.planned + '% · <b style="color:' + (g < 0 ? "#d64545" : g > 0 ? "#2e9e6b" : "#5b6b82") + '">' + (g > 0 ? "+" : "") + g + "</b></div></div>";
     }).join("") || '<div class="muted">No phases</div>';
-    h += '<div class="cols2"><div class="card">' + title("Overall progress · plan vs actual") + legend + svg + '</div><div class="card">' + title("Phase progress · actual vs plan") +
-      '<div class="stack-l" style="margin:0 0 8px"><span><i style="background:#9fb8da"></i>Plan at report date</span><span><i style="background:#1b4f8f"></i>Actual (colour = status)</span></div>' + ph + "</div></div>";
+    h += '<div class="card">' + title("Phase progress · actual vs plan") +
+      '<div class="stack-l" style="margin:0 0 8px"><span><i style="background:#1b4f8f"></i>Actual (colour = status)</span><span><i style="background:#0f2a4a;width:3px"></i>Plan at report date</span></div>' + ph + "</div>";
     // milestones by status (project vs billing)
     var bar = function (label, c) {
       var tot = 0; STATUS.forEach(function (s) { tot += c[s] || 0; });
-      return '<div style="display:grid;grid-template-columns:150px 1fr 60px;gap:10px;align-items:center;margin:0 0 8px"><b style="font-size:12px">' + label + '</b>' +
+      return '<div style="display:grid;grid-template-columns:150px 1fr 60px;gap:10px;align-items:center;margin:0 0 6px"><b style="font-size:12px">' + label + '</b>' +
         (tot ? '<div class="stack">' + STATUS.map(function (s) { return c[s] ? '<span class="' + SCLASS[s] + '" style="flex:' + c[s] + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">' + c[s] + "</span>" : ""; }).join("") + "</div>"
           : '<div class="muted" style="font-size:11px">None</div>') + '<div style="font-size:11px;color:var(--mut);text-align:right">' + tot + " total</div></div>";
     };
