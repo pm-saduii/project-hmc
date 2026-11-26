@@ -399,7 +399,7 @@ export default function PortfolioDashboard({ isMobile }: { isMobile: boolean }) 
     <div style={{ padding: isMobile ? '18px 14px' : '28px 32px', fontFamily: F }}>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, margin: '0 0 6px' }}>Dashboard</h2>
-        <p style={{ color: C.text2, fontSize: 13, margin: 0 }}>{format(today, 'EEEE d MMMM yyyy')} · what needs attention across your projects</p>
+        <p style={{ color: C.text2, fontSize: 13, margin: 0 }}>{format(today, 'EEEE dd/MM/yyyy')} · what needs attention across your projects</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : `repeat(${kpis.length}, minmax(0, 1fr))`, gap: 12, marginBottom: 16 }}>

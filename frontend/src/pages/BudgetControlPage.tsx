@@ -15,7 +15,7 @@ import { isClosedStatus, isHyperCareStatus, projectHealth } from '../utils/proje
 import type { Effort, Member, Project, Task } from '../types';
 
 const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 });
-const when = (v: string | null) => (v ? format(new Date(v), 'd MMM yyyy') : '');
+const when = (v: string | null) => (v ? format(new Date(v), 'dd/MM/yyyy') : '');
 
 interface Row { project: Project; report: BudgetReport | null; snap: BudgetSnapshot; pmName: string; frozen: boolean; finished: boolean }
 
@@ -95,7 +95,7 @@ export default function BudgetControlPage() {
           <button type="button" aria-label="Next month" disabled={period >= thisMonth} onClick={() => setPeriod(shiftPeriod(period, 1))} style={navBtn(period >= thisMonth)}><ChevronRight size={16} /></button>
         </div>
         <span style={{ fontSize: 13, color: daysToDue < 0 ? '#B91C1C' : C.text2 }}>
-          Due {format(due, 'd MMM yyyy')} · {daysToDue > 0 ? `in ${daysToDue} day${daysToDue > 1 ? 's' : ''}` : daysToDue === 0 ? 'today' : `${-daysToDue} day${daysToDue < -1 ? 's' : ''} overdue`}
+          Due {format(due, 'dd/MM/yyyy')} · {daysToDue > 0 ? `in ${daysToDue} day${daysToDue > 1 ? 's' : ''}` : daysToDue === 0 ? 'today' : `${-daysToDue} day${daysToDue < -1 ? 's' : ''} overdue`}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['none', 'draft', 'returned', 'submitted', 'reviewed', 'approved'] as const).filter((s) => counts[s]).map((s) => (
@@ -240,7 +240,7 @@ function ReportModal({ row, period, role, onClose, onChanged }: { row: Row; peri
       </>}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
         <Pill bg={s.bg} fg={s.fg}>{s.label}</Pill>
-        <span style={{ fontSize: 13, color: C.text2 }}>PM: {pmName || '—'} · Due {format(dueDateOf(period), 'd MMM yyyy')}</span>
+        <span style={{ fontSize: 13, color: C.text2 }}>PM: {pmName || '—'} · Due {format(dueDateOf(period), 'dd/MM/yyyy')}</span>
         <span style={{ fontSize: 11, color: C.text3, marginLeft: 'auto' }}>{row.frozen ? `Figures frozen when submitted (${when(report?.preparedAt || null)})` : 'Live figures from Plan › Effort'}</span>
       </div>
 

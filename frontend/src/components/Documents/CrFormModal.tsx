@@ -1,7 +1,7 @@
 import React from 'react';
 import toast from 'react-hot-toast';
 import { FileText } from 'lucide-react';
-import { Btn, C } from '../Common';
+import { Btn, C, Input } from '../Common';
 import { FormModal, fieldLabel, hint, input } from '../Admin/AdminUi';
 import { supabase } from '../../services/supabase';
 import { CR_MILESTONES, CR_MODULES, contactsFromMembers, defaultCrForm, downloadCrForm, type CrForm } from '../../utils/companyDocs';
@@ -66,7 +66,7 @@ export default function CrFormModal({ cr, project, members, canEdit, onClose, on
         </label>
         <label style={fieldLabel}>Prepared by<input value={form.preparedBy} readOnly={ro} onChange={(e) => set('preparedBy', e.target.value)} style={input} /></label>
         <label style={fieldLabel}>Project model<input value={form.projectModel} readOnly={ro} onChange={(e) => set('projectModel', e.target.value)} style={input} placeholder="e.g. Cloud" /></label>
-        <label style={fieldLabel}>Expected finish date<input type="date" value={form.expectedFinish} readOnly={ro} onChange={(e) => set('expectedFinish', e.target.value)} style={input} /></label>
+        <label style={fieldLabel}>Expected finish date<Input type="date" value={form.expectedFinish} disabled={ro} onChange={(v) => set('expectedFinish', v)} /></label>
       </div>
 
       {section('PART 1 · REQUEST')}
@@ -122,8 +122,8 @@ export default function CrFormModal({ cr, project, members, canEdit, onClose, on
         {CR_MILESTONES.map((m, i) => (
           <div key={m.name} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 160px', gap: 8, alignItems: 'center', padding: '4px 10px', borderBottom: `1px solid ${C.bg2}`, fontSize: 13, fontFamily: F }}>
             <span>{m.name}</span><span style={{ color: C.text2 }}>{m.pic}</span>
-            <input type="date" value={form.milestones[i] || ''} readOnly={ro} aria-label={`${m.name} planned finish`}
-              onChange={(e) => set('milestones', form.milestones.map((d, k) => (k === i ? e.target.value : d)))} style={{ ...input, height: 30 }} />
+            <Input type="date" value={form.milestones[i] || ''} disabled={ro} aria-label={`${m.name} planned finish`}
+              onChange={(v) => set('milestones', form.milestones.map((d, k) => (k === i ? v : d)))} />
           </div>
         ))}
       </div>

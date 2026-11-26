@@ -130,7 +130,7 @@ export default function LessonsLearnedTab({ project }: { project: Project }) {
       const contentWidth = pageWidth - margin * 2;
       const footerY = pageHeight - 12;
       const topY = 10;
-      const generatedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const generatedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
       exportHost = document.createElement('div');
       exportHost.style.cssText = 'position:fixed;inset:0;pointer-events:none;opacity:0;z-index:-1;';
       exportRoot = document.createElement('div');

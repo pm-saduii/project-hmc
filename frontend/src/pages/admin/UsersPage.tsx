@@ -17,7 +17,7 @@ const PAGE_SIZE = 25;
 const AVATAR = ['#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#F97316', '#14B8A6'];
 const avatarColor = (s: string) => AVATAR[[...s].reduce((a, ch) => a + ch.charCodeAt(0), 0) % AVATAR.length];
 const initials = (u: AdminUser) => (u.fullName || u.email).split(/[\s@.]+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-const when = (v?: string | null) => { if (!v) return ''; const d = parseISO(v); return isValid(d) ? format(d, 'd MMM yyyy') : ''; };
+const when = (v?: string | null) => { if (!v) return ''; const d = parseISO(v); return isValid(d) ? format(d, 'dd/MM/yyyy') : ''; };
 
 type Memberships = Awaited<ReturnType<typeof adminUsersApi.memberships>>;
 

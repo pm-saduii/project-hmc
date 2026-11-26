@@ -51,7 +51,7 @@ export const PROJECT_GROUPS: ProjectGroup[] = [
     label: 'Delivery',
     subs: [
       // Deliverables share the Checklist screen permission.
-      { key: 'deliverables', label: 'Deliverables', screen: 'checklists' },
+      { key: 'deliverables', label: 'Methodology', screen: 'checklists' },
       { key: 'checklist', label: 'Checklist', screen: 'checklists' },
       { key: 'lessons', label: 'Lessons Learned', screen: 'lessons' },
     ],

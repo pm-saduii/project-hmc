@@ -1,5 +1,6 @@
 import React from 'react';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 import { Mail, MessageSquare, RefreshCw, Send } from 'lucide-react';
 import { Btn, C } from '../components/Common';
 import { AdminHeader, F, Pill, input, panel, td, th } from '../components/Admin/AdminUi';
@@ -69,7 +70,7 @@ export default function NotificationsPage() {
         </>} />
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {tabBtn('queue', `Today${date ? ` · ${date}` : ''}`)}{tabBtn('history', 'History')}{(role === 'admin' || role === 'pm') && tabBtn('teams', 'Teams channels')}
+        {tabBtn('queue', `Today${date ? ` · ${date.split('-').reverse().join('/')}` : ''}`)}{tabBtn('history', 'History')}{(role === 'admin' || role === 'pm') && tabBtn('teams', 'Teams channels')}
       </div>
 
       {error && <div style={{ ...panel, padding: 16, fontSize: 13, color: C.red }}>{migrationMissing ? 'Notifications are not set up yet: run the migration 2026-11-29-notifications.sql.' : error}</div>}
@@ -120,7 +121,7 @@ export default function NotificationsPage() {
             <tbody>
               {log.length === 0 ? <tr><td colSpan={6} style={{ ...td, color: C.text2 }}>Nothing sent yet.</td></tr> : log.map((l) => (
                 <tr key={l.id}>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>{new Date(l.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}<div style={{ fontSize: 11, color: C.text3 }}>{l.trigger}</div></td>
+                  <td style={{ ...td, whiteSpace: 'nowrap' }}>{format(new Date(l.createdAt), 'dd/MM/yyyy HH:mm')}<div style={{ fontSize: 11, color: C.text3 }}>{l.trigger}</div></td>
                   <td style={td}>{l.ruleId}<div style={{ fontSize: 11, color: C.text3 }}>{l.subject}</div></td>
                   <td style={td}>{l.channel}</td>
                   <td style={td}>{l.recipient}</td>

@@ -140,7 +140,7 @@ export default function EmailLogsPage() {
   const fmtTime = (iso: string | null) => {
     if (!iso) return '-';
     try {
-      return new Date(iso).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     } catch {
       return iso;
     }

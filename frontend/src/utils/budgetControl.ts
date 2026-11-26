@@ -154,7 +154,7 @@ export async function exportBudgetPdf(args: {
   const font = await ensureThaiFont(doc);
   const W = doc.internal.pageSize.getWidth();
   const navy: [number, number, number] = [19, 40, 76];
-  const d = (v?: string | null) => { const x = toDate(v || undefined); return x ? format(x, 'd MMM yyyy') : '—'; };
+  const d = (v?: string | null) => { const x = toDate(v || undefined); return x ? format(x, 'dd/MM/yyyy') : '—'; };
   const n = (v: number) => (v ? String(Math.round(v * 100) / 100) : '');
 
   // Title and project details
@@ -235,13 +235,13 @@ export async function exportBudgetPdf(args: {
     doc.setFont(font, 'bold'); doc.setFontSize(8.5); doc.setTextColor(...navy); doc.text(title, x + 4, y + 6);
     doc.setFont(font, 'normal'); doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.text(name || '—', x + bw / 2, y + 14, { align: 'center' });
     doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-    doc.text(`${role}${at ? ` · ${format(new Date(at), 'd MMM yyyy')}` : ' · pending'}`, x + bw / 2, y + 20, { align: 'center' });
+    doc.text(`${role}${at ? ` · ${format(new Date(at), 'dd/MM/yyyy')}` : ' · pending'}`, x + bw / 2, y + 20, { align: 'center' });
   });
 
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i += 1) {
     doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
-    doc.text(`Generated ${format(new Date(), 'd MMM yyyy HH:mm')} · Page ${i} of ${pages}`, W - 12, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
+    doc.text(`Generated ${format(new Date(), 'dd/MM/yyyy HH:mm')} · Page ${i} of ${pages}`, W - 12, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
   }
   doc.save(`Project Budget control report ${project.code || project.name} ${s.period.replace('-', '')}.pdf`);
 }

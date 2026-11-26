@@ -17,7 +17,7 @@ const STATUS_COLOR: Record<string, string> = { 'On Track': '2E9E6B', Delay: 'E0A
 const STATUS_TEXT: Record<string, string> = { 'On Track': 'On track', Delay: 'At risk', Stoper: 'Off track', 'Plan N/A': 'No plan' };
 
 const toDate = (v?: string | null) => { if (!v) return null; const d = parseISO(v); return isValid(d) ? d : null; };
-const fd = (v?: string | null) => { const d = toDate(v); return d ? format(d, 'd MMM yyyy') : '—'; };
+const fd = (v?: string | null) => { const d = toDate(v); return d ? format(d, 'dd/MM/yyyy') : '—'; };
 const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 const isDone = (t: Task) => t.status === 'Done' || Number(t.percentComplete) >= 100;
 
@@ -58,7 +58,7 @@ export async function downloadWeeklyStatus(input: StatusInput) {
   pres.theme = { headFontFace: 'Poppins', bodyFontFace: 'Poppins' };
   const W = 13.333;
   const footer = (slide: Slide, n: number) => {
-    slide.addText(`${input.internal ? 'Internal use only' : 'Confidential'} · ${title} · Week ending ${format(asOf, 'd MMM yyyy')}`, { x: 0.5, y: 7.05, w: 9, h: 0.3, fontSize: 9, color: '8796AB' });
+    slide.addText(`${input.internal ? 'Internal use only' : 'Confidential'} · ${title} · Week ending ${format(asOf, 'dd/MM/yyyy')}`, { x: 0.5, y: 7.05, w: 9, h: 0.3, fontSize: 9, color: '8796AB' });
     slide.addText(String(n), { x: W - 1, y: 7.05, w: 0.5, h: 0.3, fontSize: 9, color: '8796AB', align: 'right' });
   };
   const heading = (slide: Slide, text: string, sub?: string) => {
@@ -82,15 +82,15 @@ export async function downloadWeeklyStatus(input: StatusInput) {
   cover.addText('Weekly Status Report', { x: 0.8, y: 1.6, w: 11, h: 0.5, fontSize: 16, color: 'A5B4FC' });
   cover.addText(project.name, { x: 0.8, y: 2.2, w: 11.5, h: 1.2, fontSize: 36, bold: true, color: 'FFFFFF' });
   cover.addText(`${title} · ${project.client || ''}`, { x: 0.8, y: 3.45, w: 11.5, h: 0.5, fontSize: 18, color: 'E0E7FF' });
-  cover.addText(`Week ending ${format(asOf, 'd MMMM yyyy')}${pm ? `  ·  Project Manager: ${pm}` : ''}`, { x: 0.8, y: 4.3, w: 11.5, h: 0.4, fontSize: 14, color: 'C7D2FE' });
+  cover.addText(`Week ending ${format(asOf, 'dd/MM/yyyy')}${pm ? `  ·  Project Manager: ${pm}` : ''}`, { x: 0.8, y: 4.3, w: 11.5, h: 0.4, fontSize: 14, color: 'C7D2FE' });
 
   // 2 · Summary
   const s2 = pres.addSlide();
-  heading(s2, 'Status summary', format(asOf, 'd MMM yyyy'));
+  heading(s2, 'Status summary', format(asOf, 'dd/MM/yyyy'));
   const kpis: [string, string, string, string][] = [
     ['Progress', `${health.actual}%`, `Plan ${health.planned}%`, STATUS_COLOR[health.status] || NAVY],
     ['Schedule', STATUS_TEXT[health.status] || health.status, health.planned > health.actual ? `${health.planned - health.actual} pts behind plan` : 'On or ahead of plan', STATUS_COLOR[health.status] || NAVY],
-    ['Go-live', goLive ? format(goLive, 'd MMM yyyy') : '—', daysToGoLive == null ? '' : daysToGoLive >= 0 ? `${daysToGoLive} days to go` : 'Past plan end', NAVY],
+    ['Go-live', goLive ? format(goLive, 'dd/MM/yyyy') : '—', daysToGoLive == null ? '' : daysToGoLive >= 0 ? `${daysToGoLive} days to go` : 'Past plan end', NAVY],
     ['Open items', `${openIssues.length} issue${openIssues.length === 1 ? '' : 's'} · ${openRisks.length} risk${openRisks.length === 1 ? '' : 's'}`, `${overdue.length} overdue task${overdue.length === 1 ? '' : 's'}`, overdue.length ? 'D64545' : NAVY],
   ];
   kpis.forEach(([label, value, sub, color], i) => {

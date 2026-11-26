@@ -40,7 +40,7 @@ export function statusReason(data: MonthlyReportData, key: AreaKey): string {
 }
 
 const toDate = (v?: string | null) => { if (!v) return null; const d = parseISO(v); return isValid(d) ? d : null; };
-const shortDate = (v?: string | null) => { const d = toDate(v); return d ? format(d, 'd MMM yyyy') : '—'; };
+const shortDate = (v?: string | null) => { const d = toDate(v); return d ? format(d, 'dd/MM/yyyy') : '—'; };
 const lines = (text: string) => text.split('\n').map((l) => l.replace(/^\s*[-•*]\s*/, '').trim()).filter(Boolean);
 
 function StatusPill({ status, prefix, big }: { status: ReportStatus; prefix?: string; big?: boolean }) {
@@ -87,7 +87,7 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
   const paidPct = payment.total > 0 ? Math.round((payment.paid / payment.total) * 100) : 0;
   const kpis = [
     { label: 'Progress', value: `${progress.actual}%`, delta: progressDelta, deltaFg: progress.previous != null && progress.actual < progress.previous ? '#B91C1C' : C.text2, sub: `Plan today ${progress.planned}%${progress.planned > progress.actual ? ` (−${progress.planned - progress.actual} pts)` : ''}`, color: STATUS_LOOK[effectiveStatus(record, data, 'schedule')].dot },
-    { label: 'Go-live', value: goLive.date ? format(toDate(goLive.date) || new Date(), 'd MMM yy') : '—', delta: goLiveShift == null ? 'Project end date' : goLiveShift === 0 ? `No change vs ${prevLabel}` : `${goLiveShift > 0 ? 'Moved +' : 'Moved '}${goLiveShift} days vs ${prevLabel}`, deltaFg: goLiveShift && goLiveShift > 0 ? '#B91C1C' : C.text2, sub: data.project.status, color: STATUS_LOOK[effectiveStatus(record, data, 'schedule')].dot },
+    { label: 'Go-live', value: goLive.date ? format(toDate(goLive.date) || new Date(), 'dd/MM/yyyy') : '—', delta: goLiveShift == null ? 'Project end date' : goLiveShift === 0 ? `No change vs ${prevLabel}` : `${goLiveShift > 0 ? 'Moved +' : 'Moved '}${goLiveShift} days vs ${prevLabel}`, deltaFg: goLiveShift && goLiveShift > 0 ? '#B91C1C' : C.text2, sub: data.project.status, color: STATUS_LOOK[effectiveStatus(record, data, 'schedule')].dot },
     { label: 'Manday used', value: manday.budget > 0 ? `${usedPct}%` : '—', delta: `${fmtMoney(manday.used)} of ${fmtMoney(manday.budget)} md`, deltaFg: C.text2, sub: `Progress ${progress.actual}%`, color: STATUS_LOOK[effectiveStatus(record, data, 'budget')].dot },
     { label: 'Payment received', value: payment.total > 0 ? `${paidPct}%` : '—', delta: payment.overdue ? `${payment.overdue} milestone(s) past due` : 'Nothing past due', deltaFg: payment.overdue ? '#B91C1C' : C.text2, sub: showAmounts ? `${money(payment.paid)} of ${money(payment.total)}` : 'Amounts hidden for your role', color: STATUS_LOOK[effectiveStatus(record, data, 'payment')].dot },
     { label: 'Open issues', value: String(issues.open), delta: `+${issues.opened} new · ${issues.closed} closed`, deltaFg: C.text2, sub: `${issues.blocked} blocked · ${issues.risksOpen} open risks`, color: issues.blocked ? C.red : C.blue },
@@ -130,7 +130,7 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <StatusPill status={effectiveStatus(record, data, 'overall')} prefix="Overall: " big />
           <span style={{ fontSize: 11, fontWeight: 600, color: published ? '#047857' : '#B45309' }}>
-            {published ? `Published ${record?.publishedAt ? format(new Date(record.publishedAt), 'd MMM yyyy') : ''}` : 'Draft · not published'}
+            {published ? `Published ${record?.publishedAt ? format(new Date(record.publishedAt), 'dd/MM/yyyy') : ''}` : 'Draft · not published'}
           </span>
           {canEdit && !published && <Btn variant="outline" onClick={onEdit} disabled={busy}>Edit summary</Btn>}
           {canEdit && !published && <Btn onClick={onPublish} disabled={busy}>Publish {monthName}</Btn>}
@@ -270,7 +270,7 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 700 }}>{p.name}</span>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '0 8px', borderRadius: 999, whiteSpace: 'nowrap', background: done ? C.greenBg : started ? C.primaryBg : C.bg2, color: done ? '#047857' : started ? '#4338CA' : C.text2 }}>
-                      {done ? `Completed ${p.finishedOn ? format(parseISO(p.finishedOn), 'd MMM') : ''}` : started ? 'In progress' : 'Not started'}
+                      {done ? `Completed ${p.finishedOn ? format(parseISO(p.finishedOn), 'dd/MM/yyyy') : ''}` : started ? 'In progress' : 'Not started'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

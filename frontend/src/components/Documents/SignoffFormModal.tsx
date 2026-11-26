@@ -1,10 +1,11 @@
 import React from 'react';
 import toast from 'react-hot-toast';
 import { FileText, Plus, X } from 'lucide-react';
-import { Btn, C } from '../Common';
+import { Btn, C, Input } from '../Common';
 import { FormModal, fieldLabel, hint, input } from '../Admin/AdminUi';
 import { contactsFromMembers, defaultSignoffForm, downloadSignoff, type Participant, type SignoffForm } from '../../utils/companyDocs';
 import type { Member, Project } from '../../types';
+import { fmtDate } from '../../utils';
 
 const area: React.CSSProperties = { ...input, height: 'auto', padding: '8px 12px', lineHeight: 1.5, resize: 'vertical' };
 const grid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 };
@@ -50,7 +51,7 @@ export default function SignoffFormModal({ project, deliverableName, phaseName, 
   return (
     <FormModal title={`Sign-off · ${deliverableName}`} subtitle="Project Deliverable Sign-off · company template v1.3" onClose={onClose} busy={busy} width={820}
       footer={<>
-        <span style={{ ...hint, maxWidth: 380 }}>{signedDate ? `The signing date (${signedDate}) is the deliverable's completed date.` : 'Signing dates are left blank until the deliverable is Signed.'}</span>
+        <span style={{ ...hint, maxWidth: 380 }}>{signedDate ? `The signing date (${fmtDate(signedDate)}) is the deliverable's completed date.` : 'Signing dates are left blank until the deliverable is Signed.'}</span>
         <span style={{ marginLeft: 'auto' }} />
         <Btn variant="ghost" onClick={onClose} disabled={busy}>Close</Btn>
         {canEdit && <Btn variant="outline" onClick={() => void run(false)} disabled={busy}>Save</Btn>}
@@ -63,8 +64,8 @@ export default function SignoffFormModal({ project, deliverableName, phaseName, 
         <label style={fieldLabel}>Project model<input value={form.projectModel} readOnly={ro} onChange={(e) => set('projectModel', e.target.value)} style={input} /></label>
         <label style={fieldLabel}>Place of service<input value={form.place} readOnly={ro} onChange={(e) => set('place', e.target.value)} style={input} /></label>
         <label style={fieldLabel}>Phase<input value={form.phase} readOnly={ro} onChange={(e) => set('phase', e.target.value)} style={input} /></label>
-        <label style={fieldLabel}>Start date<input type="date" value={form.start} readOnly={ro} onChange={(e) => set('start', e.target.value)} style={input} /></label>
-        <label style={fieldLabel}>Completion date<input type="date" value={form.end} readOnly={ro} onChange={(e) => set('end', e.target.value)} style={input} /></label>
+        <label style={fieldLabel}>Start date<Input type="date" value={form.start} disabled={ro} onChange={(v) => set('start', v)} /></label>
+        <label style={fieldLabel}>Completion date<Input type="date" value={form.end} disabled={ro} onChange={(v) => set('end', v)} /></label>
       </div>
       <label style={fieldLabel}>Brief description of services<textarea rows={2} value={form.description} readOnly={ro} onChange={(e) => set('description', e.target.value)} style={area} /></label>
       <label style={fieldLabel}>Deliverables<textarea rows={3} value={form.deliverables} readOnly={ro} onChange={(e) => set('deliverables', e.target.value)} style={area} />

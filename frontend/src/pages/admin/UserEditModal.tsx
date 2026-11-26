@@ -23,7 +23,7 @@ const SCREEN_GROUPS: { title: string; ids: string[] }[] = [
 ];
 const SCREEN_NOTES: Record<string, string> = { 'portfolio-overview': 'Projects list and dashboard', ms: 'Contract amounts', env: 'URLs and passwords' };
 const LEVELS: { value: ScreenAccessLevel; label: string }[] = [{ value: 'hidden', label: 'Hidden' }, { value: 'read', label: 'Read' }, { value: 'full', label: 'Full' }];
-const when = (v?: string | null) => { if (!v) return ''; const d = parseISO(v); return isValid(d) ? format(d, 'd MMM yyyy') : ''; };
+const when = (v?: string | null) => { if (!v) return ''; const d = parseISO(v); return isValid(d) ? format(d, 'dd/MM/yyyy') : ''; };
 
 interface Draft { fullName: string; email: string; role: UserRole; scope: 'member' | 'all'; screens: UserScreenPermissions }
 const draftOf = (u: AdminUser): Draft => ({ fullName: u.fullName, email: u.email, role: u.role, scope: u.role === 'admin' ? 'all' : u.projectAccessScope, screens: effectiveScreens(u) });
