@@ -21,6 +21,7 @@ const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const OnePagePage = lazy(() => import('./pages/OnePagePage'));
 const BudgetControlPage = lazy(() => import('./pages/BudgetControlPage'));
 const MethodologyPage = lazy(() => import('./pages/MethodologyPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const EmailLogsPage = lazy(() => import('./pages/EmailLogsPage'));
 const SettingsLayout = lazy(() => import('./pages/admin/settings/SettingsLayout'));
 const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
@@ -124,6 +125,7 @@ export default function App() {
           <Route path="one-page/:projectId" element={<OnePageGuard>{page(<OnePagePage />)}</OnePageGuard>} />
           <Route path="budget" element={<BudgetGuard>{page(<BudgetControlPage />)}</BudgetGuard>} />
           <Route path="methodology" element={page(<MethodologyPage />)} />
+          <Route path="notifications" element={<BudgetGuard>{page(<NotificationsPage />)}</BudgetGuard>} />
           <Route path="projects" element={portfolio('projects')} />
           <Route path="projects/:projectId/*" element={page(<ProjectPage />)} />
           <Route path="my-tasks" element={page(<MyTasksPage />)} />

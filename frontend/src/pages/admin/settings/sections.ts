@@ -7,8 +7,9 @@ export interface LookupSection {
 }
 export interface ChecklistSection { kind: 'checklist'; path: string; label: string; category: ProjectChecklistCategoryId; description: string }
 export interface TemplatesSection { kind: 'templates'; path: string; label: string; description: string }
+export interface NotificationsSection { kind: 'notifications'; path: string; label: string; description: string }
 export interface MethodologySection { kind: 'methodology'; path: string; label: string; mode: 'phases' | 'deliverables'; description: string }
-export type SettingsSection = LookupSection | ChecklistSection | TemplatesSection | MethodologySection;
+export type SettingsSection = LookupSection | ChecklistSection | TemplatesSection | MethodologySection | NotificationsSection;
 
 export const SETTINGS_GROUPS: { title: string; sections: SettingsSection[] }[] = [
   {
@@ -44,6 +45,12 @@ export const SETTINGS_GROUPS: { title: string; sections: SettingsSection[] }[] =
         description: 'Topics checked during system setup, grouped by work system.' },
       { kind: 'checklist', path: 'checklists/data-migration', label: 'Data Migration Checklist', category: 'migrate-data',
         description: 'Topics checked when migrating customer data, grouped by work system.' },
+    ],
+  },
+  {
+    title: 'Notifications',
+    sections: [
+      { kind: 'notifications', path: 'notifications', label: 'Notification rules', description: 'Rules, channels and the default Teams channel.' },
     ],
   },
   {
