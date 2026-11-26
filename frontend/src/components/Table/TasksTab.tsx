@@ -10,6 +10,7 @@ import { taskApi } from '../../services/api';
 import { STATUS_INFO, methodologyApi, type DeliverableStatus } from '../../services/methodology';
 import { Btn, EditableCell, Card, Modal, FormRow, Input, Select, C, ConfirmModal } from '../Common';
 import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, compareWbs, isoToDmy, dmyToIso, formatNameWithLastInitial, resourceLabel, PROCESS_STATUS_STYLE, computeBaselineProgress } from '../../utils';
+import SuggestMilestonesModal from './SuggestMilestonesModal';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import { ensureThaiFont } from '../../utils/pdfFont';
 import type { Task, ViewMode } from '../../types';
@@ -455,6 +456,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   const [importing, setImporting] = useState(false);
   const [savingBaseline, setSavingBaseline] = useState(false);
   const [confirmResave, setConfirmResave] = useState(false);
+  const [suggestingMilestones, setSuggestingMilestones] = useState(false);
   const [importPreview, setImportPreview] = useState<TaskImportPreview | null>(null);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
@@ -2912,6 +2914,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
           >
             {savingBaseline ? 'Saving…' : hasSavedBaseline ? 'Re-save Baseline' : 'Save Baseline'}
           </Btn>
+          <Btn small variant="ghost" onClick={() => setSuggestingMilestones(true)} disabled={projectTasks.length === 0}
+            title="Suggest which tasks are key milestones (External Status report)">◆ Suggest milestones</Btn>
+          {suggestingMilestones && <SuggestMilestonesModal projectId={projectId} tasks={projectTasks} onClose={() => setSuggestingMilestones(false)} />}
           {confirmResave && (
             <Modal title="Re-save baseline" onClose={() => setConfirmResave(false)} width={440}>
               <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px', lineHeight: 1.6 }}>

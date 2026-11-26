@@ -748,6 +748,18 @@ export const taskApi = {
     return taskApi.getByProject(projectId);
   },
 
+  /** Mark / unmark tasks as key milestones in two requests (no plan recalculation needed). */
+  setMilestones: async (projectId: string, on: string[], off: string[]): Promise<{ data: Task[] }> => {
+    const canWrite = await checkProjectPermission(projectId, 'write', 'tasks');
+    if (!canWrite) throw new Error('FORBIDDEN');
+    for (const [ids, value] of [[on, true], [off, false]] as const) {
+      if (!ids.length) continue;
+      const { error } = await supabase.from('tasks').update({ is_milestone: value }).eq('project_id', projectId).in('id', ids);
+      if (error) throw new Error(/is_milestone/.test(error.message) ? 'Run the migration 2026-12-07-task-milestone.sql first.' : error.message);
+    }
+    return taskApi.getByProject(projectId);
+  },
+
   /** Replace the baseline of every task with its current plan dates. */
   resaveBaseline: async (projectId: string): Promise<{ data: Task[] }> => {
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
