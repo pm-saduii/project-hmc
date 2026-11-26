@@ -2544,6 +2544,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                             else handleUpdate(rowTask.id, { taskName: v });
                           }}
                         />
+                        {!isNew && rowTask.isMilestone && (
+                          <span title="Key milestone (External Status report)" style={{ flexShrink:0, fontSize:11, fontWeight:700, color:'#B45309', background:'#FEF3C7', padding:'0 6px', borderRadius:999 }}>◆ Milestone</span>
+                        )}
                         {!isNew && (deliverablesByTask[rowTask.id] || []).map((d) => (
                           <span key={d.deliverableId} title={`Deliverable: ${d.name} · ${STATUS_INFO[d.status]?.label || d.status} (Methodology)`}
                             style={{ display:'inline-flex', alignItems:'center', gap:3, flexShrink:0, maxWidth:110, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
@@ -3637,6 +3640,10 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
           style={{ fontFamily:'Poppins',fontSize:13,padding:'8px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,outline:'none',width:'100%',boxSizing:'border-box' }}
           onFocus={e=>e.target.style.borderColor=C.primary} onBlur={e=>e.target.style.borderColor=C.border}/>
       </FormRow>
+      <label style={{ display:'flex', alignItems:'center', gap:8, margin:'-4px 0 10px', fontSize:13, color:C.text, cursor:'pointer' }}>
+        <input type="checkbox" checked={!!form.isMilestone} onChange={e => setForm(p => ({ ...p, isMilestone: e.target.checked }))} style={{ accentColor: C.primary }} />
+        <span><b style={{ color: C.primary }}>◆</b> Key milestone <span style={{ fontSize:11, color:C.text3 }}>— shown on the External Status report (Key Milestone Tracker); target = this task's end date</span></span>
+      </label>
       <FormRow label="Phase">
         <Select value={String(form.phase || phaseOptions[0]?.value)} onChange={v => up('phase', v)}
           options={phaseDropdownOptions.map((p) => ({ value: p.value, label: p.label }))} />

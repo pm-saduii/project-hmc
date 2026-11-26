@@ -23,7 +23,7 @@ export function shiftPeriod(period: string, dir: -1 | 1): string {
 }
 export function periodLabel(period: string): string {
   const { start, end } = periodRange(period);
-  return `${format(start, 'd')}–${format(end, 'd MMM yyyy')}`;
+  return `${format(start, 'dd/MM/yyyy')} – ${format(end, 'dd/MM/yyyy')}`;
 }
 /** The report date: what the PM set, else the end of the half-month (or today while it is running). */
 export function reportDateOf(period: string, record: Pick<StatusReport, 'reportDate'> | null, today = new Date()): Date {
@@ -132,8 +132,14 @@ export function buildRaw(input: ExternalInput) {
     });
   });
 
-  // Key milestones from the Milestones tab; progress follows the linked task.
-  const keyMs = [...milestones].sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))).map((m) => {
+  // Key milestones: tasks marked "Key milestone" (◆); else zero-length tasks (◆ in the Gantt); else the Milestones tab.
+  const flagged = tasks.filter((t) => t.isMilestone);
+  const diamonds = flagged.length ? [] : tasks.filter((t) => t.startDate && t.endDate && t.startDate === t.endDate && !kids.has(t.id));
+  const fromTasks = (flagged.length ? flagged : diamonds)
+    .sort((a, b) => String(a.endDate).localeCompare(String(b.endDate)))
+    .map((t) => ({ id: `K-${t.id}`, name: t.taskName, phase: '', key: true, start: dayOf(t.startDate), end: dayOf(t.endDate), owner: '', override: '',
+      _pct: isDone(t) ? 1 : Math.min(1, (Number(t.percentComplete) || 0) / 100) }));
+  const keyMs = fromTasks.length ? fromTasks : [...milestones].sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))).map((m) => {
     const t = m.taskId ? tasks.find((x) => x.id === m.taskId) : undefined;
     return { id: `K-${m.id}`, name: m.name, phase: '', key: true, start: t ? dayOf(t.startDate) : null, end: dayOf(m.dueDate) ?? (t ? dayOf(t.endDate) : null), owner: '', override: '',
       _pct: m.status === 'billed' || m.status === 'paid' ? 1 : t ? Math.min(1, (Number(t.percentComplete) || 0) / 100) : 0 };

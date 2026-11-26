@@ -98,6 +98,8 @@ export interface Task {
   parentId: string;
   level: number;
   sortOrder: number;
+  /** Key milestone (External Status · Key Milestone Tracker). */
+  isMilestone?: boolean;
 }
 
 export interface Member {

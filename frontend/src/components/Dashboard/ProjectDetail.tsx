@@ -263,7 +263,7 @@ function ProjectChecklistTable({ project, category, workSystemOrder }: { project
     });
 
     const today = new Date();
-    const reportDate = [String(today.getDate()).padStart(2, '0'), String(today.getMonth() + 1).padStart(2, '0'), today.getFullYear()].join('-');
+    const reportDate = fmtDate(today);
     const totalPages = doc.getNumberOfPages();
     for (let page = 1; page <= totalPages; page += 1) {
       doc.setPage(page);

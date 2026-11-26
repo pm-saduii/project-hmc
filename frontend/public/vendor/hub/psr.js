@@ -698,7 +698,8 @@
   function bar(p, s) {
     return '<div class="mbar"><div class="mfill ' + (SCLASS[s] || "s-ns") + '" style="width:' + Math.round(p * 100) + '%"></div></div>';
   }
-  function short(t) { if (t == null) return ""; var d = new Date(t); return ("0" + d.getUTCDate()).slice(-2) + " " + MON[d.getUTCMonth()]; }
+  function short(t) { return fmtD(t); }  // app standard: dd/mm/yyyy everywhere
+  function dm(t) { var d = new Date(t); return ("0" + d.getUTCDate()).slice(-2) + "/" + ("0" + (d.getUTCMonth() + 1)).slice(-2); }
   // "+ N more" → click to show / hide the extra rows (rows beyond the limit are rendered with class "xtra", hidden until the card has class "xp")
   function more(n) {
     if (n <= 0) return "";
@@ -828,7 +829,7 @@
       return (curated ? !!a.label : a.status !== "Done") && a.start <= c1 && e >= c0 && !(a.status === "Done" && e < rd);
     }).map(function (a) {
       var e = a.end == null ? a.start : a.end, t = a.label || a.name;
-      return { s: a.start, e: e, t: t.length > 40 ? t.slice(0, 38) + "…" : t, full: a.name, cls: ownerClass(a.owner), one: e === a.start,
+      return { s: a.start, e: e, t: t.length > 60 ? t.slice(0, 58) + "…" : t, full: a.name, cls: ownerClass(a.owner), one: e === a.start,
                done: a.status === "Done", late: a.status !== "Done" && e < rd };
     });
     var keys = items.filter(function (x) { return x.one; }).sort(function (a, b) { return a.s - b.s; });
@@ -844,18 +845,18 @@
     var wk = "", dn = "";
     for (w = 0; w < W; w++) {
       var ws = c0 + w * 7 * DAY, we = ws + 6 * DAY;
-      wk += '<div class="la-wh" style="left:' + X(ws) + "%;width:" + (XE(we) - X(ws)) + '%"><b>' + (w === 0 ? "This week" : "Week +" + w) + "</b> " +
-        new Date(ws).getUTCDate() + (new Date(ws).getUTCMonth() !== new Date(we).getUTCMonth() ? " " + MON[new Date(ws).getUTCMonth()] : "") + "–" + new Date(we).getUTCDate() + " " + MON[new Date(we).getUTCMonth()] + "</div>";
+      wk += '<div class="la-wh" style="left:' + X(ws) + "%;width:" + (XE(we) - X(ws)) + '%"><b>' + (w === 0 ? "This week" : "Week +" + w) + "</b> " + dm(ws) + "–" + dm(we) + "</div>";
     }
     for (d = 0; d < ND; d++) if (d % 7 < 5) {
       var t = c0 + d * DAY;
       dn += '<span class="' + (t === rd ? "rd" : t < rd ? "past" : "") + '" style="left:' + X(t) + "%;width:" + (XE(t) - X(t)) + '%">' + new Date(t).getUTCDate() + "</span>";
     }
     var h = '<section class="page">' + header(M, mode, "Key Upcoming Activities");
-    h += '<div class="cal-top"><div class="cal-rng">' + short(c0) + " – " + short(c1) + " " + new Date(c1).getUTCFullYear() + ' <span>· 5-week look-ahead</span></div>' +
+    var ce = function (t, cls) { return '<div class="la-c' + (cls ? " " + cls : "") + '">' + (t == null ? "" : fmtD(t)) + "</div>"; };
+    h += '<div class="cal-top"><div class="cal-rng">' + short(c0) + " – " + short(c1) + ' <span>· 5-week look-ahead</span></div>' +
       '<div class="cal-leg"><span><i class="ow-h"></i>HMC</span><span><i class="ow-c"></i>Client</span><span><i class="ow-j"></i>Joint</span>' +
       '<span><b class="la-dm ow-j"></b>Key date</span><span><i class="la-legrd"></i>Report date</span></div></div>';
-    h += '<div class="la"><div class="la-r la-hd"><div class="la-l"></div><div class="la-t">' + wk + '<div class="la-dn">' + dn + "</div></div></div>";
+    h += '<div class="la"><div class="la-r la-hd"><div class="la-l">Activity</div><div class="la-c">Start</div><div class="la-c">End</div><div class="la-t">' + wk + '<div class="la-dn">' + dn + "</div></div></div>";
     // key dates row
     if (keys.length) {
       var lv = [], kh = "";
@@ -866,15 +867,15 @@
         kh += '<div class="la-k ' + k.cls + '" style="left:' + x + "%;top:" + (6 + L * 22) + 'px" title="' + esc(k.full) + '"><b class="la-dm ' + k.cls + '"></b>' + esc(k.t) +
           ' <small>' + short(k.s) + "</small></div>";
       });
-      h += '<div class="la-r la-key"><div class="la-l"><b>Key dates</b></div><div class="la-t" style="height:' + (14 + lv.length * 22) + 'px">' + grid + kh + "</div></div>";
+      h += '<div class="la-r la-key"><div class="la-l"><b>Key dates</b></div>' + ce(null) + ce(null) + '<div class="la-t" style="height:' + (14 + lv.length * 22) + 'px">' + grid + kh + "</div></div>";
     }
     rows.forEach(function (x) {
       var l = X(x.s), r = XE(x.e), lo = x.s < c0, ro = x.e > c1;
       h += '<div class="la-r' + (x.late ? " la-late" : "") + '"><div class="la-l"><i class="la-ow ' + x.cls + '"></i><span title="' + esc(x.full) + '">' + esc(x.t) + "</span></div>" +
-        '<div class="la-t">' + grid + '<div class="la-b ' + x.cls + (lo ? " lo" : "") + (ro ? " ro" : "") + (x.done ? " dn" : "") + '" style="left:' + l + "%;width:" + Math.max(r - l, 1.2) + '%"></div>' +
-        '<span class="la-dt' + (r > 82 ? " in" : "") + '" style="' + (r > 82 ? "right:" + (100 - r) + "%" : "left:" + r + "%") + '">' + (lo ? "← " : "") + rng(x) + (ro ? " →" : "") + "</span></div></div>";
+        ce(x.s) + ce(x.e, x.late ? "late" : "") +
+        '<div class="la-t">' + grid + '<div class="la-b ' + x.cls + (lo ? " lo" : "") + (ro ? " ro" : "") + (x.done ? " dn" : "") + '" style="left:' + l + "%;width:" + Math.max(r - l, 1.2) + '%"></div></div></div>';
     });
-    if (!items.length) h += '<div class="la-r"><div class="la-l muted">–</div><div class="la-t">' + grid + "</div></div>";
+    if (!items.length) h += '<div class="la-r"><div class="la-l muted">–</div>' + ce(null) + ce(null) + '<div class="la-t">' + grid + "</div></div>";
     h += "</div>";
     if (!items.length) h += '<div class="tl-note">ไม่มี Activity ในช่วงนี้ · ใส่ Calendar Label (ชีท Plan คอลัมน์ X) เพื่อเลือกงานที่จะแสดง</div>';
     return h + footer(M, mode, n) + "</section>";
@@ -1858,11 +1859,11 @@
     ".cal-leg i.ow-h{background:#3b74d9}.cal-leg i.ow-c{background:#f6b26b}.cal-leg i.ow-j{background:#94a3b8}.cal-leg .la-dm{margin-right:6px;position:relative;top:0}",
     ".la-legrd{width:3px!important;height:14px!important;border-radius:2px!important;background:#f2b705}",
     ".la{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(15,42,74,.08)}",
-    ".la-r{display:grid;grid-template-columns:230px 1fr;border-top:1px solid #edf1f6;min-height:34px}.la-r:first-child{border-top:0}",
-    ".la-l{display:flex;align-items:center;gap:8px;padding:0 12px;font-size:12px;font-weight:600;color:var(--ink);min-width:0}.la-l span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    ".la-r{display:grid;grid-template-columns:minmax(0,1fr) 84px 84px 50%;border-top:1px solid #edf1f6;min-height:34px}.la-r:first-child{border-top:0}",
+    ".la-c{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums;border-left:1px solid #edf1f6}.la-c.late{color:var(--late);font-weight:700}.la-hd .la-c,.la-hd .la-l{color:#cfe0f7;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;border-color:rgba(255,255,255,.12)}.la-key .la-c{border-color:var(--line)}.la-l{display:flex;align-items:center;gap:8px;padding:0 12px;font-size:12px;font-weight:600;color:var(--ink);min-width:0}.la-l span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
     ".la-t{position:relative;min-height:34px}",
     ".la-hd{background:var(--navy);border-top:0}.la-hd .la-t{height:46px}",
-    ".la-wh{position:absolute;top:6px;font-size:10.5px;color:#9fb8da;padding-left:8px;white-space:nowrap;border-left:1px solid rgba(255,255,255,.15);height:40px}.la-wh b{color:#fff;font-weight:700;margin-right:3px}",
+    ".la-wh{position:absolute;top:6px;font-size:9px;overflow:hidden;color:#9fb8da;padding-left:8px;white-space:nowrap;border-left:1px solid rgba(255,255,255,.15);height:40px}.la-wh b{color:#fff;font-weight:700;margin-right:3px}",
     ".la-dn span{position:absolute;top:26px;text-align:center;font-size:9.5px;color:#cfe0f7}.la-dn span.past{color:#6f8bb0}.la-dn span.rd{color:var(--navy);background:#ffd34d;border-radius:3px;font-weight:700}",
     ".la-wk{position:absolute;top:0;bottom:0;background:transparent}.la-wk.odd{background:#f6f9fd}.la-we{position:absolute;top:0;bottom:0;background:#eef2f7}",
     ".la-rd{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#f2b705;z-index:1}",

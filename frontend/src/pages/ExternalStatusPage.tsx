@@ -10,7 +10,7 @@ import { FormModal, fieldLabel, hint, input } from '../components/Admin/AdminUi'
 import { memberApi } from '../services/api';
 import { currentPhase, methodologyApi } from '../services/methodology';
 import { statusReportApi, type StatusReport, type StatusReportPatch } from '../services/statusReports';
-import { isClosedStatus } from '../utils/projectHealth';
+import { isClosedStatus, isHyperCareStatus } from '../utils/projectHealth';
 import {
   PERIOD_RE, computeModel, downloadExternalPptx, loadEngine, periodLabel, periodOf, reportDateOf, shiftPeriod,
 } from '../utils/externalStatus';
@@ -60,7 +60,8 @@ export default function ExternalStatusPage() {
 
   const labelOf = (p: Project) => masterCodes.find((c) => c.codeType === 'project_status' && c.codeValue === p.status)?.label || '';
   const q = query.trim().toLowerCase();
-  const list = projects.filter((p) => !isClosedStatus(p.status, labelOf(p)))
+  // Finished projects (Hyper Care or closed) are not reported to the customer any more
+  const list = projects.filter((p) => !isClosedStatus(p.status, labelOf(p)) && !isHyperCareStatus(p.status, labelOf(p)))
     .filter((p) => !q || `${p.code} ${p.name} ${p.client} ${p.customerAbbreviation}`.toLowerCase().includes(q))
     .sort((a, b) => String(a.code).localeCompare(String(b.code)));
   const selected = projects.find((p) => p.id === projectId) || null;
@@ -220,7 +221,7 @@ export default function ExternalStatusPage() {
               {log.slice(0, 8).map((r) => (
                 <button key={r.period} type="button" onClick={() => setPeriod(r.period)} title={r.sentTo ? `To ${r.sentTo}` : undefined}
                   style={{ border: 0, background: 'transparent', padding: 0, color: C.primary, fontFamily: F, fontSize: 11, cursor: 'pointer' }}>
-                  {periodLabel(r.period)} (sent {format(new Date(r.sentAt!), 'dd/MM')})
+                  {periodLabel(r.period)} (sent {format(new Date(r.sentAt!), 'dd/MM/yyyy')})
                 </button>
               ))}
             </div>

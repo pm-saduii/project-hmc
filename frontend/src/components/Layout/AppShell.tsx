@@ -5,6 +5,7 @@ import {
   Bell, BellRing, BookOpen, ChevronDown, Clock3, FileText, FolderKanban, Wallet, LayoutDashboard, ListChecks, LogOut, Mail, Menu, Moon, PanelLeftClose,
   PanelLeftOpen, Presentation, Search, Settings, StickyNote, Sun, Users, X,
 } from 'lucide-react';
+import { fmtDate } from '../../utils';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -306,15 +307,15 @@ function NotificationBell({ isDark, isMobile }: { isDark: boolean; isMobile: boo
 
   const open_ = tasks.filter((t) => t.percentComplete < 100);
   const overdue = open_.filter((t) => { const due = parseDate(t.endDate); return due && due < today; })
-    .map((t) => ({ id: t.id, title: `Task: ${t.taskName}`, subtitle: `Due ${t.endDate}`, overdue: true }));
+    .map((t) => ({ id: t.id, title: `Task: ${t.taskName}`, subtitle: `Due ${fmtDate(t.endDate)}`, overdue: true }));
   const upcoming = open_.filter((t) => { const due = parseDate(t.endDate); return due && due >= today && due <= endIn7; })
-    .map((t) => ({ id: t.id, title: `Task: ${t.taskName}`, subtitle: `Due ${t.endDate}`, overdue: false }));
+    .map((t) => ({ id: t.id, title: `Task: ${t.taskName}`, subtitle: `Due ${fmtDate(t.endDate)}`, overdue: false }));
   const dueMilestones = milestones
     .filter((m) => String(m.status).toLowerCase() === 'pending')
     .filter((m) => { const due = parseDate(m.dueDate); return due && due <= dueIn10; })
     .map((m) => {
       const due = parseDate(m.dueDate);
-      return { id: m.id, title: `Milestone: ${m.name}`, subtitle: m.billingDate ? `Billing ${m.billingDate}` : `Due ${m.dueDate}`, overdue: !!due && due < today };
+      return { id: m.id, title: `Milestone: ${m.name}`, subtitle: m.billingDate ? `Billing ${fmtDate(m.billingDate)}` : `Due ${fmtDate(m.dueDate)}`, overdue: !!due && due < today };
     });
   const items = [...overdue, ...upcoming, ...dueMilestones];
 

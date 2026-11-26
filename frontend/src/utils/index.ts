@@ -22,10 +22,18 @@ export const calcDuration = (s: string, e: string): number => {
 };
 
 /** Display: 25/12/2024 */
-export const fmtDate = (str: string): string => {
-  if (!str) return '—';
-  const d = parseISO(str);
-  return isValid(d) ? format(d, 'dd/MM/yyyy') : str;
+/** App-wide date standard: every date on screen, in PDFs, Excel and PowerPoint is dd/mm/yyyy. */
+export const DATE_FORMAT = 'dd/MM/yyyy';
+export const DATETIME_FORMAT = 'dd/MM/yyyy HH:mm';
+export const fmtDate = (value: string | Date | null | undefined): string => {
+  if (!value) return '—';
+  const d = value instanceof Date ? value : parseISO(String(value));
+  return isValid(d) ? format(d, DATE_FORMAT) : String(value);
+};
+export const fmtDateTime = (value: string | Date | null | undefined): string => {
+  if (!value) return '—';
+  const d = value instanceof Date ? value : new Date(String(value));
+  return isValid(d) ? format(d, DATETIME_FORMAT) : String(value);
 };
 
 /** For <input type="date"> value attribute — always YYYY-MM-DD */
@@ -36,11 +44,7 @@ export const toInput = (str: string): string => {
 };
 
 /** Display: 15-05-2026 (for PDF export) */
-export const fmtDatePdf = (str: string): string => {
-  if (!str) return '—';
-  const d = parseISO(str);
-  return isValid(d) ? format(d, 'dd-MM-yyyy') : str;
-};
+export const fmtDatePdf = (str: string): string => fmtDate(str);
 
 /** Month label: Mar 25 */
 export const fmtMonth = (str: string): string => {

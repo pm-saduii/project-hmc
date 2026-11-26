@@ -5,7 +5,7 @@
  */
 import { addMonths, differenceInCalendarDays, endOfMonth, format, isValid, parseISO, startOfMonth } from 'date-fns';
 import type { ChangeRequest, Effort, Issue, Milestone, Project, ProjectProgressSnapshot, ReportStatus, Risk, Task } from '../types';
-import { compareWbs } from './index';
+import { compareWbs, fmtDate } from './index';
 import { projectHealth } from './projectHealth';
 import { reportedEfforts } from './budgetControl';
 
@@ -194,7 +194,7 @@ export function buildMonthlyReport(input: ReportInputs): MonthlyReportData {
   const topIssues: MonthlyReportData['topIssues'] = [
     ...[...openIssues].sort((a, b) => Number(b.status === 'Blocked') - Number(a.status === 'Blocked')).map((i) => ({
       kind: 'Issue' as const, title: i.title, status: i.status,
-      meta: [i.status, i.assignedTo && `Owner: ${i.assignedTo}`, i.issueDate && `Raised ${i.issueDate}`].filter(Boolean).join(' · '),
+      meta: [i.status, i.assignedTo && `Owner: ${i.assignedTo}`, i.issueDate && `Raised ${fmtDate(i.issueDate)}`].filter(Boolean).join(' · '),
     })),
     ...[...openRisks].sort((a, b) => Number(b.impact === 'High') - Number(a.impact === 'High') || Number(b.probability === 'High') - Number(a.probability === 'High')).map((r) => ({
       kind: 'Risk' as const, title: r.title, status: r.status,

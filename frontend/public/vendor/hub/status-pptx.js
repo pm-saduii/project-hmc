@@ -195,7 +195,9 @@
     (function () {
       var s4 = content("Key Upcoming Activities", "Status report");
       var rd = M.rd, dow = (new Date(rd).getUTCDay() + 6) % 7, ND = 35, WE = 0.35, c0 = rd - dow * h.DAY, c1 = c0 + (ND - 1) * h.DAY;
-      var LX = 0.5, LW = 2.75, GX = LX + LW, GW = W - 0.5 - GX;
+      // left half: activity · start · end; right half: the 5-week chart
+      var LX = 0.5, GW = (W - 1.0) / 2, GX = W - 0.5 - GW, LW = GX - LX, DW = 0.95, NW = LW - 2 * DW;
+      var dmy = function (t) { return h.fmtD(t); }, dm = function (t) { var d = new Date(t); return ("0" + d.getUTCDate()).slice(-2) + "/" + ("0" + (d.getUTCMonth() + 1)).slice(-2); };
       var wt = function (i) { return (i % 7) > 4 ? WE : 1; }, tot = 0, xs = [];
       for (var i = 0; i < ND; i++) { xs.push(tot); tot += wt(i); }
       var X = function (t) { var i = Math.round((t - c0) / h.DAY); return GX + (i <= 0 ? 0 : i >= ND ? GW : xs[i] / tot * GW); };
@@ -205,10 +207,10 @@
       var cur = acts.some(function (a) { return a.label; });
       var items = acts.filter(function (a) { var e = a.end == null ? a.start : a.end;
         return (cur ? !!a.label : a.status !== "Done") && a.start <= c1 && e >= c0 && !(a.status === "Done" && e < rd); })
-        .map(function (a) { var e = a.end == null ? a.start : a.end; return { s: a.start, e: e, t: cut(a.label || a.name, 28), c: owC(h.ownerClass(a.owner)), one: e === a.start, late: a.status !== "Done" && e < rd }; });
+        .map(function (a) { var e = a.end == null ? a.start : a.end; return { s: a.start, e: e, t: cut(a.label || a.name, 46), c: owC(h.ownerClass(a.owner)), one: e === a.start, late: a.status !== "Done" && e < rd }; });
       var keys = items.filter(function (x) { return x.one; }).sort(function (a, b) { return a.s - b.s; });
       var rows = items.filter(function (x) { return !x.one; }).sort(function (a, b) { return (a.s - b.s) || (a.e - b.e); }).slice(0, 14);
-      s4.addText([{ text: h.short(c0) + " – " + h.short(c1) + " " + new Date(c1).getUTCFullYear(), options: { bold: true, color: K_.navy } }, { text: "  ·  5-week look-ahead", options: { color: K_.mut } }],
+      s4.addText([{ text: dmy(c0) + " – " + dmy(c1), options: { bold: true, color: K_.navy } }, { text: "  ·  5-week look-ahead", options: { color: K_.mut } }],
         { x: 0.5, y: 1.18, w: 6, h: 0.32, fontSize: 13, margin: 0, isTextBox: true });
       var lg = [["HMC", K_.hmc], ["Client", K_.client], ["Joint", K_.joint]], lx = 8.2;
       lg.forEach(function (l) { s4.addShape(pres.ShapeType.roundRect, { x: lx, y: 1.28, w: 0.28, h: 0.13, rectRadius: 0.06, fill: { color: l[1] }, line: { type: "none" } });
@@ -229,12 +231,14 @@
         if (w % 2) s4.addShape(pres.ShapeType.rect, { x: X(ws), y: top + hh, w: XE(we) - X(ws), h: bodyH, fill: { color: "F6F9FD" }, line: { type: "none" } });
         s4.addShape(pres.ShapeType.rect, { x: X(ws + 5 * h.DAY), y: top + hh, w: XE(we) - X(ws + 5 * h.DAY), h: bodyH, fill: { color: "EEF2F7" }, line: { type: "none" } });
         s4.addText([{ text: w === 0 ? "This week " : "Week +" + w + " ", options: { bold: true, color: K_.white } },
-          { text: new Date(ws).getUTCDate() + "–" + new Date(we).getUTCDate() + " " + h.MON[new Date(we).getUTCMonth()], options: { color: "9FB8DA" } }],
-          { x: X(ws) + 0.05, y: top + 0.04, w: XE(we) - X(ws) - 0.05, h: 0.26, fontSize: 9, margin: 0, isTextBox: true });
+          { text: dm(ws) + "–" + dm(we), options: { color: "9FB8DA" } }],
+          { x: X(ws) + 0.03, y: top + 0.04, w: XE(we) - X(ws) - 0.03, h: 0.26, fontSize: 7, margin: 0, isTextBox: true });
         for (var d = 0; d < 5; d++) { var t = ws + d * h.DAY;
           s4.addText(String(new Date(t).getUTCDate()), { x: X(t), y: top + 0.32, w: XE(t) - X(t), h: 0.24, fontSize: 8, align: "center", valign: "middle", margin: 0, isTextBox: true,
             bold: t === rd, color: t === rd ? K_.navy : t < rd ? "6F8BB0" : "CFE0F7", fill: t === rd ? { color: "FFD34D" } : undefined }); }
       }
+      [["ACTIVITY", LX + 0.15, NW - 0.2, "left"], ["START", LX + NW, DW, "center"], ["END", LX + NW + DW, DW, "center"]].forEach(function (c) {
+        s4.addText(c[0], { x: c[1], y: top, w: c[2], h: hh, fontSize: 9, bold: true, color: "CFE0F7", charSpacing: 1, align: c[3], valign: "middle", margin: 0, isTextBox: true }); });
       var rdx = (X(rd) + XE(rd)) / 2;
       var y = top + hh;
       if (keys.length) {
@@ -248,13 +252,11 @@
       }
       rows.forEach(function (r) {
         s4.addShape(pres.ShapeType.rect, { x: LX + 0.15, y: y + rowH / 2 - 0.06, w: 0.12, h: 0.12, fill: { color: r.c }, line: { type: "none" } });
-        s4.addText(r.t, { x: LX + 0.35, y: y, w: LW - 0.4, h: rowH, fontSize: 9.5, bold: true, color: r.late ? K_.late : K_.ink, valign: "middle", margin: 0, isTextBox: true });
+        s4.addText(r.t, { x: LX + 0.35, y: y, w: NW - 0.4, h: rowH, fontSize: 9.5, bold: true, color: r.late ? K_.late : K_.ink, valign: "middle", margin: 0, isTextBox: true });
+        s4.addText(dmy(r.s), { x: LX + NW, y: y, w: DW, h: rowH, fontSize: 9, color: K_.mut, align: "center", valign: "middle", margin: 0, isTextBox: true });
+        s4.addText(dmy(r.e), { x: LX + NW + DW, y: y, w: DW, h: rowH, fontSize: 9, bold: r.late, color: r.late ? K_.late : K_.mut, align: "center", valign: "middle", margin: 0, isTextBox: true });
         var l = X(r.s), rr = XE(r.e);
         s4.addShape(pres.ShapeType.roundRect, { x: l, y: y + rowH / 2 - 0.07, w: Math.max(rr - l, 0.12), h: 0.14, rectRadius: 0.07, fill: { color: r.c }, line: { type: "none" } });
-        var a = new Date(r.s), b = new Date(r.e), lab = (r.s < c0 ? "← " : "") + (a.getUTCMonth() === b.getUTCMonth() ? a.getUTCDate() + "–" + b.getUTCDate() + " " + h.MON[b.getUTCMonth()] : h.short(r.s) + " – " + h.short(r.e)) + (r.e > c1 ? " →" : "");
-        if (rr + 1.4 < GX + GW) s4.addText(lab, { x: rr + 0.06, y: y, w: 1.35, h: rowH, fontSize: 8, color: K_.mut, align: "left", valign: "middle", margin: 0, isTextBox: true });
-        else if (l - 1.45 > GX) s4.addText(lab, { x: l - 1.42, y: y, w: 1.35, h: rowH, fontSize: 8, color: K_.mut, align: "right", valign: "middle", margin: 0, isTextBox: true });
-        else s4.addText(lab, { x: rr - 1.5, y: y, w: 1.42, h: rowH, fontSize: 8, bold: true, color: K_.white, align: "right", valign: "middle", margin: 0, isTextBox: true });
         y += rowH;
         s4.addShape(pres.ShapeType.line, { x: LX, y: y, w: W - 1.0, h: 0, line: { color: "EDF1F6", width: 0.5 } });
       });
