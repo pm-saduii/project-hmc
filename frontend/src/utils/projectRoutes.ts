@@ -68,6 +68,12 @@ export const PROJECT_GROUPS: ProjectGroup[] = [
   },
 ];
 
+/** Order of the project tabs (sub-page keys); the first one the user can see opens by default. */
+export const PROJECT_TAB_ORDER = [
+  'tasks', 'summary', 'milestones', 'effort', 'members', 'checklist', 'activities', 'deliverables',
+  'issues', 'risks', 'change-requests', 'lessons', 'environments', 'settings',
+];
+
 /** Where a screen id lives, e.g. 'ms' -> { group: 'plan', sub: 'milestones' }. */
 export function locateScreen(screen: string): { group: string; sub: string } | null {
   for (const group of PROJECT_GROUPS) {

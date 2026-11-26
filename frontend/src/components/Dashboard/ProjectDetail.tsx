@@ -10,7 +10,7 @@ import type { Project } from '../../types';
 import ProjectModal from './ProjectModal';
 import TaskTemplateModal from '../Setup/TaskTemplateModal';
 import Breadcrumb from '../Layout/Breadcrumb';
-import { PROJECT_GROUPS } from '../../utils/projectRoutes';
+import { PROJECT_GROUPS, PROJECT_TAB_ORDER } from '../../utils/projectRoutes';
 import { useStore }      from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
@@ -571,10 +571,18 @@ export default function ProjectDetail({ project }: Props) {
   const visibleGroups = PROJECT_GROUPS
     .map((group) => ({ ...group, subs: group.subs.filter((sub) => canSee(sub.screen)) }))
     .filter((group) => group.subs.length > 0);
+  // Every visible screen as one ordered list of tabs.
+  const orderOf = (key: string) => { const i = PROJECT_TAB_ORDER.indexOf(key); return i < 0 ? 999 : i; };
+  const visibleTabs = visibleGroups
+    .flatMap((group) => group.subs.map((sub) => ({ group, sub })))
+    .sort((a, b) => orderOf(a.sub.key) - orderOf(b.sub.key));
   const requestedGroup = visibleGroups.find((group) => group.key === groupParam);
   const requestedSub = requestedGroup?.subs.find((sub) => sub.key === subParam);
-  const shownGroup = requestedSub ? requestedGroup! : (requestedGroup ?? visibleGroups[0]);
-  const shownSub = requestedSub ?? shownGroup?.subs[0];
+  const fallback = requestedGroup
+    ? visibleTabs.find((t) => t.group.key === requestedGroup.key)
+    : visibleTabs[0];
+  const shownGroup = requestedSub ? requestedGroup! : fallback?.group;
+  const shownSub = requestedSub ?? fallback?.sub;
   const activeTab = !shownSub ? '' : shownSub.key === 'settings' || shownSub.key === 'deliverables' ? shownSub.key : shownSub.screen;
   const pathFor = (group: string, sub: string) => `/projects/${encodeURIComponent(project.id)}/${group}/${sub}`;
   useEffect(() => {
@@ -776,7 +784,7 @@ export default function ProjectDetail({ project }: Props) {
           <div style={{ marginBottom: 10 }}>
             <Breadcrumb items={[
               { label: 'Projects', to: '/projects' },
-              { label: project.code || project.name, to: visibleGroups[0] ? pathFor(visibleGroups[0].key, visibleGroups[0].subs[0].key) : undefined },
+              { label: project.code || project.name, to: visibleTabs[0] ? pathFor(visibleTabs[0].group.key, visibleTabs[0].sub.key) : undefined },
               ...(shownSub ? [{ label: shownSub.label }] : []),
             ]} />
           </div>
@@ -802,7 +810,7 @@ export default function ProjectDetail({ project }: Props) {
           </div>
           {/* One row with every screen of the project (a dropdown on phones). */}
           <Tabs
-            tabs={visibleGroups.flatMap((group) => group.subs.map((sub) => ({ id: `${group.key}/${sub.key}`, label: sub.label })))}
+            tabs={visibleTabs.map(({ group, sub }) => ({ id: `${group.key}/${sub.key}`, label: sub.label }))}
             active={shownGroup && shownSub ? `${shownGroup.key}/${shownSub.key}` : ''}
             onChange={(id) => {
               const [groupKey, subKey] = id.split('/');
