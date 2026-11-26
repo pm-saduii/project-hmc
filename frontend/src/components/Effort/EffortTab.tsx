@@ -316,7 +316,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                       <Card key={e.id} style={{ padding: 14 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{e.module}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{e.module || <span style={{ color: C.red, fontStyle: 'italic' }} title="This line lost its name in an earlier save. Copy it into the right Budget Control line, then delete it.">(no name)</span>}</div>
                             <div style={{ fontSize: 13, color: C.text2 }}>{e.budgetManday} MD • ฿{fmtMoney(permissions.getMaskedAmount(e.budgetAmount))}</div>
                           </div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -392,7 +392,7 @@ export default function EffortTab({ projectId, extraActions }: Props) {
                         const rem  = e.budgetManday - used;
                         return (
                           <tr key={e.id} style={{ background: i % 2 === 0 ? C.white : C.bg }}>
-                            <td style={{ ...TD, fontWeight: 600 }}>{e.module}</td>
+                            <td style={{ ...TD, fontWeight: 600 }}>{e.module || <span style={{ color: C.red, fontStyle: 'italic' }} title="This line lost its name in an earlier save. Copy it into the right Budget Control line, then delete it.">(no name)</span>}</td>
                             <td style={{ ...TD, fontFamily: 'Poppins, sans-serif', color: C.primary, fontWeight: 600 }}>฿{fmtMoney(permissions.getMaskedAmount(e.budgetAmount))}</td>
                             <td style={{ ...TD, textAlign: 'center', fontWeight: 700, color: C.blue }}>{e.budgetManday}</td>
                             {months.map(mo => (

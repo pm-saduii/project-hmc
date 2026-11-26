@@ -1883,14 +1883,16 @@ export const effortApi = {
     const projectId = String(existing?.project_id || e.projectId || '');
     if (!projectId) throw new Error('MISSING_PROJECT_ID');
     if (!await checkProjectPermission(projectId, 'write', 'effort')) throw new Error('FORBIDDEN');
-    const base: Record<string, unknown> = {
-      module: e.module ?? '',
-      budget_amount: e.budgetAmount ?? 0,
-      budget_manday: e.budgetManday ?? 0,
-    };
+    // Only the fields given are changed; a partial update (e.g. just the budget man-days) must not
+    // blank the line's name, amount or phase.
+    const base: Record<string, unknown> = {};
+    if (e.module !== undefined) base.module = e.module ?? '';
+    if (e.budgetAmount !== undefined) base.budget_amount = e.budgetAmount ?? 0;
+    if (e.budgetManday !== undefined) base.budget_manday = e.budgetManday ?? 0;
+    const withPhase = e.phase !== undefined ? { ...base, phase: e.phase ?? '' } : base;
     // Try with phase; fall back without it if DB column is absent
-    let { data, error } = await supabase.from('efforts').update({ ...base, phase: e.phase ?? '' }).eq('id', id).select().single();
-    if (error) {
+    let { data, error } = await supabase.from('efforts').update(withPhase).eq('id', id).select().single();
+    if (error && withPhase !== base) {
       const retry = await supabase.from('efforts').update(base).eq('id', id).select().single();
       data = retry.data;
       error = retry.error;
