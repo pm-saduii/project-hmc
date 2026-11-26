@@ -113,7 +113,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
 
   // ── Board helpers ─────────────────────────────────────────────────────────
   const OWNER_COLOR: Record<Owner, string> = { HMC: '#2563EB', Client: '#EA580C', Joint: '#0D9488' };
-  const PHASE_BG = ['#C7D2FE', '#A5B4FC', '#6366F1', '#4F46E5', '#312E81'];
+  const PHASE_BG = ['#A5B4FC', '#818CF8', '#6366F1', '#4338CA', '#1E1B4B'];
   const stepsOf = (phaseId: string) => method.steps.filter((x) => x.phaseId === phaseId).sort((a, b) => a.sortOrder - b.sortOrder);
   const deliverablesOfStep = (stepId: string) => method.deliverables
     .filter((d) => d.active && d.stepId === stepId && !(isClient && d.internalOnly)).sort((a, b) => a.sortOrder - b.sortOrder);

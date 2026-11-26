@@ -1,119 +1,186 @@
 import React from 'react';
-import { FileDown, Lock, PenLine } from 'lucide-react';
-import { C } from '../components/Common';
-import { OWNER_INFO, methodologyApi, type Methodology } from '../services/methodology';
+import { useNavigate } from 'react-router-dom';
+import { CheckSquare, FileDown, Lock, PenLine, Repeat } from 'lucide-react';
+import { Btn, C } from '../components/Common';
+import { FormModal } from '../components/Admin/AdminUi';
+import { useStore } from '../store';
+import { currentPhase, methodologyApi, type MethodStep, type Methodology, type Owner, type PhaseGate } from '../services/methodology';
+import { isClosedStatus, isHyperCareStatus } from '../utils/projectHealth';
+import { projectPath } from '../utils/projectRoutes';
 
 const F = 'Poppins, sans-serif';
-
-const CADENCE: [string, string, string][] = [
-  ['Every Friday', 'External Status Report', 'Weekly status sent to the customer'],
-  ['Every week', 'Internal Status', 'Status, activities and billing for the team only'],
-  ['Within 2 working days', 'Minutes of Meeting', 'MOM with actions, issues and decisions after each meeting'],
-  ['Monthly', 'Steering Committee', 'Status by area, decisions needed, risks and change requests'],
-  ['Monthly, by the 5th', 'Budget Control Report', 'Prepared by the PM → reviewed by the Account Manager → approved by a Director'],
-  ['When scope changes', 'Change Request', 'Pre-check, then the CR form'],
+const OWNER_COLOR: Record<Owner, string> = { HMC: '#2563EB', Client: '#EA580C', Joint: '#0D9488' };
+const PHASE_BG = ['#A5B4FC', '#818CF8', '#6366F1', '#4338CA', '#1E1B4B'];
+const CADENCE: { when: string; what: string; note: string; hot?: boolean }[] = [
+  { when: 'Every Friday', what: 'External Status', note: 'To the customer · PowerPoint' },
+  { when: 'Weekly', what: 'Internal Status', note: 'Team only · with billing' },
+  { when: '≤ 2 working days', what: 'Minutes of Meeting', note: 'After each meeting' },
+  { when: 'Monthly · by the 5th', what: 'Budget Control', note: 'PM → AM → Director', hot: true },
+  { when: 'Ongoing', what: 'RAIDD log', note: 'Risks · actions · issues · decisions' },
+  { when: 'When scope changes', what: 'Change Request', note: 'CR form v1.4' },
+  { when: 'Monthly', what: 'Steering Committee', note: 'Status · decisions · risks' },
 ];
 
-/** /methodology — the company implementation methodology: phases, steps, deliverables and gates. */
+/** /methodology — the company implementation protocol on one board: phases → steps → deliverables → gates. */
 export default function MethodologyPage() {
+  const navigate = useNavigate();
+  const projects = useStore((s) => s.projects);
+  const masterCodes = useStore((s) => s.masterCodes);
   const [method, setMethod] = React.useState<Methodology | null>(null);
+  const [gates, setGates] = React.useState<PhaseGate[]>([]);
   const [error, setError] = React.useState('');
+  const [step, setStep] = React.useState<MethodStep | null>(null);
+
   React.useEffect(() => {
     methodologyApi.load().then(setMethod).catch((e) => setError(e instanceof Error ? e.message : 'Unable to load'));
+    methodologyApi.allGates().then(setGates).catch(() => undefined);
   }, []);
 
-  const card: React.CSSProperties = { background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 };
+  if (error) {
+    return <div style={{ padding: 32, fontSize: 13, color: C.red, fontFamily: F }}>{/relation|schema cache/i.test(error) ? 'The methodology is not set up yet: run the migration 2026-11-27-methodology-and-budget-control.sql.' : error}</div>;
+  }
+  if (!method) return <div style={{ padding: 32, fontSize: 13, color: C.text2, fontFamily: F }}>Loading…</div>;
+
+  const phases = method.phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder);
+  const stepsOf = (phaseId: string) => method.steps.filter((s) => s.phaseId === phaseId).sort((a, b) => a.sortOrder - b.sortOrder);
+  const delsOf = (stepId: string) => method.deliverables.filter((d) => d.active && d.stepId === stepId).sort((a, b) => a.sortOrder - b.sortOrder);
+  // Which running projects are in which phase (first phase whose gate is not passed).
+  const label = (status: string) => masterCodes.find((c) => c.codeType === 'project_status' && c.codeValue === status)?.label || '';
+  const running = projects.filter((p) => !isClosedStatus(p.status, label(p.status)) && !isHyperCareStatus(p.status, label(p.status)));
+  const projectsIn = (phaseId: string) => running.filter((p) => currentPhase(phases, gates.filter((g) => g.projectId === p.id))?.id === phaseId);
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: '24px 32px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16, fontFamily: F }}>
-      <div>
-        <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800, color: C.text }}>Methodology</h1>
-        <p style={{ margin: 0, fontSize: 13, color: C.text2, maxWidth: 760 }}>
-          The company's implementation protocol: five phases, the steps in each, the documents every project delivers, and the gate a phase must pass before the next one starts.
-          Track a project against it in the project's Delivery › Deliverables page.
-        </p>
+    <div style={{ height: '100%', overflowY: 'auto', padding: '24px 32px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 18, fontFamily: F, color: C.text }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>Methodology</h1>
+          <p style={{ margin: 0, fontSize: 13, color: C.text2 }}>One protocol for every project. Click a step for its checklist and templates.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11, color: C.text2 }}>
+          {(Object.keys(OWNER_COLOR) as Owner[]).map((o) => (
+            <span key={o} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: OWNER_COLOR[o] }} />{o === 'HMC' ? 'HMC leads' : o === 'Client' ? 'Client leads' : 'Joint'}</span>
+          ))}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PenLine size={11} />Sign-off</span>
+        </div>
       </div>
 
-      {error && <div style={{ ...card, color: C.red, fontSize: 13 }}>{/relation|schema cache/i.test(error) ? 'The methodology is not set up yet: run the migration 2026-11-27-methodology-and-budget-control.sql.' : error}</div>}
-      {!method && !error && <div style={{ fontSize: 13, color: C.text2 }}>Loading…</div>}
-
-      {method && (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${method.phases.filter((p) => p.active).length || 1}, minmax(0, 1fr))`, gap: 6 }}>
-            {method.phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder).map((p, i) => (
-              <a key={p.id} href={`#phase-${p.id}`} style={{ padding: '10px 12px', borderRadius: 10, textDecoration: 'none', background: i === 0 ? '#C7D2FE' : i === 1 ? '#A5B4FC' : i === 2 ? '#6366F1' : i === 3 ? '#4F46E5' : '#312E81', color: i < 2 ? '#1E1B4B' : '#FFFFFF' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85 }}>PHASE {i + 1}</div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{p.name}</div>
-              </a>
-            ))}
-          </div>
-
-          {method.phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder).map((p, i) => {
-            const steps = method.steps.filter((s) => s.phaseId === p.id).sort((a, b) => a.sortOrder - b.sortOrder);
-            const loose = method.deliverables.filter((d) => d.active && d.phaseId === p.id && !steps.some((s) => s.id === d.stepId));
+      <section style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18, overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, phases.length)}, minmax(200px, 1fr))`, gap: 12, minWidth: phases.length * 212 }}>
+          {phases.map((p, i) => {
+            const light = i < 2;
+            const inPhase = projectsIn(p.id);
             return (
-              <section key={p.id} id={`phase-${p.id}`} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.text2 }}>PHASE {i + 1}</div>
-                  <h2 style={{ margin: '2px 0 2px', fontSize: 16, fontWeight: 700, color: C.text }}>{p.name}</h2>
-                  <div style={{ fontSize: 13, color: C.text2 }}>{p.description}</div>
+              <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+                <div style={{ padding: '10px 24px 10px 14px', background: PHASE_BG[i % PHASE_BG.length], color: light ? '#1E1B4B' : '#FFFFFF',
+                  clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)', borderRadius: '8px 0 0 8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.03em' }}>{p.name.toUpperCase()}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{i + 1}/{phases.length}</span>
+                  </div>
+                  <div title={p.description} style={{ fontSize: 11, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description}</div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
-                  {steps.map((s) => {
-                    const dels = method.deliverables.filter((d) => d.active && d.stepId === s.id).sort((a, b) => a.sortOrder - b.sortOrder);
-                    const o = OWNER_INFO[s.owner];
-                    return (
-                      <div key={s.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{s.name}</span>
-                          <span title="Main owner" style={{ fontSize: 11, fontWeight: 700, padding: '0 8px', borderRadius: 999, background: o.bg, color: o.fg, whiteSpace: 'nowrap' }}>{o.label}</span>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, minHeight: 22 }}>
+                  {inPhase.map((x) => (
+                    <button key={x.id} type="button" title={`${x.name} — open its methodology`} onClick={() => navigate(projectPath(x.id, 'checklists'))}
+                      style={{ border: 0, cursor: 'pointer', fontFamily: F, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#FFEDD5', color: '#9A3412' }}>
+                      {x.customerAbbreviation || x.code}
+                    </button>
+                  ))}
+                </div>
+
+                {stepsOf(p.id).map((s, k, arr) => (
+                  <React.Fragment key={s.id}>
+                    <button type="button" onClick={() => setStep(s)}
+                      style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontFamily: F, background: C.white,
+                        border: `1px solid ${C.border}`, borderLeft: `4px solid ${OWNER_COLOR[s.owner]}`, transition: 'box-shadow .15s, border-color .15s' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px rgba(15,23,42,0.08)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{s.name}</div>
+                      {delsOf(s.id).length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                          {delsOf(s.id).map((d) => (
+                            <span key={d.id} title={d.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, padding: '1px 7px', borderRadius: 6,
+                              background: d.requiresSignoff ? '#ECFDF5' : C.bg, color: d.requiresSignoff ? '#047857' : C.text2, fontWeight: 600 }}>
+                              {d.shortName || d.name}{d.requiresSignoff && <PenLine size={10} />}
+                            </span>
+                          ))}
                         </div>
-                        <div style={{ fontSize: 13, color: C.text2 }}>{s.objective}</div>
-                        {s.activities.length > 0 && (
-                          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: C.text, lineHeight: 1.7 }}>
-                            {s.activities.map((a, k) => <li key={k}>{a}</li>)}
-                          </ul>
-                        )}
-                        {dels.length > 0 && (
-                          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {dels.map((d) => (
-                              <div key={d.id} style={{ fontSize: 11, color: C.text, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                <span style={{ fontWeight: 600, fontSize: 13 }}>{d.name}</span>
-                                {d.requiresSignoff && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#047857', background: C.greenBg, padding: '0 6px', borderRadius: 999, fontWeight: 600 }}><PenLine size={11} />Sign-off</span>}
-                                {d.internalOnly && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: C.text2, background: C.bg2, padding: '0 6px', borderRadius: 999, fontWeight: 600 }}><Lock size={11} />Internal</span>}
-                                <span style={{ color: C.text3 }}>{d.format}</span>
-                                {d.templateUrl && <a href={d.templateUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: C.primary, fontWeight: 600 }}><FileDown size={11} />Template</a>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      )}
+                    </button>
+                    {k < arr.length - 1 && <span aria-hidden="true" style={{ alignSelf: 'center', width: 2, height: 6, background: C.border2, margin: '-8px 0' }} />}
+                  </React.Fragment>
+                ))}
+
+                <div style={{ marginTop: 'auto', display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, background: '#FFFBEB', border: '1px dashed #FCD34D' }}>
+                  <span aria-hidden="true" style={{ width: 10, height: 10, marginTop: 3, transform: 'rotate(45deg)', background: '#D97706', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: '#78350F', lineHeight: 1.5 }}><strong>Gate</strong> · {p.gate}</span>
                 </div>
-                {loose.length > 0 && <div style={{ fontSize: 13, color: C.text2 }}>Also delivered: {loose.map((d) => d.name).join(', ')}</div>}
-                <div style={{ padding: '10px 12px', borderRadius: 10, background: '#F8FAFC', border: `1px dashed ${C.border2}` }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.text2 }}>GATE · </span>
-                  <span style={{ fontSize: 13, color: C.text }}>{p.gate}</span>
-                </div>
-              </section>
+              </div>
             );
           })}
+        </div>
+      </section>
 
-          <section style={card}>
-            <h2 style={{ margin: '0 0 10px', fontSize: 16, fontWeight: 700, color: C.text }}>Reporting cadence</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
-              {CADENCE.map(([when, what, desc]) => (
-                <div key={what} style={{ padding: '10px 12px', borderRadius: 10, background: C.bg }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#4338CA' }}>{when}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{what}</div>
-                  <div style={{ fontSize: 11, color: C.text2 }}>{desc}</div>
-                </div>
-              ))}
+      <section style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: '#1E1B4B', color: '#FFFFFF', fontSize: 13, fontWeight: 700 }}>
+          <Repeat size={15} aria-hidden="true" />Reporting & governance — through every phase
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          {CADENCE.map((c) => (
+            <div key={c.what} style={{ padding: '12px 14px', borderRight: `1px solid ${C.border}`, borderTop: `1px solid ${C.border}`, background: c.hot ? '#FFFBEB' : C.white }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{c.what}</div>
+              <div style={{ fontSize: 11, color: C.text2, margin: '2px 0 6px' }}>{c.note}</div>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 999, background: c.hot ? '#DC2626' : '#4338CA', color: '#FFFFFF' }}>{c.when}</span>
             </div>
-          </section>
-        </>
-      )}
+          ))}
+        </div>
+      </section>
+
+      {step && (() => {
+        const phase = phases.find((p) => p.id === step.phaseId);
+        const dels = delsOf(step.id);
+        return (
+          <FormModal title={step.name} subtitle={`${phase?.name || ''} · led by ${step.owner === 'Joint' ? 'HMC and the client' : step.owner}`} onClose={() => setStep(null)} width={640}
+            footer={<><span style={{ marginLeft: 'auto' }} /><Btn variant="ghost" onClick={() => setStep(null)}>Close</Btn></>}>
+            <div style={{ fontSize: 13, color: C.text, padding: '10px 12px', borderRadius: 10, background: C.bg }}>{step.objective}</div>
+            {step.activities.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.text2 }}>CHECKLIST</div>
+                {step.activities.map((a, k) => (
+                  <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}><CheckSquare size={15} color={C.primary} style={{ marginTop: 2, flexShrink: 0 }} />{a}</div>
+                ))}
+              </div>
+            )}
+            {dels.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.text2 }}>DELIVERABLES</div>
+                {dels.map((d) => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, border: `1px solid ${C.border}` }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>{d.name}</span>
+                      <span style={{ display: 'flex', gap: 8, fontSize: 11, color: C.text3, flexWrap: 'wrap' }}>
+                        {d.format}
+                        {d.requiresSignoff && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#047857', fontWeight: 600 }}><PenLine size={10} />Sign-off</span>}
+                        {d.internalOnly && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}><Lock size={10} />Internal</span>}
+                      </span>
+                    </span>
+                    {d.templateUrl
+                      ? <a href={d.templateUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 600, color: C.primary, textDecoration: 'none' }}><FileDown size={14} />Template</a>
+                      : <span style={{ fontSize: 11, color: C.text3 }}>No template yet</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {phase?.gate && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, background: '#FFFBEB', border: '1px dashed #FCD34D', fontSize: 13, color: '#78350F' }}>
+                <span aria-hidden="true" style={{ width: 10, height: 10, marginTop: 4, transform: 'rotate(45deg)', background: '#D97706', flexShrink: 0 }} />
+                <span><strong>Phase gate</strong> · {phase.gate}</span>
+              </div>
+            )}
+          </FormModal>
+        );
+      })()}
     </div>
   );
 }
