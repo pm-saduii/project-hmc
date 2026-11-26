@@ -275,38 +275,45 @@ export default function MethodologySettingsPage({ mode, eyebrow }: { mode: Mode;
     <>
       <AdminHeader eyebrow={eyebrow} title="Deliverables" description="Documents every project delivers, by phase. Link each one to its standard template so teams always start from the right form."
         actions={<Btn onClick={() => setDeliverable({ isNew: true, phaseId: phases[0]?.id, owner: 'HMC', active: true })}><Plus size={14} style={{ marginRight: 6 }} />Add deliverable</Btn>} />
-      <section style={{ ...panel, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
-            <thead><tr><th style={{ ...th, width: 70 }}>Order</th><th style={th}>Deliverable</th><th style={th}>Phase › Step</th><th style={th}>Owner</th><th style={th}>Template</th><th style={th}>Used by</th><th style={th}>Active</th><th style={{ ...th, width: 70 }}><span style={{ position: 'absolute', left: -9999 }}>Actions</span></th></tr></thead>
-            <tbody>
-              {list.map((x) => {
-                const group = list.filter((y) => y.phaseId === x.phaseId);
-                const gi = group.findIndex((y) => y.id === x.id);
-                return (
-                <tr key={x.id} style={{ opacity: x.active ? 1 : 0.55 }}>
-                  <td style={td}><MoveButtons index={gi} count={group.length} disabled={busy} onMove={(dir) => move(reorder(group, gi, dir), (r) => methodologyApi.saveDeliverable(r))} /></td>
-                  <td style={td}>
-                    <div style={{ fontWeight: 600 }}>{x.name} <span style={{ fontSize: 11, color: C.text3, fontWeight: 400 }}>{x.id}</span></div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                      {x.requiresSignoff && <Pill bg={C.greenBg} fg="#047857">Sign-off</Pill>}
-                      {x.internalOnly && <Pill bg={C.bg2} fg={C.text2}>Internal</Pill>}
-                      {x.format && <span style={{ fontSize: 11, color: C.text3 }}>{x.format}</span>}
-                    </div>
-                  </td>
-                  <td style={{ ...td, color: C.text2 }}>{phaseName(x.phaseId)} › {stepName(x.stepId)}</td>
-                  <td style={td}><Pill bg={OWNER_INFO[x.owner].bg} fg={OWNER_INFO[x.owner].fg}>{x.owner}</Pill></td>
-                  <td style={td}>{x.templateUrl ? <a href={x.templateUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600 }}>Open</a> : <span style={{ color: '#B45309', fontSize: 11 }}>Not linked</span>}</td>
-                  <td style={{ ...td, color: C.text2 }}>{usage[x.id] ? `${usage[x.id]} project${usage[x.id] > 1 ? 's' : ''}` : 'Not used'}</td>
-                  <td style={td}><Switch checked={x.active} label={`${x.name} active`} onChange={(v) => void run(() => methodologyApi.saveDeliverable({ id: x.id, active: v }), v ? 'Activated' : 'Deactivated')} /></td>
-                  <td style={{ ...td, textAlign: 'right' }}><button type="button" onClick={() => setDeliverable({ ...x })} style={linkBtn(C.primary)}>Edit</button></td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {phases.map((p, pi) => {
+        const group = list.filter((y) => y.phaseId === p.id);
+        return (
+          <section key={p.id} style={{ ...panel, overflow: 'hidden', opacity: p.active ? 1 : 0.6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${C.border}`, background: '#F8FAFC' }}>
+              <PhaseIconBadge phase={p} index={pi} size={28} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.text, flex: 1 }}>{String(pi + 1).padStart(2, '0')} · {p.name}</span>
+              <span style={{ fontSize: 11, color: C.text3 }}>{group.filter((x) => x.active).length} active</span>
+              <button type="button" onClick={() => setDeliverable({ isNew: true, phaseId: p.id, owner: 'HMC', active: true })} style={linkBtn(C.primary)}>+ Add deliverable</button>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
+                <tbody>
+                  {group.length === 0 && <tr><td style={{ ...td, color: C.text3 }}>No deliverables yet.</td></tr>}
+                  {group.map((x, gi) => (
+                    <tr key={x.id} style={{ opacity: x.active ? 1 : 0.55 }}>
+                      <td style={{ ...td, width: 70 }}><MoveButtons index={gi} count={group.length} disabled={busy} onMove={(dir) => move(reorder(group, gi, dir), (r) => methodologyApi.saveDeliverable(r))} /></td>
+                      <td style={td}>
+                        <div style={{ fontWeight: 600 }}>{x.name} <span style={{ fontSize: 11, color: C.text3, fontWeight: 400 }}>{x.id}</span></div>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: C.text2 }}>{stepName(x.stepId)}</span>
+                          {x.requiresSignoff && <Pill bg={C.greenBg} fg="#047857">Sign-off</Pill>}
+                          {x.internalOnly && <Pill bg={C.bg2} fg={C.text2}>Internal</Pill>}
+                          {x.format && <span style={{ fontSize: 11, color: C.text3 }}>· {x.format}</span>}
+                        </div>
+                      </td>
+                      <td style={{ ...td, width: 90 }}><Pill bg={OWNER_INFO[x.owner].bg} fg={OWNER_INFO[x.owner].fg}>{x.owner}</Pill></td>
+                      <td style={{ ...td, width: 90 }}>{x.templateUrl ? <a href={x.templateUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600 }}>Template</a> : <span style={{ color: '#B45309', fontSize: 11, whiteSpace: 'nowrap' }}>No template</span>}</td>
+                      <td style={{ ...td, width: 100, color: C.text2, whiteSpace: 'nowrap' }}>{usage[x.id] ? `${usage[x.id]} project${usage[x.id] > 1 ? 's' : ''}` : 'Not used'}</td>
+                      <td style={{ ...td, width: 60 }}><Switch checked={x.active} label={`${x.name} active`} onChange={(v) => void run(() => methodologyApi.saveDeliverable({ id: x.id, active: v }), v ? 'Activated' : 'Deactivated')} /></td>
+                      <td style={{ ...td, width: 60, textAlign: 'right' }}><button type="button" onClick={() => setDeliverable({ ...x })} style={linkBtn(C.primary)}>Edit</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
       <div style={hint}>A deliverable used by projects cannot be deleted — make it inactive instead.</div>
 
       {d && (
