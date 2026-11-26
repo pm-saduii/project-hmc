@@ -20,7 +20,7 @@ export interface ProjectDeliverable {
   /** Data of the generated sign-off document (company template). */
   form?: Record<string, unknown> | null;
 }
-export interface PhaseGate { projectId: string; phaseId: string; status: 'open' | 'passed'; passedAt: string | null; passedBy: string | null; notes: string }
+export interface PhaseGate { projectId: string; phaseId: string; status: 'open' | 'passed'; passedAt: string | null; passedBy: string | null; notes: string; /** Main task of this phase in the plan. */ taskId?: string | null }
 
 export const STATUS_INFO: Record<DeliverableStatus, { label: string; bg: string; fg: string }> = {
   planned: { label: 'Planned', bg: '#F1F5F9', fg: '#475569' },
@@ -112,6 +112,12 @@ export const methodologyApi = {
     return (pd.data || []).filter((r: { task_id?: string | null }) => r.task_id)
       .map((r: { task_id: string; deliverable_id: string; status: DeliverableStatus }) => ({ taskId: r.task_id, deliverableId: r.deliverable_id, name: names.get(r.deliverable_id) || r.deliverable_id, status: r.status }));
   },
+  /** Link a phase to its main task in the plan (null to unlink). */
+  setGateTask: async (projectId: string, phaseId: string, taskId: string | null) => {
+    const { error } = await supabase.from('project_phase_gates')
+      .upsert({ project_id: projectId, phase_id: phaseId, task_id: taskId }, { onConflict: 'project_id,phase_id' });
+    if (error) throw new Error(error.message);
+  },
   setGate: async (projectId: string, phaseId: string, status: 'open' | 'passed', notes = '') => {
     const { error } = await supabase.from('project_phase_gates')
       .upsert({ project_id: projectId, phase_id: phaseId, status, notes }, { onConflict: 'project_id,phase_id' });
@@ -157,5 +163,20 @@ export function suggestLinks<T extends { id: string; taskName: string; phase?: s
     if (best) out[d.id] = best;
   });
   return out;
+}
+
+/** Progress of a task and everything under it, counted on the lowest-level tasks. */
+export function subtreeProgress<T extends { id: string; parentId: string; status: string; percentComplete: number }>(rootId: string, tasks: T[]): { total: number; done: number; open: T[] } {
+  const kids = new Map<string, T[]>();
+  tasks.forEach((t) => { if (t.parentId) { const l = kids.get(t.parentId) || []; l.push(t); kids.set(t.parentId, l); } });
+  const leaves: T[] = [];
+  const walk = (id: string, depth: number) => {
+    const c = kids.get(id) || [];
+    if (!c.length || depth > 20) { const t = tasks.find((x) => x.id === id); if (t) leaves.push(t); return; }
+    c.forEach((x) => walk(x.id, depth + 1));
+  };
+  walk(rootId, 0);
+  const isDone = (t: T) => t.status === 'Done' || (Number(t.percentComplete) || 0) >= 100;
+  return { total: leaves.length, done: leaves.filter(isDone).length, open: leaves.filter((t) => !isDone(t)) };
 }
 

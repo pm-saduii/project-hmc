@@ -1,12 +1,13 @@
 import React from 'react';
 import toast from 'react-hot-toast';
-import { BookOpen, CheckCircle2, Link2, Wand2, ChevronDown, ChevronRight, Circle, CircleDot, ExternalLink, FileBarChart, FileDown, FileText, LayoutGrid, List, Lock, PenLine, Presentation, Repeat, Timer, Wallet } from 'lucide-react';
+import { BookOpen, CheckCircle2, Link2, ListPlus, Wand2, ChevronDown, ChevronRight, Circle, CircleDot, ExternalLink, FileBarChart, FileDown, FileText, LayoutGrid, List, Lock, PenLine, Presentation, Repeat, Timer, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FormModal } from '../Admin/AdminUi';
 import { projectPath } from '../../utils/projectRoutes';
 import SignoffFormModal from '../Documents/SignoffFormModal';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
+import { taskApi } from '../../services/api';
 import type { SignoffForm } from '../../utils/companyDocs';
 import type { Task } from '../../types';
 import { Btn, C, Input, Modal } from '../Common';
@@ -14,8 +15,8 @@ import { fmtDate } from '../../utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
 import {
-  OWNER_INFO, STATUS_INFO, currentPhase, isComplete, methodologyApi, statusesFor, suggestLinks,
-  type DeliverableStatus, type MethodDeliverable, type Methodology, type Owner, type PhaseGate, type ProjectDeliverable,
+  OWNER_INFO, STATUS_INFO, currentPhase, isComplete, methodologyApi, statusesFor, subtreeProgress, suggestLinks, matchScore,
+  type DeliverableStatus, type MethodDeliverable, type MethodPhase, type Methodology, type Owner, type PhaseGate, type ProjectDeliverable,
 } from '../../services/methodology';
 
 const F = 'Poppins, sans-serif';
@@ -52,6 +53,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   React.useEffect(() => { if (!allTasks.some((t) => t.projectId === projectId)) void fetchTasks(projectId).catch(() => undefined); }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [finishTask, setFinishTask] = React.useState<{ task: Task; date: string; deliverable: string } | null>(null);
   const [matching, setMatching] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
 
   const load = React.useCallback(async () => {
     try {
@@ -111,6 +113,14 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   };
   /** Due date: the linked task's end date, else the date typed here. */
   const dueOf = (d: MethodDeliverable) => taskOf(d)?.endDate || state[d.id]?.dueDate || '';
+  /** The phase's main task in the plan and how far the tasks under it are. */
+  const phaseTaskOf = (phaseId: string): Task | null => {
+    const id = gates.find((g) => g.phaseId === phaseId)?.taskId;
+    return id ? tasks.find((t) => t.id === id) || null : null;
+  };
+  const phaseTasks = (phaseId: string) => { const t = phaseTaskOf(phaseId); return t ? subtreeProgress(t.id, tasks) : null; };
+  /** Ready to pass: every deliverable complete and every task under the phase done. */
+  const gateReady = (phaseId: string) => deliverablesOf(phaseId).every((d) => isComplete(statusOf(d))) && (phaseTasks(phaseId)?.open.length ?? 0) === 0;
   const changeStatus = async (d: MethodDeliverable, status: DeliverableStatus) => {
     const done = isComplete(status) && status !== 'not_required';
     const date = done ? (state[d.id]?.completedDate || today()) : null;
@@ -235,8 +245,11 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Project methodology</div>
-          <div style={{ fontSize: 13, color: C.text2 }}>{current ? <>Now in <strong style={{ color: '#4338CA' }}>{current.name}</strong></> : 'All phases passed'}</div>
+          <div style={{ fontSize: 13, color: C.text2 }}>{current ? <>Now in <strong style={{ color: '#4338CA' }}>{current.name}</strong>{gateReady(current.id) && <span style={{ color: '#047857', fontWeight: 600 }}> · gate ready to pass</span>}</> : 'All phases passed'}</div>
         </div>
+        {canWrite && (
+          <Btn small variant="outline" onClick={() => setCreating(true)} title="Add tasks to the plan for the methodology phases, steps and deliverables"><ListPlus size={14} style={{ marginRight: 6 }} />Create tasks</Btn>
+        )}
         {canWrite && tasks.length > 0 && (
           <Btn small variant="outline" onClick={() => setMatching(true)} title="Link deliverables to tasks in the plan"><Wand2 size={14} style={{ marginRight: 6 }} />Link tasks</Btn>
         )}
@@ -340,8 +353,10 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: isPassed ? '#047857' : C.text2 }}>
                       <span aria-hidden="true" style={{ width: 8, height: 8, transform: 'rotate(45deg)', background: isPassed ? C.green : C.text3 }} />
                       GATE {isPassed && gate?.passedAt ? `· ${fmtDate(gate.passedAt.slice(0, 10))}` : ''}
+                      {!isPassed && gateReady(p.id) && <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, color: '#047857', background: C.greenBg, padding: '0 6px', borderRadius: 999 }}>READY</span>}
                     </div>
                     <div title={p.gate} style={{ fontSize: 11, color: C.text2, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.gate}</div>
+                    <GateChecks deliverables={list.length - missing.length} deliverableTotal={list.length} tasks={phaseTasks(p.id)} />
                     {canManage && isCurrent && !isPassed && (
                       <Btn small onClick={() => setConfirmGate({ phaseId: p.id, pass: true })} disabled={!!gateBusy || missing.length > 0}
                         title={missing.length ? `Waiting for: ${missing.map((d) => d.shortName || d.name).join(', ')}` : undefined}
@@ -425,8 +440,10 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                     <div style={{ fontSize: 11, color: isPassed ? '#047857' : missing.length ? '#B45309' : '#047857', marginTop: 2 }}>
                       {isPassed
                         ? `Passed${gate?.passedAt ? ` on ${fmtDate(gate.passedAt.slice(0, 10))}` : ''}`
-                        : missing.length ? `Waiting for: ${missing.map((d) => d.shortName || d.name).join(', ')}` : 'All deliverables complete — ready to pass'}
+                        : missing.length ? `Waiting for: ${missing.map((d) => d.shortName || d.name).join(', ')}`
+                          : gateReady(p.id) ? 'All deliverables complete and tasks done — ready to pass' : 'All deliverables complete — tasks still open'}
                     </div>
+                    {!isPassed && <GateChecks deliverables={list.length - missing.length} deliverableTotal={list.length} tasks={phaseTasks(p.id)} />}
                   </div>
                   {canManage && (isPassed
                     ? <Btn variant="ghost" small onClick={() => setConfirmGate({ phaseId: p.id, pass: false })} disabled={!!gateBusy}>Reopen gate</Btn>
@@ -498,21 +515,57 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
           </div>
         </Modal>
       )}
+      {creating && (
+        <CreateTasksModal
+          phases={phases}
+          stepsOf={stepsOf}
+          deliverablesOfStep={deliverablesOfStep}
+          looseDeliverables={(phaseId) => deliverablesOf(phaseId).filter((d) => !d.stepId || !method.steps.some((x) => x.id === d.stepId))}
+          linkedPhases={new Set(gates.filter((g) => g.taskId && tasks.some((t) => t.id === g.taskId)).map((g) => g.phaseId))}
+          hasTasks={tasks.length > 0}
+          onClose={() => setCreating(false)}
+          onCreate={async (nodes, deliverableKeys, phaseKeys) => {
+            const { data, ids } = await taskApi.appendTree(projectId, nodes);
+            useStore.setState({ tasks: [...useStore.getState().tasks.filter((t) => t.projectId !== projectId), ...data] });
+            let warned = false;
+            for (const [deliverableId, key] of Object.entries(deliverableKeys)) {
+              try { await methodologyApi.saveDeliverableState(projectId, deliverableId, { taskId: ids[key] }); }
+              catch { if (!warned) { toast.error('Tasks created, but linking needs the migration 2026-12-02-deliverable-task-link.sql.'); warned = true; } break; }
+            }
+            for (const [phaseId, key] of Object.entries(phaseKeys)) {
+              try { await methodologyApi.setGateTask(projectId, phaseId, ids[key]); }
+              catch { if (!warned) { toast.error('Tasks created, but linking phases needs the migration 2026-12-03-phase-gate-task.sql.'); warned = true; } break; }
+            }
+            await load();
+            if (!warned) toast.success(`${nodes.length} tasks added to the plan and linked`);
+          }}
+        />
+      )}
       {matching && (
         <LinkTasksModal
           deliverables={phases.flatMap((p) => deliverablesOf(p.id))}
           phaseNameOf={(id) => phases.find((p) => p.id === id)?.name || ''}
           linked={Object.fromEntries(Object.values(state).filter((x) => x.taskId).map((x) => [x.deliverableId, x.taskId as string]))}
+          phases={phases}
+          phaseLinked={Object.fromEntries(gates.filter((g) => g.taskId).map((g) => [g.phaseId, g.taskId as string]))}
           tasks={tasks}
           onClose={() => setMatching(false)}
-          onApply={async (links) => {
+          onApply={async (links, phaseLinks) => {
             let ok = 0;
+            const total = Object.keys(links).length + Object.keys(phaseLinks).length;
             for (const [deliverableId, taskId] of Object.entries(links)) {
               const d = method.deliverables.find((x) => x.id === deliverableId);
               if (d && await save(d, { taskId: taskId || null })) ok += 1; else break;
             }
-            if (ok) toast.success(`${ok} deliverable${ok > 1 ? 's' : ''} updated`);
-            return ok === Object.keys(links).length;
+            if (ok === Object.keys(links).length) {
+              for (const [phaseId, taskId] of Object.entries(phaseLinks)) {
+                try { await methodologyApi.setGateTask(projectId, phaseId, taskId || null); ok += 1; }
+                catch (e) { const m = e instanceof Error ? e.message : ''; toast.error(/task_id/i.test(m) ? 'Run the migration 2026-12-03-phase-gate-task.sql to link phases.' : m || 'Could not save'); break; }
+              }
+              await load();
+            }
+            if (ok) toast.success(`${ok} link${ok > 1 ? 's' : ''} updated`);
+            return ok === total;
           }}
         />
       )}
@@ -520,7 +573,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
         <Modal title={confirmGate.pass ? 'Pass phase gate' : 'Reopen phase gate'} onClose={() => !gateBusy && setConfirmGate(null)} width={440} closeOnBackdrop={false}>
           <p style={{ fontSize: 13, color: C.text2, margin: '0 0 20px', lineHeight: 1.6 }}>
             {confirmGate.pass
-              ? `Confirm that "${phases.find((p) => p.id === confirmGate.phaseId)?.name}" meets its gate. The project moves to the next phase.`
+              ? `Confirm that "${phases.find((p) => p.id === confirmGate.phaseId)?.name}" meets its gate. The project moves to the next phase.${(phaseTasks(confirmGate.phaseId)?.open.length ?? 0) > 0 ? ` Note: ${phaseTasks(confirmGate.phaseId)!.open.length} task(s) under this phase are not done yet.` : ''}`
               : 'The project goes back to this phase until the gate is passed again.'}
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -585,17 +638,28 @@ function TaskCell({ task, tasks, editable, label, onChange }: { task: Task | nul
 }
 
 /** Suggest a task for each deliverable (by name and phase); the PM checks, changes and applies. */
-function LinkTasksModal({ deliverables, phaseNameOf, linked, tasks, onClose, onApply }: {
-  deliverables: MethodDeliverable[]; phaseNameOf: (phaseId: string) => string; linked: Record<string, string>; tasks: Task[];
-  onClose: () => void; onApply: (links: Record<string, string>) => Promise<boolean>;
+function LinkTasksModal({ deliverables, phaseNameOf, linked, phases, phaseLinked, tasks, onClose, onApply }: {
+  deliverables: MethodDeliverable[]; phaseNameOf: (phaseId: string) => string; linked: Record<string, string>;
+  phases: MethodPhase[]; phaseLinked: Record<string, string>; tasks: Task[];
+  onClose: () => void; onApply: (links: Record<string, string>, phaseLinks: Record<string, string>) => Promise<boolean>;
 }) {
+  // Phases link to a main (top-level) task, suggested by name
+  const mainTasks = tasks.filter((t) => !t.parentId);
+  const phaseSuggest = React.useMemo(() => Object.fromEntries(phases.filter((p) => !phaseLinked[p.id]).flatMap((p) => {
+    let best: { taskId: string; score: number } | null = null;
+    mainTasks.forEach((t) => { const sc = matchScore({ name: p.name, shortName: '' }, '', t); if (sc >= 0.5 && (!best || sc > best.score)) best = { taskId: t.id, score: sc }; });
+    return best ? [[p.id, best]] : [];
+  })) as Record<string, { taskId: string; score: number }>, [phases, phaseLinked, tasks]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [phaseChoice, setPhaseChoice] = React.useState<Record<string, string>>(() => ({ ...phaseLinked, ...Object.fromEntries(Object.entries(phaseSuggest).map(([k, v]) => [k, v.taskId])) }));
+  const phaseChanges = Object.fromEntries(phases.filter((p) => (phaseChoice[p.id] || '') !== (phaseLinked[p.id] || '')).map((p) => [p.id, phaseChoice[p.id] || '']));
+  const phaseRows = phases;
   const [onlyUnlinked, setOnlyUnlinked] = React.useState(true);
   const suggestions = React.useMemo(() => suggestLinks(deliverables.filter((d) => !linked[d.id]), phaseNameOf, tasks), [deliverables, linked, tasks]); // eslint-disable-line react-hooks/exhaustive-deps
   const [choice, setChoice] = React.useState<Record<string, string>>(() => ({ ...linked, ...Object.fromEntries(Object.entries(suggestions).map(([k, v]) => [k, v.taskId])) }));
   const [busy, setBusy] = React.useState(false);
   const rows = deliverables.filter((d) => !onlyUnlinked || !linked[d.id]);
   const changes = Object.fromEntries(deliverables.filter((d) => (choice[d.id] || '') !== (linked[d.id] || '')).map((d) => [d.id, choice[d.id] || '']));
-  const n = Object.keys(changes).length;
+  const n = Object.keys(changes).length + Object.keys(phaseChanges).length;
   const cell: React.CSSProperties = { padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13, verticalAlign: 'middle' };
   return (
     <FormModal title="Link deliverables to tasks" subtitle="Suggested by matching names and phases — check each one before applying" onClose={onClose} busy={busy} width={860}
@@ -605,8 +669,35 @@ function LinkTasksModal({ deliverables, phaseNameOf, linked, tasks, onClose, onA
         </label>
         <span style={{ marginLeft: 'auto' }} />
         <Btn variant="ghost" onClick={onClose} disabled={busy}>Close</Btn>
-        <Btn disabled={!n || busy} onClick={() => { setBusy(true); void onApply(changes).then((ok) => { setBusy(false); if (ok) onClose(); }); }}>{busy ? 'Saving…' : `Apply ${n || ''} change${n === 1 ? '' : 's'}`}</Btn>
+        <Btn disabled={!n || busy} onClick={() => { setBusy(true); void onApply(changes, phaseChanges).then((ok) => { setBusy(false); if (ok) onClose(); }); }}>{busy ? 'Saving…' : `Apply ${n || ''} change${n === 1 ? '' : 's'}`}</Btn>
       </>}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.04em' }}>PHASES → MAIN TASK <span style={{ fontWeight: 400 }}>(the gate checks every task under it)</span></div>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            {phaseRows.map((p) => {
+              const sug = phaseSuggest[p.id];
+              const changed = (phaseChoice[p.id] || '') !== (phaseLinked[p.id] || '');
+              return (
+                <tr key={p.id} style={{ background: changed ? '#F8FAFF' : undefined }}>
+                  <td style={{ ...cell, fontWeight: 600 }}>{p.name}</td>
+                  <td style={{ ...cell, width: 420 }}>
+                    <select value={phaseChoice[p.id] || ''} onChange={(e) => setPhaseChoice((c) => ({ ...c, [p.id]: e.target.value }))} aria-label={`${p.name} main task`}
+                      style={{ height: 30, width: '100%', border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, background: C.white }}>
+                      <option value="">— Not linked —</option>
+                      {mainTasks.map((t) => <option key={t.id} value={t.id}>{taskLabel(t)}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ ...cell, width: 110, fontSize: 11, color: C.text2, whiteSpace: 'nowrap' }}>
+                    {phaseLinked[p.id] ? (changed ? 'Change' : 'Linked') : sug && phaseChoice[p.id] === sug.taskId ? `Suggested · ${Math.round(sug.score * 100)}%` : changed ? 'New' : 'No match'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, letterSpacing: '0.04em' }}>DELIVERABLES → TASK</div>
       {rows.length === 0 ? <div style={{ fontSize: 13, color: C.text3 }}>Every deliverable is linked.</div> : (
         <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -643,3 +734,100 @@ function LinkTasksModal({ deliverables, phaseNameOf, linked, tasks, onClose, onA
     </FormModal>
   );
 }
+
+/** Gate checklist: deliverables complete, tasks under the phase done. */
+function GateChecks({ deliverables, deliverableTotal, tasks }: { deliverables: number; deliverableTotal: number; tasks: { total: number; done: number } | null }) {
+  const item = (ok: boolean, text: string) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: ok ? '#047857' : C.text2 }}>
+      {ok ? <CheckCircle2 size={12} /> : <Circle size={12} />}{text}
+    </span>
+  );
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', marginTop: 4 }}>
+      {item(deliverables === deliverableTotal, `Deliverables ${deliverables}/${deliverableTotal}`)}
+      {tasks ? item(tasks.done === tasks.total, `Tasks ${tasks.done}/${tasks.total}`) : <span style={{ fontSize: 11, color: C.text3 }}>No phase task linked</span>}
+    </div>
+  );
+}
+
+type TreeNode = { key: string; parentKey: string | null; taskName: string };
+
+/** Build Phase → Step (→ Deliverable) tasks from the methodology and link them. */
+function CreateTasksModal({ phases, stepsOf, deliverablesOfStep, looseDeliverables, linkedPhases, hasTasks, onClose, onCreate }: {
+  phases: MethodPhase[]; stepsOf: (phaseId: string) => { id: string; name: string }[]; deliverablesOfStep: (stepId: string) => MethodDeliverable[];
+  looseDeliverables: (phaseId: string) => MethodDeliverable[]; linkedPhases: Set<string>; hasTasks: boolean; onClose: () => void;
+  onCreate: (nodes: TreeNode[], deliverableKeys: Record<string, string>, phaseKeys: Record<string, string>) => Promise<void>;
+}) {
+  const [detail, setDetail] = React.useState<'steps' | 'deliverables'>('deliverables');
+  const [picked, setPicked] = React.useState<Set<string>>(() => new Set(phases.filter((p) => !linkedPhases.has(p.id)).map((p) => p.id)));
+  const [busy, setBusy] = React.useState(false);
+  const plan = React.useMemo(() => {
+    const nodes: TreeNode[] = []; const deliverableKeys: Record<string, string> = {}; const phaseKeys: Record<string, string> = {};
+    phases.forEach((p) => {
+      if (!picked.has(p.id)) return;
+      const pk = `p:${p.id}`;
+      nodes.push({ key: pk, parentKey: null, taskName: p.name });
+      phaseKeys[p.id] = pk;
+      stepsOf(p.id).forEach((st) => {
+        const sk = `s:${st.id}`;
+        nodes.push({ key: sk, parentKey: pk, taskName: st.name });
+        deliverablesOfStep(st.id).forEach((d) => {
+          if (detail === 'deliverables') {
+            const dk = `d:${d.id}`;
+            nodes.push({ key: dk, parentKey: sk, taskName: d.name });
+            deliverableKeys[d.id] = dk;
+          } else deliverableKeys[d.id] = sk;
+        });
+      });
+      looseDeliverables(p.id).forEach((d) => {
+        const dk = `d:${d.id}`;
+        nodes.push({ key: dk, parentKey: pk, taskName: d.name });
+        deliverableKeys[d.id] = dk;
+      });
+    });
+    return { nodes, deliverableKeys, phaseKeys };
+  }, [picked, detail]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const radio = (value: 'steps' | 'deliverables', title: string, sub: string) => (
+    <label style={{ flex: 1, display: 'flex', gap: 8, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${detail === value ? C.primary : C.border}`, background: detail === value ? C.primaryBg : C.white }}>
+      <input type="radio" name="detail" checked={detail === value} onChange={() => setDetail(value)} style={{ accentColor: C.primary, marginTop: 2 }} />
+      <span><span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text }}>{title}</span><span style={{ fontSize: 11, color: C.text2 }}>{sub}</span></span>
+    </label>
+  );
+  return (
+    <FormModal title="Create tasks from the methodology" subtitle="Tasks are added after the existing plan, without dates — then set dates and resources in Tasks" onClose={onClose} busy={busy} width={720}
+      footer={<>
+        <span style={{ fontSize: 11, color: C.text2 }}>{plan.nodes.length} tasks · deliverables and phase gates are linked automatically</span>
+        <span style={{ marginLeft: 'auto' }} />
+        <Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
+        <Btn disabled={!plan.nodes.length || busy} onClick={() => {
+          setBusy(true);
+          void onCreate(plan.nodes, plan.deliverableKeys, plan.phaseKeys)
+            .then(() => onClose())
+            .catch((e) => toast.error(e instanceof Error ? e.message : 'Could not create the tasks'))
+            .finally(() => setBusy(false));
+        }}>{busy ? 'Creating…' : `Create ${plan.nodes.length} tasks`}</Btn>
+      </>}>
+      {hasTasks && <div style={{ fontSize: 13, color: '#B45309', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 12px' }}>This project already has tasks. New tasks go after them; phases already linked to a task are unticked. To link existing tasks instead, use “Link tasks”.</div>}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {radio('deliverables', 'Phases, steps and deliverables', 'A task for each deliverable, under its step')}
+        {radio('steps', 'Phases and steps', 'Deliverables link to their step task')}
+      </div>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+        {phases.map((p, i) => {
+          const steps = stepsOf(p.id);
+          const dels = steps.reduce((n, st) => n + deliverablesOfStep(st.id).length, 0) + looseDeliverables(p.id).length;
+          return (
+            <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: `1px solid ${C.bg2}`, cursor: 'pointer' }}>
+              <input type="checkbox" checked={picked.has(p.id)} onChange={() => setPicked((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })} style={{ accentColor: C.primary }} />
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: C.text }}>{i + 1}. {p.name}</span>
+              <span style={{ fontSize: 11, color: C.text2 }}>{steps.length} steps · {dels} deliverables</span>
+              {linkedPhases.has(p.id) && <span style={{ fontSize: 11, fontWeight: 600, color: '#047857', background: C.greenBg, padding: '0 6px', borderRadius: 999 }}>Linked</span>}
+            </label>
+          );
+        })}
+      </div>
+    </FormModal>
+  );
+}
+

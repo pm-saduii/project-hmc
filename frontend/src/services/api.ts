@@ -1045,6 +1045,35 @@ export const taskApi = {
     return { allTasks: [] };
   },
 
+  /**
+   * Append a tree of new tasks (no dates) after the project's existing tasks, in one insert.
+   * `nodes` are in display order; `parentKey` refers to an earlier node. Returns the new task id of each key.
+   */
+  appendTree: async (projectId: string, nodes: Array<{ key: string; parentKey: string | null; taskName: string }>): Promise<{ data: Task[]; ids: Record<string, string> }> => {
+    const okWrite = await checkProjectPermission(projectId, 'write', 'tasks');
+    if (!okWrite) throw new Error('FORBIDDEN');
+    const existing = (await taskApi.getByProject(projectId)).data;
+    const emptyRelationValue: string | null = existing.some((t) => t.parentId === '' || t.relatedTask === '') ? '' : null;
+    let next = existing.reduce((m, t) => Math.max(m, Number(t.sortOrder) || 0, Number((t as any).order) || 0), 0);
+    const ids: Record<string, string> = {};
+    const levels: Record<string, number> = {};
+    const rows = nodes.map((n) => {
+      const id = newTaskId();
+      ids[n.key] = id;
+      levels[n.key] = n.parentKey ? (levels[n.parentKey] ?? 0) + 1 : 0;
+      next += 1;
+      return {
+        id, project_id: projectId, wbs: '', task_name: n.taskName, effort_manday: 0,
+        start_date: null, end_date: null, actual_finish: null, baseline_start_date: null, baseline_end_date: null,
+        phase: '', duration: 0, percent_complete: 0, status: 'Todo', resource: '',
+        related_task: emptyRelationValue, related_task_type: 'FS', related_task_lag_days: 0,
+        parent_id: n.parentKey ? ids[n.parentKey] : emptyRelationValue, level: levels[n.key], sort_order: next, order: next,
+      } as Record<string, unknown>;
+    });
+    if (rows.length) await insertTaskRowsInOneRequest(rows);
+    return { data: await recalcAndPersistProject(projectId), ids };
+  },
+
   copyFromProject: async (sourceProjectId: string, targetProjectId: string, scope: 'all' | 'main' = 'all'): Promise<{ data: Task[] }> => {
     const canWriteTarget = await checkProjectPermission(targetProjectId, 'write', 'tasks');
     if (!canWriteTarget) throw new Error('FORBIDDEN');
