@@ -147,11 +147,13 @@ export async function exportBudgetPdf(args: {
   preparedAt: string | null; reviewedName: string; reviewedAt: string | null; approvedName: string; approvedAt: string | null;
 }): Promise<void> {
   const { snapshot: s, project } = args;
-  const [{ default: JsPDF }, { default: autoTable }, { ensureThaiFont }] = await Promise.all([
+  const [{ default: JsPDF }, { default: autoTable }, { ensurePoppinsFont, hasThai }] = await Promise.all([
     import('jspdf'), import('jspdf-autotable'), import('./pdfFont'),
   ]);
   const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const font = await ensureThaiFont(doc);
+  // Poppins like the app; Sarabun only for text with Thai letters (Poppins has none).
+  const { latin: font, thai: thaiFont, fontFor } = await ensurePoppinsFont(doc);
+  const thaiCells = (data: { cell: { text: string[]; styles: { font?: string } } }) => { if (hasThai(data.cell.text.join(' '))) data.cell.styles.font = thaiFont; };
   const W = doc.internal.pageSize.getWidth();
   const navy: [number, number, number] = [19, 40, 76];
   const d = (v?: string | null) => { const x = toDate(v || undefined); return x ? format(x, 'dd/MM/yyyy') : '—'; };
@@ -161,7 +163,18 @@ export async function exportBudgetPdf(args: {
   doc.setFont(font, 'bold'); doc.setFontSize(14); doc.setTextColor(...navy);
   doc.text('Project Budget Control Report', 12, 14);
   doc.setFont(font, 'normal'); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
-  doc.text(`${periodLabel(s.period)} · Status: ${args.status}`, W - 12, 14, { align: 'right' });
+  // Customer logo (top right, fitted into 46 × 14 mm); the period and status sit under the title.
+  let logoDrawn = false;
+  if (project.logo && project.logo.startsWith('data:image/')) {
+    try {
+      const props = doc.getImageProperties(project.logo);
+      const scale = Math.min(46 / props.width, 14 / props.height);
+      const w = props.width * scale; const h = props.height * scale;
+      doc.addImage(project.logo, 'PNG', W - 12 - w, 6 + (14 - h) / 2, w, h);
+      logoDrawn = true;
+    } catch { /* unreadable image: leave it out */ }
+  }
+  doc.text(`${periodLabel(s.period)} · Status: ${args.status}`, logoDrawn ? 12 : W - 12, logoDrawn ? 19 : 14, { align: logoDrawn ? 'left' : 'right' });
   const info: [string, string, string, string][] = [
     ['Client (Company Name)', project.client || project.name, 'Job Code', project.code || '—'],
     ['Application / Module', project.softwareVersion || project.name, 'Project Manager', args.pmName || '—'],
@@ -169,7 +182,7 @@ export async function exportBudgetPdf(args: {
     ['Project Started Date', d(project.startDate), 'Plan End Date', d(project.endDate)],
   ];
   autoTable(doc, {
-    startY: 18, theme: 'plain', margin: { left: 12, right: 12 },
+    startY: logoDrawn ? 22 : 18, theme: 'plain', margin: { left: 12, right: 12 }, didParseCell: thaiCells,
     styles: { font, fontSize: 8, cellPadding: 0.7, textColor: [30, 41, 59] },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 42 }, 1: { cellWidth: 95 }, 2: { fontStyle: 'bold', cellWidth: 38 } },
     body: info,
@@ -218,6 +231,7 @@ export async function exportBudgetPdf(args: {
     headStyles: { font, fontStyle: 'bold', fillColor: navy, textColor: 255, halign: 'center' },
     columnStyles: { 0: { halign: 'left', cellWidth: 82 } },
     theme: 'grid',
+    didParseCell: thaiCells,
   });
 
   // Sign-offs
@@ -233,7 +247,8 @@ export async function exportBudgetPdf(args: {
     const x = 12 + i * (bw + 8);
     doc.setDrawColor(203, 213, 225); doc.roundedRect(x, y, bw, 24, 2, 2);
     doc.setFont(font, 'bold'); doc.setFontSize(8.5); doc.setTextColor(...navy); doc.text(title, x + 4, y + 6);
-    doc.setFont(font, 'normal'); doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.text(name || '—', x + bw / 2, y + 14, { align: 'center' });
+    doc.setFont(fontFor(name), 'normal'); doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.text(name || '—', x + bw / 2, y + 14, { align: 'center' });
+    doc.setFont(font, 'normal');
     doc.setFontSize(8); doc.setTextColor(100, 116, 139);
     doc.text(`${role}${at ? ` · ${format(new Date(at), 'dd/MM/yyyy')}` : ' · pending'}`, x + bw / 2, y + 20, { align: 'center' });
   });

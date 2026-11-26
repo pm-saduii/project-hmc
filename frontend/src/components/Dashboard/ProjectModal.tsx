@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store';
 import { taskApi } from '../../services/api';
 import { supabase } from '../../services/supabase';
-import { Modal, FormRow, Input, Select, Textarea, Btn } from '../Common';
+import { Modal, FormRow, Input, Select, Textarea, Btn, C } from '../Common';
 import type { Project } from '../../types';
 
 const COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EC4899','#EF4444','#8B5CF6','#F97316'];
@@ -83,6 +83,15 @@ export default function ProjectModal({ project, onClose, inline = false }: Props
     return baseOptions;
   })();
 
+  // Customer logo: kept apart from the form so saving works before the logo column exists.
+  const [logo, setLogo] = useState<string>(project?.logo || '');
+  const logoChanged = logo !== (project?.logo || '');
+  const pickLogo = async (file: File | undefined) => {
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|svg\+xml|webp|gif)$/.test(file.type)) { toast.error('Choose a PNG, JPG, SVG or WebP image'); return; }
+    try { setLogo(await logoToPng(file)); } catch { toast.error('That image could not be read'); }
+  };
+
   const up = <K extends keyof ProjectForm>(key: K, value: ProjectForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -91,9 +100,9 @@ export default function ProjectModal({ project, onClose, inline = false }: Props
     if (!form.name.trim()) { toast.error('Project name is required'); return; }
     setSaving(true);
     try {
-      if (project) { await updateProject(project.id, form); toast.success('Project updated'); }
+      if (project) { await updateProject(project.id, logoChanged ? { ...form, logo } : form); toast.success('Project updated'); }
       else {
-        const created = await createProject(form);
+        const created = await createProject(logo ? { ...form, logo } : form);
         if (copyFromProjectId) {
           const copied = await taskApi.copyFromProject(copyFromProjectId, created.id, copyScope);
           await fetchTasks();
@@ -180,6 +189,19 @@ export default function ProjectModal({ project, onClose, inline = false }: Props
           </div>
         </FormRow>
       </div>
+      <FormRow label="Customer logo">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ width: 160, height: 64, border: `1px dashed ${C.border2}`, borderRadius: 8, display: 'grid', placeItems: 'center', background: '#FFFFFF', overflow: 'hidden' }}>
+            {logo ? <img src={logo} alt="Customer logo" style={{ maxWidth: 150, maxHeight: 56, objectFit: 'contain' }} /> : <span style={{ fontSize: 11, color: C.text3 }}>No logo</span>}
+          </div>
+          <label style={{ display: 'inline-flex', alignItems: 'center', height: 34, padding: '0 12px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, color: C.primary, cursor: 'pointer', background: C.white }}>
+            {logo ? 'Change' : 'Upload'}
+            <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" style={{ display: 'none' }} onChange={(e) => { void pickLogo(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          {logo && <button type="button" onClick={() => setLogo('')} style={{ border: 0, background: 'transparent', color: C.red, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Remove</button>}
+          <span style={{ fontSize: 11, color: C.text3 }}>Shown on reports such as Budget Control. Resized automatically.</span>
+        </div>
+      </FormRow>
       <FormRow label="Description">
         <Textarea value={form.description} onChange={v => up('description', v)} rows={2} placeholder="Brief project description…" />
       </FormRow>
@@ -254,4 +276,26 @@ export default function ProjectModal({ project, onClose, inline = false }: Props
       </div>
     </Modal>
   );
+}
+
+/** Read an image file and return a PNG data URL no larger than 600 × 240 px (keeps the project record small). */
+function logoToPng(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 600 / (img.naturalWidth || 600), 240 / (img.naturalHeight || 240));
+      const w = Math.max(1, Math.round((img.naturalWidth || 600) * scale));
+      const h = Math.max(1, Math.round((img.naturalHeight || 240) * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no canvas')); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+    img.src = url;
+  });
 }

@@ -52,3 +52,35 @@ export async function ensureThaiFont(doc: jsPDF): Promise<string> {
   doc.setFont(PDF_FONT, 'normal');
   return PDF_FONT;
 }
+
+/* ── Poppins (the app's font) with Sarabun for Thai ─────────────────────── */
+export const PDF_LATIN = 'Poppins';
+let poppinsPromise: Promise<{ regular: string; bold: string } | null> | null = null;
+function loadPoppins() {
+  if (!poppinsPromise) {
+    poppinsPromise = Promise.all([fetch('/fonts/Poppins-Regular.ttf'), fetch('/fonts/Poppins-SemiBold.ttf')])
+      .then(async ([r, b]) => (r.ok && b.ok ? { regular: toBase64(await r.arrayBuffer()), bold: toBase64(await b.arrayBuffer()) } : null))
+      .catch(() => null)
+      .then((d) => { if (!d) poppinsPromise = null; return d; });
+  }
+  return poppinsPromise;
+}
+export const hasThai = (s: unknown) => /[฀-๿]/.test(String(s ?? ''));
+
+/**
+ * Register Poppins (Latin) and Sarabun (Thai) on the document.
+ * `fontFor(text)` picks Sarabun for text with Thai letters (Poppins has none), else Poppins.
+ */
+export async function ensurePoppinsFont(doc: jsPDF): Promise<{ latin: string; thai: string; fontFor: (text: unknown) => string }> {
+  const [poppins, thai] = await Promise.all([loadPoppins(), ensureThaiFont(doc)]);
+  let latin = thai;
+  if (poppins) {
+    doc.addFileToVFS('Poppins-Regular.ttf', poppins.regular);
+    doc.addFileToVFS('Poppins-SemiBold.ttf', poppins.bold);
+    doc.addFont('Poppins-Regular.ttf', PDF_LATIN, 'normal');
+    doc.addFont('Poppins-SemiBold.ttf', PDF_LATIN, 'bold');
+    latin = PDF_LATIN;
+  }
+  doc.setFont(latin, 'normal');
+  return { latin, thai, fontFor: (text) => (hasThai(text) ? thai : latin) };
+}

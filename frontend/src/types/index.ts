@@ -16,6 +16,8 @@ export interface Project {
   emailNotificationRecipients: string;
   emailNotificationTime: string;
   emailNotificationLastSentAt?: string;
+  /** Customer logo as a PNG data URL ('' = none). */
+  logo?: string;
 }
 
 export interface MasterCode {
