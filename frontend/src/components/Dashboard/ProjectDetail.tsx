@@ -777,7 +777,6 @@ export default function ProjectDetail({ project }: Props) {
             <Breadcrumb items={[
               { label: 'Projects', to: '/projects' },
               { label: project.code || project.name, to: visibleGroups[0] ? pathFor(visibleGroups[0].key, visibleGroups[0].subs[0].key) : undefined },
-              ...(shownGroup ? [{ label: shownGroup.label, to: pathFor(shownGroup.key, shownGroup.subs[0].key) }] : []),
               ...(shownSub ? [{ label: shownSub.label }] : []),
             ]} />
           </div>
@@ -801,43 +800,16 @@ export default function ProjectDetail({ project }: Props) {
               </div>
             </div>
           </div>
-          {/* Level 1: section groups (a dropdown on phones) */}
+          {/* One row with every screen of the project (a dropdown on phones). */}
           <Tabs
-            tabs={visibleGroups.map((group) => ({ id: group.key, label: group.label }))}
-            active={shownGroup?.key || ''}
-            onChange={(key) => {
-              const group = visibleGroups.find((item) => item.key === key);
-              if (group) navigate(pathFor(group.key, group.subs[0].key));
+            tabs={visibleGroups.flatMap((group) => group.subs.map((sub) => ({ id: `${group.key}/${sub.key}`, label: sub.label })))}
+            active={shownGroup && shownSub ? `${shownGroup.key}/${shownSub.key}` : ''}
+            onChange={(id) => {
+              const [groupKey, subKey] = id.split('/');
+              if (subKey === 'checklist') setActiveChecklistTab('project');
+              navigate(pathFor(groupKey, subKey));
             }}
           />
-          {/* Level 2: pages inside the group */}
-          {shownGroup && (
-            <nav aria-label={`${shownGroup.label} pages`} style={{ display: 'flex', gap: 6, padding: '10px 0 12px', overflowX: 'auto' }}>
-              {shownGroup.subs.map((sub) => {
-                const selected = sub.key === shownSub?.key;
-                return (
-                  <button
-                    key={sub.key}
-                    type="button"
-                    aria-current={selected ? 'page' : undefined}
-                    onClick={() => {
-                      if (sub.key === 'checklist') setActiveChecklistTab('project');
-                      navigate(pathFor(shownGroup.key, sub.key));
-                    }}
-                    style={{
-                      height: 30, padding: '0 14px', borderRadius: 999, fontSize: 13, fontWeight: selected ? 600 : 500,
-                      fontFamily: 'Poppins, sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
-                      border: `1px solid ${selected ? '#C7D2FE' : C.border}`,
-                      background: selected ? C.primaryBg : C.white,
-                      color: selected ? C.primary : C.text2,
-                    }}
-                  >
-                    {sub.label}
-                  </button>
-                );
-              })}
-            </nav>
-          )}
         </div>
       </div>
 
