@@ -11,13 +11,13 @@ import { BUDGET_STATUS, budgetReportApi, type BudgetReport, type BudgetStatus } 
 import {
   buildBudgetSnapshot, defaultPeriod, dueDateOf, exportBudgetPdf, exportBudgetXlsx, periodLabel, shiftPeriod, usedToDate, type BudgetSnapshot,
 } from '../utils/budgetControl';
-import { isClosedStatus, projectHealth } from '../utils/projectHealth';
+import { isClosedStatus, isHyperCareStatus, projectHealth } from '../utils/projectHealth';
 import type { Effort, Member, Project, Task } from '../types';
 
 const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 });
 const when = (v: string | null) => (v ? format(new Date(v), 'd MMM yyyy') : '');
 
-interface Row { project: Project; report: BudgetReport | null; snap: BudgetSnapshot; pmName: string; frozen: boolean }
+interface Row { project: Project; report: BudgetReport | null; snap: BudgetSnapshot; pmName: string; frozen: boolean; finished: boolean }
 
 /** /budget — the monthly Budget Control report: PM prepares, Account Manager reviews, Director approves (due by the 5th). */
 export default function BudgetControlPage() {
@@ -35,6 +35,8 @@ export default function BudgetControlPage() {
   const [error, setError] = React.useState('');
   const [search, setSearch] = React.useState('');
   const [openId, setOpenId] = React.useState('');
+  // Finished projects (Hyper Care, closed, or 100% complete) are hidden unless asked for.
+  const [showFinished, setShowFinished] = React.useState(false);
 
   const loadReports = React.useCallback(async () => {
     try { setReports(await budgetReportApi.listForPeriod(period)); setError(''); }
@@ -55,16 +57,20 @@ export default function BudgetControlPage() {
   const statusLabel = (p: Project) => masterCodes.find((c) => c.codeType === 'project_status' && c.codeValue === p.status)?.label || '';
   const pmOf = (p: Project) => members.find((m) => m.projectId === p.id && /project manager/i.test(m.role) && m.type !== 'client')?.name || '';
 
-  const rows: Row[] = projects
-    .filter((p) => !isClosedStatus(p.status, statusLabel(p)))
+  const allRows: Row[] = projects
     .map((project) => {
       const report = reports.find((r) => r.projectId === project.id) || null;
       const frozen = !!report?.snapshot && report.status !== 'draft' && report.status !== 'returned';
-      const snap = frozen ? report!.snapshot! : buildBudgetSnapshot(project, efforts.filter((e) => e.projectId === project.id), period,
-        projectHealth(tasks.filter((t) => t.projectId === project.id)).actual);
-      return { project, report, snap, pmName: report?.preparedName || pmOf(project), frozen };
+      const actual = projectHealth(tasks.filter((t) => t.projectId === project.id)).actual;
+      const snap = frozen ? report!.snapshot! : buildBudgetSnapshot(project, efforts.filter((e) => e.projectId === project.id), period, actual);
+      const label = statusLabel(project);
+      const finished = isClosedStatus(project.status, label) || isHyperCareStatus(project.status, label) || actual >= 100;
+      return { project, report, snap, pmName: report?.preparedName || pmOf(project), frozen, finished };
     })
-    .filter((r) => r.snap.budget > 0 || r.report)
+    .filter((r) => r.snap.budget > 0 || r.report);
+  const finishedCount = allRows.filter((r) => r.finished).length;
+  const rows = allRows
+    .filter((r) => showFinished || !r.finished)
     .filter((r) => !search.trim() || `${r.project.code} ${r.project.name} ${r.project.customerAbbreviation} ${r.pmName}`.toLowerCase().includes(search.trim().toLowerCase()))
     .sort((a, b) => String(a.project.code).localeCompare(String(b.project.code)));
 
@@ -102,7 +108,13 @@ export default function BudgetControlPage() {
         <div style={{ ...panel, padding: 18, fontSize: 13, color: C.red }}>Budget Control is not set up yet: run the migration 2026-11-27-methodology-and-budget-control.sql.</div>
       ) : (
         <section style={{ ...panel, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}><SearchBox value={search} onChange={setSearch} placeholder="Search project or PM" /></div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', padding: '12px 14px', borderBottom: `1px solid ${C.border}` }}>
+            <SearchBox value={search} onChange={setSearch} placeholder="Search project or PM" />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text2, cursor: 'pointer' }}>
+              <input type="checkbox" checked={showFinished} onChange={(e) => setShowFinished(e.target.checked)} style={{ accentColor: C.primary }} />
+              Show finished projects{finishedCount ? ` (${finishedCount})` : ''}
+            </label>
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
               <thead>
@@ -124,7 +136,7 @@ export default function BudgetControlPage() {
                         <tr key={r.project.id} onClick={() => setOpenId(r.project.id)} style={{ cursor: 'pointer', background: waitingOnMe(r) ? '#FFFBEB' : undefined }}>
                           <td style={td}>
                             <div style={{ fontWeight: 600 }}>{r.project.code}{r.project.customerAbbreviation ? ` (${r.project.customerAbbreviation})` : ''}</div>
-                            <div style={{ fontSize: 11, color: C.text2 }}>{r.project.name}</div>
+                            <div style={{ fontSize: 11, color: C.text2 }}>{r.project.name}{r.finished && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.text2, background: C.bg2, padding: '0 6px', borderRadius: 999 }}>Finished</span>}</div>
                           </td>
                           <td style={{ ...td, color: C.text2 }}>{r.pmName || '—'}</td>
                           <td style={{ ...td, textAlign: 'right' }}>{fmt(r.snap.budget)}</td>
