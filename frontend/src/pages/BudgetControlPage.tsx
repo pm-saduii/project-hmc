@@ -1,7 +1,7 @@
 import React from 'react';
 import toast from 'react-hot-toast';
 import { differenceInCalendarDays, format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText } from 'lucide-react';
 import { Btn, C } from '../components/Common';
 import { AdminHeader, F, FormModal, Pill, SearchBox, panel, td, th } from '../components/Admin/AdminUi';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,7 +9,7 @@ import { useStore } from '../store';
 import { effortApi, memberApi, taskApi } from '../services/api';
 import { BUDGET_STATUS, budgetReportApi, type BudgetReport, type BudgetStatus } from '../services/budgetReports';
 import {
-  buildBudgetSnapshot, defaultPeriod, dueDateOf, exportBudgetXlsx, periodLabel, shiftPeriod, usedToDate, type BudgetSnapshot,
+  buildBudgetSnapshot, defaultPeriod, dueDateOf, exportBudgetPdf, exportBudgetXlsx, periodLabel, shiftPeriod, usedToDate, type BudgetSnapshot,
 } from '../utils/budgetControl';
 import { isClosedStatus, projectHealth } from '../utils/projectHealth';
 import type { Effort, Member, Project, Task } from '../types';
@@ -193,6 +193,16 @@ function ReportModal({ row, period, role, onClose, onChanged }: { row: Row; peri
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Export failed'); }
   };
 
+  const doPdf = async () => {
+    try {
+      await exportBudgetPdf({
+        snapshot: snap, project, pmName, status: BUDGET_STATUS[status].label,
+        preparedAt: report?.preparedAt || null, reviewedName: report?.reviewedName || '', reviewedAt: report?.reviewedAt || null,
+        approvedName: report?.approvedName || '', approvedAt: report?.approvedAt || null,
+      });
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'PDF export failed'); }
+  };
+
   const months = snap.months.filter((m) => m <= period);
   const cell: React.CSSProperties = { ...td, padding: '7px 10px', textAlign: 'right', whiteSpace: 'nowrap' };
   const head: React.CSSProperties = { ...th, padding: '8px 10px', textAlign: 'right' };
@@ -206,7 +216,8 @@ function ReportModal({ row, period, role, onClose, onChanged }: { row: Row; peri
   return (
     <FormModal title={`Budget Control · ${periodLabel(period)}`} subtitle={`${project.code}${project.customerAbbreviation ? ` (${project.customerAbbreviation})` : ''} · ${project.name}`} onClose={onClose} busy={busy} width={1100}
       footer={<>
-        <Btn variant="outline" onClick={() => void doExport()} disabled={busy}><FileSpreadsheet size={14} style={{ marginRight: 6 }} />Export Excel</Btn>
+        <Btn onClick={() => void doPdf()} disabled={busy}><FileText size={14} style={{ marginRight: 6 }} />Export PDF</Btn>
+        <Btn variant="ghost" onClick={() => void doExport()} disabled={busy} title="The company Excel template"><FileSpreadsheet size={14} style={{ marginRight: 6 }} />Excel</Btn>
         {canReopen && <Btn variant="ghost" onClick={() => void act('draft', {}, 'Reopened as draft')} disabled={busy}>Reopen</Btn>}
         <span style={{ marginLeft: 'auto' }} />
         <Btn variant="ghost" onClick={onClose} disabled={busy}>Close</Btn>

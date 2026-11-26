@@ -126,3 +126,111 @@ export async function exportBudgetXlsx(args: {
   downloadBytes(bytes, `Project Budget control report ${project.code || project.name} ${s.period.replace('-', '')}.xlsx`);
   return { skipped };
 }
+
+/**
+ * PDF of the report in the layout of the company template: project details, one row per budget
+ * line with man-days used per month, totals, accumulated use against progress, and the three sign-offs.
+ */
+export async function exportBudgetPdf(args: {
+  snapshot: BudgetSnapshot; project: Project; pmName: string; status: string;
+  preparedAt: string | null; reviewedName: string; reviewedAt: string | null; approvedName: string; approvedAt: string | null;
+}): Promise<void> {
+  const { snapshot: s, project } = args;
+  const [{ default: JsPDF }, { default: autoTable }, { ensureThaiFont }] = await Promise.all([
+    import('jspdf'), import('jspdf-autotable'), import('./pdfFont'),
+  ]);
+  const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const font = await ensureThaiFont(doc);
+  const W = doc.internal.pageSize.getWidth();
+  const navy: [number, number, number] = [19, 40, 76];
+  const d = (v?: string | null) => { const x = toDate(v || undefined); return x ? format(x, 'd MMM yyyy') : '—'; };
+  const n = (v: number) => (v ? String(Math.round(v * 100) / 100) : '');
+
+  // Title and project details
+  doc.setFont(font, 'bold'); doc.setFontSize(14); doc.setTextColor(...navy);
+  doc.text('Project Budget Control Report', 12, 14);
+  doc.setFont(font, 'normal'); doc.setFontSize(9); doc.setTextColor(90, 90, 90);
+  doc.text(`${periodLabel(s.period)} · Status: ${args.status}`, W - 12, 14, { align: 'right' });
+  const info: [string, string, string, string][] = [
+    ['Client (Company Name)', project.client || project.name, 'Job Code', project.code || '—'],
+    ['Application / Module', project.softwareVersion || project.name, 'Project Manager', args.pmName || '—'],
+    ['Date as of', d(format(endOfMonth(parseISO(`${s.period}-01`)), 'yyyy-MM-dd')), 'Budget Created Date', d(project.startDate)],
+    ['Project Started Date', d(project.startDate), 'Plan End Date', d(project.endDate)],
+  ];
+  autoTable(doc, {
+    startY: 18, theme: 'plain', margin: { left: 12, right: 12 },
+    styles: { font, fontSize: 8, cellPadding: 0.7, textColor: [30, 41, 59] },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 42 }, 1: { cellWidth: 95 }, 2: { fontStyle: 'bold', cellWidth: 38 } },
+    body: info,
+  });
+
+  // Lines grouped like the template; non-template lines under "Other".
+  const months = s.months;
+  const head = [['Stage / Phase · Activity', 'Budget (MD)', ...months.map((m) => format(parseISO(`${m}-01`), 'MMM yy')), 'Sum', 'Balance']];
+  const body: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
+  const lineRow = (label: string, budget: number, used: Record<string, number>) => {
+    const total = Object.entries(used).filter(([m]) => m <= s.period).reduce((a, [, v]) => a + v, 0);
+    return [label, n(budget), ...months.map((m) => (m <= s.period ? n(used[m] || 0) : '')), n(total) || '0', n(budget - total) || '0'];
+  };
+  const groups = [...new Set(STANDARD_LINES.map((l) => l.group))];
+  groups.forEach((g) => {
+    body.push([{ content: g, colSpan: months.length + 4, styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } }]);
+    STANDARD_LINES.filter((l) => l.group === g).forEach((std) => {
+      const matched = s.lines.filter((l) => l.code === std.code);
+      const used: Record<string, number> = {};
+      matched.forEach((l) => Object.entries(l.used).forEach(([m, v]) => { used[m] = (used[m] || 0) + v; }));
+      body.push(lineRow(std.name, matched.reduce((a, l) => a + l.budget, 0), used));
+    });
+  });
+  const others = s.lines.filter((l) => !l.code);
+  if (others.length) {
+    body.push([{ content: 'Other', colSpan: months.length + 4, styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } }]);
+    others.forEach((l) => body.push(lineRow(l.module, l.budget, l.used)));
+  }
+  // Totals, accumulated man-days and accumulated % of budget
+  const monthTotal = (m: string) => s.lines.reduce((a, l) => a + (l.used[m] || 0), 0);
+  let acc = 0;
+  const accRow = months.map((m) => { if (m > s.period) return ''; acc += monthTotal(m); return n(acc) || '0'; });
+  const pctRow = accRow.map((v) => (v === '' || !s.budget ? '' : `${Math.round((Number(v) / s.budget) * 100)}%`));
+  const bold = { fontStyle: 'bold', fillColor: [241, 245, 249] };
+  body.push([{ content: 'TOTAL MAN-DAY', styles: bold }, { content: n(s.budget), styles: bold },
+    ...months.map((m) => ({ content: m <= s.period ? n(monthTotal(m)) || '0' : '', styles: bold })),
+    { content: n(s.usedToDate) || '0', styles: bold }, { content: n(s.budget - s.usedToDate) || '0', styles: bold }]);
+  body.push(['ACCUMULATED MAN-DAY', '', ...accRow, '', '']);
+  body.push([`% ACCUMULATED OF BUDGET (progress ${s.progress}%)`, '', ...pctRow, '', '']);
+
+  autoTable(doc, {
+    startY: ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 40) + 3,
+    margin: { left: 12, right: 12 },
+    head, body: body as never,
+    styles: { font, fontSize: 7, cellPadding: 0.8, lineColor: [203, 213, 225], lineWidth: 0.1, textColor: [30, 41, 59], halign: 'right' },
+    headStyles: { font, fontStyle: 'bold', fillColor: navy, textColor: 255, halign: 'center' },
+    columnStyles: { 0: { halign: 'left', cellWidth: 82 } },
+    theme: 'grid',
+  });
+
+  // Sign-offs
+  let y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 150) + 5;
+  if (y > doc.internal.pageSize.getHeight() - 32) { doc.addPage(); y = 20; }
+  const boxes: [string, string, string, string | null][] = [
+    ['Prepared By', 'Project Manager', args.preparedAt ? args.pmName : '', args.preparedAt],
+    ['Reviewed By', 'Account Manager', args.reviewedName, args.reviewedAt],
+    ['Approved By', 'Director', args.approvedName, args.approvedAt],
+  ];
+  const bw = (W - 24 - 16) / 3;
+  boxes.forEach(([title, role, name, at], i) => {
+    const x = 12 + i * (bw + 8);
+    doc.setDrawColor(203, 213, 225); doc.roundedRect(x, y, bw, 24, 2, 2);
+    doc.setFont(font, 'bold'); doc.setFontSize(8.5); doc.setTextColor(...navy); doc.text(title, x + 4, y + 6);
+    doc.setFont(font, 'normal'); doc.setFontSize(10); doc.setTextColor(30, 41, 59); doc.text(name || '—', x + bw / 2, y + 14, { align: 'center' });
+    doc.setFontSize(8); doc.setTextColor(100, 116, 139);
+    doc.text(`${role}${at ? ` · ${format(new Date(at), 'd MMM yyyy')}` : ' · pending'}`, x + bw / 2, y + 20, { align: 'center' });
+  });
+
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i += 1) {
+    doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
+    doc.text(`Generated ${format(new Date(), 'd MMM yyyy HH:mm')} · Page ${i} of ${pages}`, W - 12, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
+  }
+  doc.save(`Project Budget control report ${project.code || project.name} ${s.period.replace('-', '')}.pdf`);
+}
