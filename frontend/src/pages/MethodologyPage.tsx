@@ -4,13 +4,12 @@ import { CheckSquare, FileDown, Lock, PenLine, Repeat } from 'lucide-react';
 import { Btn, C } from '../components/Common';
 import { FormModal } from '../components/Admin/AdminUi';
 import { useStore } from '../store';
-import { currentPhase, methodologyApi, type MethodStep, type Methodology, type Owner, type PhaseGate } from '../services/methodology';
+import { currentPhase, hasGate, methodologyApi, type MethodStep, type Methodology, type Owner, type PhaseGate } from '../services/methodology';
 import { isClosedStatus, isHyperCareStatus } from '../utils/projectHealth';
 import { projectPath } from '../utils/projectRoutes';
+import MethodBoard, { OWNER_COLOR } from '../components/Methodology/MethodBoard';
 
 const F = 'Poppins, sans-serif';
-const OWNER_COLOR: Record<Owner, string> = { HMC: '#2563EB', Client: '#EA580C', Joint: '#0D9488' };
-const PHASE_BG = ['#A5B4FC', '#818CF8', '#6366F1', '#4338CA', '#1E1B4B'];
 const CADENCE: { when: string; what: string; note: string; hot?: boolean }[] = [
   { when: 'Every Friday', what: 'External Status', note: 'To the customer · PowerPoint' },
   { when: 'Weekly', what: 'Internal Status', note: 'Team only · with billing' },
@@ -54,7 +53,7 @@ export default function MethodologyPage() {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>Methodology</h1>
-          <p style={{ margin: 0, fontSize: 13, color: C.text2 }}>One protocol for every project. Click a step for its checklist and templates.</p>
+          <p style={{ margin: 0, fontSize: 13, color: C.text2 }}>Project management methodology for every project. Click a step for its checklist and templates.</p>
         </div>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11, color: C.text2 }}>
           {(Object.keys(OWNER_COLOR) as Owner[]).map((o) => (
@@ -64,62 +63,35 @@ export default function MethodologyPage() {
         </div>
       </div>
 
-      <section style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18, overflowX: 'auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, phases.length)}, minmax(200px, 1fr))`, gap: 12, minWidth: phases.length * 212 }}>
-          {phases.map((p, i) => {
-            const light = i < 2;
+      <section style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: '6px 6px 4px' }}>
+        <MethodBoard
+          phases={phases}
+          stepsOf={stepsOf}
+          deliverablesOf={(phaseId) => method.deliverables.filter((d) => d.active && d.phaseId === phaseId).sort((a, b) => a.sortOrder - b.sortOrder)}
+          onStep={setStep}
+          onDeliverable={(d) => { const st = method.steps.find((x) => x.id === d.stepId); if (st) setStep(st); }}
+          deliverableTone={(d) => ({ bg: d.requiresSignoff ? '#ECFDF5' : C.bg, fg: d.requiresSignoff ? '#047857' : C.text2, title: `${d.name}${d.format ? ` · ${d.format}` : ''}`,
+            after: d.requiresSignoff ? <PenLine size={10} /> : null })}
+          phaseExtra={(p) => {
             const inPhase = projectsIn(p.id);
-            return (
-              <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-                <div style={{ padding: '10px 24px 10px 14px', background: PHASE_BG[i % PHASE_BG.length], color: light ? '#1E1B4B' : '#FFFFFF',
-                  clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)', borderRadius: '8px 0 0 8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.03em' }}>{p.name.toUpperCase()}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.7 }}>{i + 1}/{phases.length}</span>
-                  </div>
-                  <div title={p.description} style={{ fontSize: 11, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description}</div>
-                </div>
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, minHeight: 22 }}>
-                  {inPhase.map((x) => (
-                    <button key={x.id} type="button" title={`${x.name} — open its methodology`} onClick={() => navigate(projectPath(x.id, 'checklists'))}
-                      style={{ border: 0, cursor: 'pointer', fontFamily: F, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#FFEDD5', color: '#9A3412' }}>
-                      {x.customerAbbreviation || x.code}
-                    </button>
-                  ))}
-                </div>
-
-                {stepsOf(p.id).map((s, k, arr) => (
-                  <React.Fragment key={s.id}>
-                    <button type="button" onClick={() => setStep(s)}
-                      style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontFamily: F, background: C.white,
-                        border: `1px solid ${C.border}`, borderLeft: `4px solid ${OWNER_COLOR[s.owner]}`, transition: 'box-shadow .15s, border-color .15s' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px rgba(15,23,42,0.08)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{s.name}</div>
-                      {delsOf(s.id).length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-                          {delsOf(s.id).map((d) => (
-                            <span key={d.id} title={d.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, padding: '1px 7px', borderRadius: 6,
-                              background: d.requiresSignoff ? '#ECFDF5' : C.bg, color: d.requiresSignoff ? '#047857' : C.text2, fontWeight: 600 }}>
-                              {d.shortName || d.name}{d.requiresSignoff && <PenLine size={10} />}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </button>
-                    {k < arr.length - 1 && <span aria-hidden="true" style={{ alignSelf: 'center', width: 2, height: 6, background: C.border2, margin: '-8px 0' }} />}
-                  </React.Fragment>
+            return inPhase.length ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 4 }}>
+                {inPhase.map((x) => (
+                  <button key={x.id} type="button" title={`${x.name} — open its methodology`} onClick={() => navigate(projectPath(x.id, 'checklists'))}
+                    style={{ border: 0, cursor: 'pointer', fontFamily: F, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: '#FFEDD5', color: '#9A3412' }}>
+                    {x.customerAbbreviation || x.code}
+                  </button>
                 ))}
-
-                <div style={{ marginTop: 'auto', display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, background: '#FFFBEB', border: '1px dashed #FCD34D' }}>
-                  <span aria-hidden="true" style={{ width: 10, height: 10, marginTop: 3, transform: 'rotate(45deg)', background: '#D97706', flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: '#78350F', lineHeight: 1.5 }}><strong>Gate</strong> · {p.gate}</span>
-                </div>
               </div>
-            );
-          })}
-        </div>
+            ) : <span style={{ fontSize: 11, color: C.text3, minHeight: 20 }}>{p.description}</span>;
+          }}
+          phaseFooter={(p) => hasGate(p) ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 10, background: '#FFFBEB', border: '1px dashed #FCD34D' }}>
+              <span aria-hidden="true" style={{ width: 9, height: 9, marginTop: 3, transform: 'rotate(45deg)', background: '#D97706', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: '#78350F', lineHeight: 1.5 }}><strong>Gate</strong> · {p.gate}</span>
+            </div>
+          ) : null}
+        />
       </section>
 
       <section style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden' }}>
@@ -172,7 +144,7 @@ export default function MethodologyPage() {
                 ))}
               </div>
             )}
-            {phase?.gate && (
+            {phase && hasGate(phase) && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, background: '#FFFBEB', border: '1px dashed #FCD34D', fontSize: 13, color: '#78350F' }}>
                 <span aria-hidden="true" style={{ width: 10, height: 10, marginTop: 4, transform: 'rotate(45deg)', background: '#D97706', flexShrink: 0 }} />
                 <span><strong>Phase gate</strong> · {phase.gate}</span>

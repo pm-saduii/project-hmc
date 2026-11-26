@@ -4,7 +4,13 @@ import { supabase } from './supabase';
 export type Owner = 'HMC' | 'Client' | 'Joint';
 export type DeliverableStatus = 'planned' | 'draft' | 'client_review' | 'signed' | 'final' | 'not_required';
 
-export interface MethodPhase { id: string; name: string; description: string; gate: string; sortOrder: number; active: boolean }
+export interface MethodPhase {
+  id: string; name: string; description: string;
+  /** What must be true to leave the phase; empty = no gate (e.g. Hypercare). */
+  gate: string; sortOrder: number; active: boolean;
+  /** Icon key (see PHASE_ICONS) and colour of the phase on the board. */
+  icon?: string; color?: string;
+}
 export interface MethodStep { id: string; phaseId: string; name: string; owner: Owner; objective: string; activities: string[]; sortOrder: number }
 export interface MethodDeliverable {
   id: string; phaseId: string; stepId: string | null; name: string; shortName: string; format: string; templateUrl: string;
@@ -51,6 +57,16 @@ async function rows<T>(table: string, order = 'sort_order'): Promise<T[]> {
   return (data || []).map((r) => camel<T>(r as Record<string, unknown>));
 }
 
+/** Update the row with this id, or insert it when it does not exist yet (a partial upsert would fail on NOT NULL columns). */
+async function saveRow(table: string, row: Record<string, unknown> & { id: string }) {
+  const { id, ...rest } = row;
+  const { data, error } = await supabase.from(table).update(snake(rest)).eq('id', id).select('id');
+  if (error) throw new Error(error.message);
+  if (data && data.length) return;
+  const ins = await supabase.from(table).insert(snake(row));
+  if (ins.error) throw new Error(ins.error.message);
+}
+
 export const methodologyApi = {
   load: async (): Promise<Methodology> => {
     const [phases, steps, deliverables] = await Promise.all([
@@ -58,14 +74,24 @@ export const methodologyApi = {
     ]);
     return { phases, steps: steps.map((s) => ({ ...s, activities: s.activities || [] })), deliverables };
   },
-  savePhase: async (phase: Partial<MethodPhase> & { id: string }) => {
-    const { error } = await supabase.from('methodology_phases').upsert(snake(phase), { onConflict: 'id' });
+  savePhase: async (phase: Partial<MethodPhase> & { id: string }) => saveRow('methodology_phases', phase),
+  deletePhase: async (id: string) => {
+    const { error } = await supabase.from('methodology_phases').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
-  saveDeliverable: async (d: Partial<MethodDeliverable> & { id: string }) => {
-    const { error } = await supabase.from('methodology_deliverables').upsert(snake(d), { onConflict: 'id' });
+  saveStep: async (step: Partial<MethodStep> & { id: string }) => saveRow('methodology_steps', step),
+  deleteStep: async (id: string) => {
+    const { error } = await supabase.from('methodology_steps').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
+  /** How many projects have a gate record for each phase (a phase in use cannot be deleted). */
+  phaseUsage: async (): Promise<Record<string, number>> => {
+    const { data } = await supabase.from('project_phase_gates').select('phase_id');
+    const counts: Record<string, number> = {};
+    (data || []).forEach((r: { phase_id: string }) => { counts[r.phase_id] = (counts[r.phase_id] || 0) + 1; });
+    return counts;
+  },
+  saveDeliverable: async (d: Partial<MethodDeliverable> & { id: string }) => saveRow('methodology_deliverables', d),
   deleteDeliverable: async (id: string) => {
     const { error } = await supabase.from('methodology_deliverables').delete().eq('id', id);
     if (error) throw new Error(error.message);
@@ -125,11 +151,18 @@ export const methodologyApi = {
   },
 };
 
-/** The first phase whose gate is not passed (the phase the project is in), or null when all are passed. */
+/**
+ * The phase the project is in: the first phase not passed yet. A phase without a gate counts as passed
+ * once a later phase's gate is passed; the last phases without a gate (Hypercare) stay current at the end.
+ */
 export function currentPhase(phases: MethodPhase[], gates: PhaseGate[]): MethodPhase | null {
   const passed = new Set(gates.filter((g) => g.status === 'passed').map((g) => g.phaseId));
-  return phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder).find((p) => !passed.has(p.id)) || null;
+  const list = phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder);
+  let lastPassed = -1;
+  list.forEach((p, i) => { if (passed.has(p.id)) lastPassed = i; });
+  return list.find((p, i) => !passed.has(p.id) && !(i < lastPassed && !p.gate.trim())) || null;
 }
+export const hasGate = (p: Pick<MethodPhase, 'gate'>) => !!p.gate.trim();
 
 /* ── Linking deliverables to tasks ─────────────────────────────────────── */
 const WORDS_IGNORED = new Set(['the', 'and', 'of', 'for', 'to', 'a', 'an', 'in', 'on', 'with', 'by', 'doc', 'document', 'report', 'plan', '&']);

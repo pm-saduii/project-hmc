@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { FormModal } from '../Admin/AdminUi';
 import { projectPath } from '../../utils/projectRoutes';
 import SignoffFormModal from '../Documents/SignoffFormModal';
+import MethodBoard from '../Methodology/MethodBoard';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
 import { taskApi } from '../../services/api';
@@ -15,7 +16,7 @@ import { compareWbs, fmtDate } from '../../utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
 import {
-  OWNER_INFO, STATUS_INFO, currentPhase, isComplete, methodologyApi, statusesFor, subtreeProgress, suggestLinks, matchScore,
+  OWNER_INFO, STATUS_INFO, currentPhase, hasGate, isComplete, methodologyApi, statusesFor, subtreeProgress, suggestLinks, matchScore,
   type DeliverableStatus, type MethodDeliverable, type MethodPhase, type Methodology, type Owner, type PhaseGate, type ProjectDeliverable,
 } from '../../services/methodology';
 
@@ -154,8 +155,6 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
   const input: React.CSSProperties = { height: 30, border: `1px solid ${C.border}`, borderRadius: 6, padding: '0 6px', fontFamily: F, fontSize: 13, color: C.text, background: C.white, boxSizing: 'border-box' };
 
   // ── Board helpers ─────────────────────────────────────────────────────────
-  const OWNER_COLOR: Record<Owner, string> = { HMC: '#2563EB', Client: '#EA580C', Joint: '#0D9488' };
-  const PHASE_BG = ['#A5B4FC', '#818CF8', '#6366F1', '#4338CA', '#1E1B4B'];
   const stepsOf = (phaseId: string) => method.steps.filter((x) => x.phaseId === phaseId).sort((a, b) => a.sortOrder - b.sortOrder);
   const deliverablesOfStep = (stepId: string) => method.deliverables
     .filter((d) => d.active && d.stepId === stepId && !(isClient && d.internalOnly)).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -255,7 +254,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Project methodology</div>
-          <div style={{ fontSize: 13, color: C.text2 }}>{current ? <>Now in <strong style={{ color: '#4338CA' }}>{current.name}</strong>{gateReady(current.id) && <span style={{ color: '#047857', fontWeight: 600 }}> · gate ready to pass</span>}</> : 'All phases passed'}</div>
+          <div style={{ fontSize: 13, color: C.text2 }}>{current ? <>Now in <strong style={{ color: '#4338CA' }}>{current.name}</strong>{hasGate(current) && !passed(current.id) && gateReady(current.id) && <span style={{ color: '#047857', fontWeight: 600 }}> · gate ready to pass</span>}</> : 'All phases passed'}</div>
         </div>
         {canWrite && (
           <Btn small variant="outline" onClick={() => setCreating(true)} title="Add tasks to the plan for the methodology phases, steps and deliverables"><ListPlus size={14} style={{ marginRight: 6 }} />Create tasks</Btn>
@@ -302,87 +301,77 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
       </div>
 
       {view === 'board' && (
-        <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, phases.length)}, minmax(220px, 1fr))`, gap: 10, minWidth: phases.length * 230 }}>
-            {phases.map((p, i) => {
+        <section style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: '6px 6px 4px' }}>
+          <MethodBoard
+            phases={phases}
+            stepsOf={stepsOf}
+            deliverablesOf={deliverablesOf}
+            highlight={current?.id}
+            onStep={(st) => setStepOpen(st.id)}
+            onDeliverable={(d) => { const st = d.stepId && method.steps.some((x) => x.id === d.stepId) ? d.stepId : null; if (st) setStepOpen(st); else setView('list'); }}
+            stepMark={(p, st) => stepState(p.id, st.id)}
+            deliverableTone={(d) => {
+              const info = STATUS_INFO[statusOf(d)];
+              const t = taskOf(d);
+              return { bg: info.bg, fg: info.fg,
+                title: `${d.name} · ${info.label}${t ? ` · task ${t.percentComplete || 0}%` : ''}${dueOf(d) ? ` · due ${fmtDate(dueOf(d))}` : ''}`,
+                after: <>{d.requiresSignoff && <PenLine size={10} />}{t && <Link2 size={10} aria-label="linked to a task" />}</> };
+            }}
+            phaseExtra={(p) => {
               const list = deliverablesOf(p.id);
               const done = list.filter((d) => isComplete(statusOf(d))).length;
+              const isPassed = passed(p.id);
+              const isCurrent = current?.id === p.id;
+              return (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', padding: '1px 8px', borderRadius: 999,
+                    background: isPassed ? C.greenBg : isCurrent ? '#FEF3C7' : C.bg2, color: isPassed ? '#047857' : isCurrent ? '#B45309' : C.text3 }}>
+                    {isPassed ? 'PASSED' : isCurrent ? 'NOW' : 'UPCOMING'}
+                  </span>
+                  <div style={{ width: '80%', height: 4, borderRadius: 2, background: C.bg2 }}>
+                    <div style={{ width: `${list.length ? (done / list.length) * 100 : 0}%`, height: '100%', borderRadius: 2, background: isPassed ? C.green : C.primary }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: C.text3 }}>{done}/{list.length} deliverables</span>
+                </div>
+              );
+            }}
+            phaseFooter={(p) => {
+              if (!hasGate(p)) return null;
+              const list = deliverablesOf(p.id);
               const missing = list.filter((d) => !isComplete(statusOf(d)));
               const isPassed = passed(p.id);
               const isCurrent = current?.id === p.id;
               const gate = gateOf(p.id);
-              const light = i < 2;
               return (
-                <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-                  {/* chevron header */}
-                  <div style={{ position: 'relative', padding: '10px 22px 10px 12px', background: PHASE_BG[i % PHASE_BG.length], color: light ? '#1E1B4B' : '#FFFFFF',
-                    clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)', borderRadius: '8px 0 0 8px',
-                    outline: isCurrent ? '3px solid #F59E0B' : 'none', outlineOffset: -3 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, opacity: 0.85 }}>
-                      <span>{i + 1}/{phases.length}</span>
-                      <span>{isPassed ? 'PASSED' : isCurrent ? 'NOW' : ''}</span>
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.02em' }}>{p.name.toUpperCase()}</div>
-                    <div style={{ height: 4, borderRadius: 2, background: light ? 'rgba(30,27,75,0.15)' : 'rgba(255,255,255,0.25)', marginTop: 6 }}>
-                      <div style={{ width: `${list.length ? (done / list.length) * 100 : 0}%`, height: '100%', borderRadius: 2, background: light ? '#1E1B4B' : '#FFFFFF' }} />
-                    </div>
+                <div style={{ padding: '8px 10px', borderRadius: 10, border: `1px dashed ${isPassed ? '#86EFAC' : C.border2}`, background: isPassed ? '#F0FDF4' : '#F8FAFC' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: isPassed ? '#047857' : C.text2 }}>
+                    <span aria-hidden="true" style={{ width: 8, height: 8, transform: 'rotate(45deg)', background: isPassed ? C.green : C.text3 }} />
+                    GATE {isPassed && gate?.passedAt ? `· ${fmtDate(gate.passedAt.slice(0, 10))}` : ''}
+                    {!isPassed && gateReady(p.id) && <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, color: '#047857', background: C.greenBg, padding: '0 6px', borderRadius: 999 }}>READY</span>}
                   </div>
-                  {/* steps */}
-                  {stepsOf(p.id).map((st) => {
-                    const stState = stepState(p.id, st.id);
-                    const dels = deliverablesOfStep(st.id);
-                    return (
-                      <button key={st.id} type="button" onClick={() => setStepOpen(st.id)} title={st.objective}
-                        style={{ textAlign: 'left', padding: '10px 10px 10px 12px', borderRadius: 10, cursor: 'pointer', fontFamily: F,
-                          border: `1px solid ${stState === 'current' ? '#C7D2FE' : C.border}`, borderLeft: `4px solid ${OWNER_COLOR[st.owner]}`,
-                          background: stState === 'done' ? '#F0FDF4' : stState === 'current' ? '#F8FAFF' : C.white, opacity: stState === 'upcoming' ? 0.8 : 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                          <span aria-label={stState} style={{ marginTop: 1, color: stState === 'done' ? '#047857' : stState === 'current' ? C.primary : C.text3, display: 'inline-flex' }}>
-                            {stState === 'done' ? <CheckCircle2 size={14} /> : stState === 'current' ? <CircleDot size={14} /> : <Circle size={14} />}
-                          </span>
-                          <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.3 }}>{st.name}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: OWNER_COLOR[st.owner] }}>{st.owner}</span>
-                        </div>
-                        {dels.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-                            {dels.map((d) => {
-                              const info = STATUS_INFO[statusOf(d)];
-                              return (
-                                <span key={d.id} title={`${d.name} · ${info.label}${taskOf(d) ? ` · task ${taskOf(d)!.percentComplete || 0}%` : ''}${dueOf(d) ? ` · due ${fmtDate(dueOf(d))}` : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '1px 7px', borderRadius: 999, background: info.bg, color: info.fg, fontWeight: 600 }}>
-                                  {d.requiresSignoff && <PenLine size={10} />}{d.shortName || d.name}{taskOf(d) && <Link2 size={10} aria-label="linked to a task" />}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                  {/* gate */}
-                  <div style={{ marginTop: 'auto', padding: '8px 10px', borderRadius: 10, border: `1px dashed ${isPassed ? '#86EFAC' : C.border2}`, background: isPassed ? '#F0FDF4' : '#F8FAFC' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: isPassed ? '#047857' : C.text2 }}>
-                      <span aria-hidden="true" style={{ width: 8, height: 8, transform: 'rotate(45deg)', background: isPassed ? C.green : C.text3 }} />
-                      GATE {isPassed && gate?.passedAt ? `· ${fmtDate(gate.passedAt.slice(0, 10))}` : ''}
-                      {!isPassed && gateReady(p.id) && <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, color: '#047857', background: C.greenBg, padding: '0 6px', borderRadius: 999 }}>READY</span>}
-                    </div>
-                    <div title={p.gate} style={{ fontSize: 11, color: C.text2, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.gate}</div>
-                    <GateChecks deliverables={list.length - missing.length} deliverableTotal={list.length} tasks={phaseTasks(p.id)} />
-                    {canManage && isCurrent && !isPassed && (
-                      <Btn small onClick={() => setConfirmGate({ phaseId: p.id, pass: true })} disabled={!!gateBusy || missing.length > 0}
-                        title={missing.length ? `Waiting for: ${missing.map((d) => d.shortName || d.name).join(', ')}` : undefined}
-                        style={{ marginTop: 6, width: '100%' }}>{missing.length ? `${missing.length} to complete` : 'Pass gate'}</Btn>
-                    )}
-                  </div>
+                  <div title={p.gate} style={{ fontSize: 11, color: C.text2, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.gate}</div>
+                  {!isPassed && <GateChecks deliverables={list.length - missing.length} deliverableTotal={list.length} tasks={phaseTasks(p.id)} />}
+                  {canManage && isCurrent && !isPassed && (
+                    <Btn small onClick={() => setConfirmGate({ phaseId: p.id, pass: true })} disabled={!!gateBusy || missing.length > 0}
+                      title={missing.length ? `Waiting for: ${missing.map((d) => d.shortName || d.name).join(', ')}` : undefined}
+                      style={{ marginTop: 6, width: '100%' }}>{missing.length ? `${missing.length} to complete` : 'Pass gate'}</Btn>
+                  )}
+                  {canManage && isPassed && (
+                    <button type="button" onClick={() => setConfirmGate({ phaseId: p.id, pass: false })} disabled={!!gateBusy}
+                      style={{ marginTop: 4, border: 0, background: 'transparent', padding: 0, fontFamily: F, fontSize: 11, color: C.text2, cursor: 'pointer', textDecoration: 'underline' }}>Reopen</button>
+                  )}
                 </div>
               );
-            })}
+            }}
+          />
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', padding: '6px 12px 8px', fontSize: 11, color: C.text2, borderTop: `1px solid ${C.border}` }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} color="#047857" />Done</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><CircleDot size={12} color={C.primary} />In progress</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><PenLine size={11} />Needs sign-off</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Link2 size={11} />Linked to a task</span>
+            <span>Click a step or deliverable to update it.</span>
           </div>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 10, fontSize: 11, color: C.text2 }}>
-            {(Object.keys(OWNER_COLOR) as Owner[]).map((o) => <span key={o} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: OWNER_COLOR[o] }} />{o === 'HMC' ? 'HMC leads' : o === 'Client' ? 'Client leads' : 'Joint'}</span>)}
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PenLine size={11} />Needs sign-off</span>
-            <span>Click a step to update its deliverables.</span>
-          </div>
-        </div>
+        </section>
       )}
 
       {view === 'list' && <>
@@ -442,8 +431,8 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                     </tbody>
                   </table>
                 </div>
-                {/* Gate */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px', background: isPassed ? '#F0FDF4' : '#F8FAFC' }}>
+                {/* Gate (none for phases like Hypercare) */}
+                {hasGate(p) && <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px', background: isPassed ? '#F0FDF4' : '#F8FAFC' }}>
                   <div style={{ flex: '1 1 320px', minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.text2 }}>PHASE GATE</div>
                     <div style={{ fontSize: 13, color: C.text }}>{p.gate || '—'}</div>
@@ -459,7 +448,7 @@ export default function DeliverablesTab({ projectId }: { projectId: string }) {
                     ? <Btn variant="ghost" small onClick={() => setConfirmGate({ phaseId: p.id, pass: false })} disabled={!!gateBusy}>Reopen gate</Btn>
                     : <Btn small onClick={() => setConfirmGate({ phaseId: p.id, pass: true })} disabled={!!gateBusy || missing.length > 0}
                         title={missing.length ? 'Complete every deliverable first (or mark it Not required)' : undefined}>Pass gate</Btn>)}
-                </div>
+                </div>}
               </div>
             )}
           </section>

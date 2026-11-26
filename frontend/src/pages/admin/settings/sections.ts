@@ -8,7 +8,7 @@ export interface LookupSection {
 export interface ChecklistSection { kind: 'checklist'; path: string; label: string; category: ProjectChecklistCategoryId; description: string }
 export interface TemplatesSection { kind: 'templates'; path: string; label: string; description: string }
 export interface NotificationsSection { kind: 'notifications'; path: string; label: string; description: string }
-export interface MethodologySection { kind: 'methodology'; path: string; label: string; mode: 'phases' | 'deliverables'; description: string }
+export interface MethodologySection { kind: 'methodology'; path: string; label: string; mode: 'phases' | 'steps' | 'deliverables'; description: string }
 export type SettingsSection = LookupSection | ChecklistSection | TemplatesSection | MethodologySection | NotificationsSection;
 
 export const SETTINGS_GROUPS: { title: string; sections: SettingsSection[] }[] = [
@@ -33,6 +33,7 @@ export const SETTINGS_GROUPS: { title: string; sections: SettingsSection[] }[] =
     title: 'Methodology',
     sections: [
       { kind: 'methodology', path: 'methodology/phases', label: 'Phases & Gates', mode: 'phases', description: 'The phases of the implementation methodology and their gates.' },
+      { kind: 'methodology', path: 'methodology/steps', label: 'Steps', mode: 'steps', description: 'The steps (activities) of each phase, with their checklist.' },
       { kind: 'methodology', path: 'methodology/deliverables', label: 'Deliverables', mode: 'deliverables', description: 'Documents each phase delivers, with their templates.' },
     ],
   },
