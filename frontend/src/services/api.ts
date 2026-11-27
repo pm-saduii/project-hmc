@@ -1317,6 +1317,9 @@ function buildCopiedTaskRows(sourceTasks: Task[], targetProjectId: string, empty
 
 // ── Task Templates (System-wide) ───────────────────────────────────────────
 
+/** New task templates can no longer be created (the two company templates are maintained instead). */
+const TEMPLATE_CREATE_ENABLED = false as boolean;
+
 type UpsertTemplateItem = {
   wbs: string;
   parentWbs: string;
@@ -1374,6 +1377,7 @@ export const taskTemplateApi = {
   },
 
   createFromProject: async (name: string, sourceProjectId: string): Promise<{ data: TaskTemplate }> => {
+    if (!TEMPLATE_CREATE_ENABLED) throw new Error('Creating new task templates is turned off. Edit the existing templates instead.');
     const createdBy = await ensureAdminRole();
     const source = await taskApi.getByProject(sourceProjectId);
     const sourceTasks = [...source.data].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));

@@ -9,6 +9,9 @@ import { compareWbs } from '../../utils';
 import type { TaskTemplateItem, TaskTemplate } from '../../types';
 import { Btn, C, FormRow, Input, Modal, Select } from '../Common';
 
+/** Creating new templates is turned off; edit the two company templates instead. */
+const TEMPLATE_CREATE_ENABLED = false as boolean;
+
 function getTodayPassword(): string {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
@@ -190,6 +193,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
   };
 
   const handleCreateTemplate = async () => {
+    if (!TEMPLATE_CREATE_ENABLED) return;
     if (!isAdmin) {
       toast.error('Admin only');
       return;
@@ -442,7 +446,8 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
               </div>
             )}
 
-            {/* Create Template */}
+            {/* Create Template — turned off: the company templates (Standard / with Customization) are maintained, not added to */}
+            {TEMPLATE_CREATE_ENABLED && (
             <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', display: 'grid', gap: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.text2, textTransform: 'uppercase', letterSpacing: 1 }}>Create Template From Project</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -458,6 +463,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                 </Btn>
               </div>
             </div>
+            )}
 
             {/* Edit Template */}
             <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: '8px 12px', display: 'grid', gap: 6 }}>
