@@ -9,10 +9,10 @@
     "dev:vercel": "cd .. && vercel dev --listen 5175",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "db:status": "node --env-file=.env.local scripts/db-migrate.mjs status",
-    "db:migrate": "node --env-file=.env.local scripts/db-migrate.mjs up",
-    "db:baseline": "node --env-file=.env.local scripts/db-migrate.mjs baseline",
-    "db:sql": "node --env-file=.env.local scripts/db-migrate.mjs sql"
+    "db:status": "node --env-file-if-exists=../.env.local --env-file-if-exists=.env.local scripts/db-migrate.mjs status",
+    "db:migrate": "node --env-file-if-exists=../.env.local --env-file-if-exists=.env.local scripts/db-migrate.mjs up",
+    "db:baseline": "node --env-file-if-exists=../.env.local --env-file-if-exists=.env.local scripts/db-migrate.mjs baseline",
+    "db:sql": "node --env-file-if-exists=../.env.local --env-file-if-exists=.env.local scripts/db-migrate.mjs sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.0",

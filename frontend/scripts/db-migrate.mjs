@@ -21,7 +21,7 @@ const [cmd = 'status', arg] = process.argv.slice(2);
 
 const url = process.env.DATABASE_URL;
 if (!url) {
-  console.error('DATABASE_URL is not set in frontend/.env.local (Supabase → Connect → Session pooler).');
+  console.error('DATABASE_URL is not set in .env.local (repo root or frontend/) (Supabase → Connect → Session pooler).');
   process.exit(1);
 }
 const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
