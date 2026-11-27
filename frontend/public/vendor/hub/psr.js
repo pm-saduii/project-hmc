@@ -708,29 +708,17 @@
   }
   function xtra(html, i, lim) { return i < lim ? html : html.replace(/^<(li|tr)/, '<$1 class="xtra"').replace('<li class="xtra" class="', '<li class="xtra '); }
 
-  // Page header (same as the slides): title + "Client | Update · date" on the left;
-  // client logo · HUMANICA logo on the right with the Project Manager under them.
-  function logos(P) {
-    var vendor = /humanica/i.test(P.vendor || "HUMANICA") ? '<img class="hlogo r" src="' + BRAND.hw + '" alt="HUMANICA">' : '<div class="vendor">' + esc(P.vendor) + "</div>";
-    return '<div class="rh-logos">' + (P.logo ? '<span class="clogo-box"><img src="' + esc(P.logo) + '" alt="' + esc(P.client) + '"></span>' : "") + vendor + "</div>";
-  }
+  // Page header (same as the slides): HUMANICA logo · title · "Client | Update · date" on the left;
+  // client logo with the Project Manager under it on the right.
   function header(M, mode, pageTitle) {
     var P = Object.assign({}, M.P), ph = M.P.placeholder;
     if (ph) { P.name = P.name || "Project Name"; P.client = P.client || "Client Name"; P.lead = P.lead || "Project Manager"; }
-    return '<header class="rh"><div class="rh-l"><div class="rh-tt"><h1>' + esc(pageTitle) + '</h1>' +
+    var vendor = /humanica/i.test(P.vendor || "HUMANICA") ? '<img class="hlogo" src="' + BRAND.hw + '" alt="HUMANICA">' : '<div class="vendor">' + esc(P.vendor) + "</div>";
+    return '<header class="rh"><div class="rh-l">' + vendor + '<div class="rh-tt"><h1>' + esc(pageTitle) + '</h1>' +
       '<div class="sub">' + esc(P.client || P.name) + " &nbsp;|&nbsp; Update · <b>" + fmtD(P.rd) + "</b></div></div></div>" +
-      '<div class="rh-rr">' + logos(P) + '<div class="rh-pm">' + (mode === "internal" ? '<span class="badge b-int">INTERNAL · CONFIDENTIAL</span> ' : "") +
+      '<div class="rh-rr">' + (P.logo ? '<span class="clogo-box"><img src="' + esc(P.logo) + '" alt="' + esc(P.client) + '"></span>' : "") +
+      '<div class="rh-pm">' + (mode === "internal" ? '<span class="badge b-int">INTERNAL · CONFIDENTIAL</span> ' : "") +
       "Project Manager: <b>" + esc(P.lead || "–") + "</b></div></div></header>";
-  }
-  // Cover page (same as the first slide)
-  function pageCover(M, mode) {
-    var P = M.P;
-    return '<section class="page cover">' +
-      '<div class="cv-top">' + (mode === "internal" ? '<span class="badge b-int">INTERNAL · CONFIDENTIAL</span>' : "<span></span>") + logos(P) + "</div>" +
-      '<div class="cv-mid"><h1>Project Progress Status</h1><div class="cv-client">' + esc(P.client || P.name) + '</div><div class="cv-date">Update · ' + fmtD(P.rd) + "</div></div>" +
-      '<div class="cv-bot"><div><div class="cv-k">OVERALL STATUS</div><div class="cv-row"><span class="cv-st ' + (SCLASS[P.overallStatus] || "s-ns") + '">' + esc(P.overallStatus) + "</span>" +
-      '<span class="cv-prog">Progress <b>' + fmtP(P.overall) + "</b> &nbsp;·&nbsp; Plan " + fmtP(P.overallPlanned) + "</span></div></div>" +
-      '<div class="cv-pm">Project Manager : <b>' + esc(P.lead || "–") + "</b></div></div></section>";
   }
   function footer(M, mode, n) {
     return '<footer class="rf"><div class="leg">' + STATUS.map(function (s) { return dot(s) + s; }).join("") +
@@ -1816,13 +1804,13 @@
     if (mode === "docs") return renderDocs(M);
     mode = mode === "internal" ? "internal" : "external";
     // order: summary · upcoming activities · steering · timeline · progress overview (charts) · key milestones
-    var pages = [pageCover, pageSummary, pageCalendar];
+    var pages = [pageSummary, pageCalendar];
     if (steerItems(M, mode).length) pages.push(pageSteering);
     pages.push(pageTimeline);
     if (M.chart) pages.push(pageProgress);
     pages.push(pageMilestones);
     if (mode === "internal") pages.push(pageBilling, pageActivities);
-    return '<div class="psr ' + mode + '">' + pages.map(function (f, i) { return f(M, mode, i + 1); }).join("") + "</div>";   // page 1 = cover
+    return '<div class="psr ' + mode + '">' + pages.map(function (f, i) { return f(M, mode, i + 1); }).join("") + "</div>";
   }
 
   // Poppins (Latin subset, embedded) · Thai falls back to Kanit (Google Fonts when online) → Thonburi / Leelawadee UI

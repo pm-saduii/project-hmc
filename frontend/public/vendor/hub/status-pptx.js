@@ -32,19 +32,21 @@
     };
     pres.defineSlideMaster({ title: "PSR Cover", background: { color: K_.navy },
       objects: [
-        /humanica/i.test(P.vendor || "HUMANICA") ? { image: { x: W - 0.7 - 0.34 * h.BRAND.hratio, y: 0.75, w: 0.34 * h.BRAND.hratio, h: 0.34, data: h.BRAND.hw.replace(/^data:/, "") } }
-          : { text: { text: (P.vendor || "").toUpperCase(), options: { x: W - 0.7 - 6, y: 0.75, w: 6, h: 0.35, fontSize: 12, bold: true, color: "8FB4E8", charSpacing: 6, margin: 0, align: "right" } } },
+        /humanica/i.test(P.vendor || "HUMANICA") ? { image: { x: 0.7, y: 0.75, w: 0.34 * h.BRAND.hratio, h: 0.34, data: h.BRAND.hw.replace(/^data:/, "") } }
+          : { text: { text: (P.vendor || "").toUpperCase(), options: { x: 0.7, y: 0.75, w: 6, h: 0.35, fontSize: 12, bold: true, color: "8FB4E8", charSpacing: 6, margin: 0 } } },
         { placeholder: { options: { name: "title", type: "title", x: 0.7, y: 2.6, w: 11.5, h: 1.05, fontSize: 40, bold: true, color: K_.white, align: "left", valign: "bottom", margin: 0 }, text: "Project Progress Status" } },
         { placeholder: { options: { name: "body", type: "body", x: 0.7, y: 3.75, w: 11.5, h: 0.95, fontSize: 18, color: "B9CBE4", align: "left", valign: "top", margin: 0 }, text: "Client · Update · Date" } }
       ] });
     var HW = 0.24 * h.BRAND.hratio;   // HUMANICA logo width in the header band
+    var TX = 0.5 + HW + 0.4;          // title and subtitle start after the logo and the divider
     pres.defineSlideMaster({ title: "PSR Content", background: { color: K_.bg },
       objects: foot([
         { rect: { x: 0, y: 0, w: W, h: 1.05, fill: { color: K_.navy } } },
-        /humanica/i.test(P.vendor || "HUMANICA") ? { image: { x: W - 0.5 - HW, y: 0.24, w: HW, h: 0.24, data: h.BRAND.hw.replace(/^data:/, "") } }
-          : { text: { text: (P.vendor || "").toUpperCase(), options: { x: W - 0.5 - 3, y: 0.2, w: 3, h: 0.3, fontSize: 11, bold: true, color: "8FB4E8", charSpacing: 4, margin: 0, align: "right" } } },
-        { placeholder: { options: { name: "title", type: "title", x: 0.5, y: 0.14, w: 8.4, h: 0.58, fontSize: 26, bold: true, color: K_.white, align: "left", valign: "middle", margin: 0 }, text: "Slide title" } },
-        { placeholder: { options: { name: "sub", type: "body", x: 0.5, y: 0.68, w: 8.4, h: 0.28, fontSize: 11, color: "B9CBE4", align: "left", valign: "middle", margin: 0 }, text: "Project · Report · Date" } }
+        /humanica/i.test(P.vendor || "HUMANICA") ? { image: { x: 0.5, y: 0.405, w: HW, h: 0.24, data: h.BRAND.hw.replace(/^data:/, "") } }
+          : { text: { text: (P.vendor || "").toUpperCase(), options: { x: 0.5, y: 0.37, w: HW, h: 0.3, fontSize: 11, bold: true, color: "8FB4E8", charSpacing: 4, margin: 0 } } },
+        { line: { x: 0.5 + HW + 0.2, y: 0.25, w: 0, h: 0.55, line: { color: "4A6A92", width: 0.75 } } },
+        { placeholder: { options: { name: "title", type: "title", x: TX, y: 0.14, w: W - 0.5 - 2.2 - TX, h: 0.58, fontSize: 26, bold: true, color: K_.white, align: "left", valign: "middle", margin: 0 }, text: "Slide title" } },
+        { placeholder: { options: { name: "sub", type: "body", x: TX, y: 0.68, w: W - 0.5 - 2.2 - TX - 3.0, h: 0.28, fontSize: 11, color: "B9CBE4", align: "left", valign: "middle", margin: 0 }, text: "Project · Report · Date" } }
       ]), slideNumber: { x: W - 1.0, y: H - 0.42, w: 0.5, h: 0.3, fontSize: 9, color: K_.mut, align: "right" } });
     pres.defineSlideMaster({ title: "PSR Text", background: { color: K_.bg },
       objects: foot([
@@ -62,14 +64,13 @@
       s.addText(subline, { placeholder: "sub" });
       // top right: client logo (white box) and the Project Manager under it
       if (hasLogo) {
-        var lx = W - 0.5 - HW - 0.3 - 1.6;
+        var lx = W - 0.5 - 1.6;
         s.addShape(pres.ShapeType.roundRect, { x: lx, y: 0.08, w: 1.6, h: 0.56, rectRadius: 0.06, fill: { color: K_.white }, line: { type: "none" }, objectName: "Logo box" });
         s.addImage({ data: P.logo.replace(/^data:/, ""), x: lx + 0.08, y: 0.12, w: 1.44, h: 0.48, sizing: { type: "contain", w: 1.44, h: 0.48 }, altText: P.client || "Client logo" });
-        s.addShape(pres.ShapeType.line, { x: W - 0.5 - HW - 0.15, y: 0.16, w: 0, h: 0.4, line: { color: "4A6A92", width: 0.75 } });
       }
       s.addText([{ text: "Project Manager: ", options: { color: "B9CBE4" } }, { text: P.lead || "–", options: { color: K_.white } }],
         { x: W - 0.5 - 5.0, y: 0.72, w: 5.0, h: 0.26, fontSize: 10, align: "right", valign: "middle", margin: 0, isTextBox: true, objectName: "Project manager" });
-      if (internal) s.addText("INTERNAL", { shape: pres.ShapeType.roundRect, rectRadius: 0.15, x: W - 0.5 - HW - 0.3 - 1.6 - 1.45, y: 0.2, w: 1.3, h: 0.32, fontSize: 9, bold: true, charSpacing: 2,
+      if (internal) s.addText("INTERNAL", { shape: pres.ShapeType.roundRect, rectRadius: 0.15, x: W - 0.5 - 1.6 - 1.45, y: 0.2, w: 1.3, h: 0.32, fontSize: 9, bold: true, charSpacing: 2,
         color: K_.white, align: "center", valign: "middle", fill: { color: K_.late }, line: { color: K_.late, width: 0.75 }, margin: 0, objectName: "Badge" });
       return s;
     }
@@ -101,10 +102,9 @@
     cv.addText([{ text: "Project Manager : ", options: { color: "8FB4E8" } }, { text: P.lead || "–", options: { color: K_.white } }],
       { x: 7.6, y: 6.32, w: 5.0, h: 0.55, fontSize: 14, valign: "middle", align: "right", margin: 0, isTextBox: true });
     if (P.logo && /^data:image\//.test(P.logo)) {   // client logo (picture in sheet Kickoff B13, or chosen in the Generator)
-      var cx = W - 0.7 - 0.34 * h.BRAND.hratio - 0.45 - 2.15;
+      var cx = W - 0.4 - 2.15;
       cv.addShape(pres.ShapeType.roundRect, { x: cx, y: 0.45, w: 2.15, h: 0.95, rectRadius: 0.08, fill: { color: K_.white }, line: { type: "none" } });
       cv.addImage({ data: P.logo.replace(/^data:/, ""), x: cx + 0.15, y: 0.55, w: 1.85, h: 0.75, sizing: { type: "contain", w: 1.85, h: 0.75 }, altText: P.client || "Client logo" });
-      cv.addShape(pres.ShapeType.line, { x: W - 0.7 - 0.34 * h.BRAND.hratio - 0.22, y: 0.62, w: 0, h: 0.6, line: { color: "4A6A92", width: 0.75 } });
     }
     if (internal) cv.addText("INTERNAL · CONFIDENTIAL", { x: 0.7, y: 1.2, w: 4.0, h: 0.35, fontSize: 11, bold: true, color: "FF8A8A", charSpacing: 2, margin: 0, isTextBox: true });
 
