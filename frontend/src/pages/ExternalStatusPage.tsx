@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import { ChevronLeft, ChevronRight, FileDown, Pencil, Presentation, Search, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileDown, Pencil, Presentation, Search, Send, Sparkles } from 'lucide-react';
 import { useStore } from '../store';
 import { useAuth } from '../contexts/AuthContext';
 import { Btn, C } from '../components/Common';
@@ -12,7 +12,7 @@ import { currentPhase, methodologyApi } from '../services/methodology';
 import { statusReportApi, type StatusReport, type StatusReportPatch } from '../services/statusReports';
 import { isClosedStatus, isHyperCareStatus } from '../utils/projectHealth';
 import {
-  PERIOD_RE, computeModel, downloadExternalPptx, loadEngine, periodLabel, periodOf, reportDateOf, shiftPeriod,
+  PERIOD_RE, computeModel, downloadExternalPptx, loadEngine, periodLabel, periodOf, reportDateOf, shiftPeriod, suggestText, type SuggestedText,
 } from '../utils/externalStatus';
 import type { Member, Project } from '../types';
 
@@ -113,6 +113,13 @@ export default function ExternalStatusPage() {
     return computeModel(window.PSR, { project: selected, period, record, tasks: mine(tasks), milestones: mine(milestones), issues: mine(issues), risks: mine(risks), members, phaseName, snapshots: mine(snapshots) });
   }, [ready, selected, period, record, tasks, milestones, issues, risks, members, phaseName, snapshots]);
   const model = (frozen ? record!.snapshot : liveModel) as typeof liveModel;
+  // Draft text for the Edit form (empty fields start from it; "Auto suggestion" rewrites one field)
+  const suggestion = React.useMemo(() => {
+    if (!ready || !selected || !window.PSR) return null;
+    const mine = <T extends { projectId: string }>(xs: T[]) => xs.filter((x) => x.projectId === selected.id);
+    try { return suggestText(window.PSR, { project: selected, period, record, tasks: mine(tasks), milestones: mine(milestones), issues: mine(issues), risks: mine(risks), members, phaseName, snapshots: mine(snapshots) }); }
+    catch { return null; }
+  }, [ready, selected, period, record, tasks, milestones, issues, risks, members, phaseName, snapshots]);
   const html = React.useMemo(() => (model && window.PSR ? window.PSR.fullDocument(model, 'external') : ''), [model]);
 
   // Fit the 1123px report pages to the available width
@@ -241,7 +248,7 @@ export default function ExternalStatusPage() {
       </section>
 
       {editing && selected && (
-        <EditReport record={record} period={period} busy={busy} onClose={() => setEditing(false)}
+        <EditReport record={record} period={period} busy={busy} suggestion={suggestion} onClose={() => setEditing(false)}
           onSave={(patch) => void save(patch, 'Saved').then((ok) => { if (ok) setEditing(false); })} />
       )}
       {sending && selected && (
@@ -255,12 +262,31 @@ export default function ExternalStatusPage() {
 
 const area: React.CSSProperties = { ...input, height: 'auto', padding: '8px 12px', lineHeight: 1.5, resize: 'vertical' };
 
-function EditReport({ record, period, busy, onClose, onSave }: { record: StatusReport | null; period: string; busy: boolean; onClose: () => void; onSave: (p: StatusReportPatch) => void }) {
+type TextKey = 'projectSummary' | 'rationale' | 'accomplishments' | 'nextSteps';
+function EditReport({ record, period, busy, suggestion, onClose, onSave }: { record: StatusReport | null; period: string; busy: boolean; suggestion: SuggestedText | null; onClose: () => void; onSave: (p: StatusReportPatch) => void }) {
+  // Saved text wins; a field never saved (empty) starts from the auto text.
+  const initial = (k: TextKey) => (record?.[k]?.trim() ? record[k] || '' : suggestion?.[k] || '');
   const [f, setF] = React.useState<StatusReportPatch>({
-    reportDate: record?.reportDate || '', overallStatus: record?.overallStatus || '', rationale: record?.rationale || '',
-    accomplishments: record?.accomplishments || '', nextSteps: record?.nextSteps || '', projectSummary: record?.projectSummary || '',
+    reportDate: record?.reportDate || '', overallStatus: record?.overallStatus || '', rationale: initial('rationale'),
+    accomplishments: initial('accomplishments'), nextSteps: initial('nextSteps'), projectSummary: initial('projectSummary'),
   });
-  const set = (k: keyof StatusReportPatch, v: string) => setF((x) => ({ ...x, [k]: v }));
+  const [auto, setAuto] = React.useState<Record<TextKey, boolean>>(() => ({
+    projectSummary: !record?.projectSummary?.trim() && !!suggestion?.projectSummary, rationale: !record?.rationale?.trim() && !!suggestion?.rationale,
+    accomplishments: !record?.accomplishments?.trim() && !!suggestion?.accomplishments, nextSteps: !record?.nextSteps?.trim() && !!suggestion?.nextSteps,
+  }));
+  const set = (k: keyof StatusReportPatch, v: string) => { setF((x) => ({ ...x, [k]: v })); if (k in auto) setAuto((a) => ({ ...a, [k]: false })); };
+  const head = (k: TextKey, label: string) => (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span>{label}</span>
+      {auto[k] && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: C.primaryBg, color: C.primary }}>Auto draft</span>}
+      <span style={{ flex: 1 }} />
+      <button type="button" disabled={!suggestion || busy} title="Replace this field with text written from the project's numbers"
+        onClick={(e) => { e.preventDefault(); if (!suggestion) return; setF((x) => ({ ...x, [k]: suggestion[k] })); setAuto((a) => ({ ...a, [k]: true })); }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: 0, background: 'transparent', padding: 0, color: suggestion ? C.primary : C.text3, fontFamily: 'Poppins, sans-serif', fontSize: 11, fontWeight: 600, cursor: suggestion ? 'pointer' : 'default' }}>
+        <Sparkles size={12} />Auto suggestion
+      </button>
+    </span>
+  );
   return (
     <FormModal title={`External Status · ${periodLabel(period)}`} subtitle="Text the customer sees; numbers come from the project" onClose={onClose} busy={busy} width={720}
       footer={<><span style={{ marginLeft: 'auto' }} /><Btn variant="ghost" onClick={onClose} disabled={busy}>Cancel</Btn>
@@ -274,14 +300,14 @@ function EditReport({ record, period, busy, onClose, onSave }: { record: StatusR
             {['On Track', 'At Risk', 'Delayed', 'Completed', 'Not Started'].map((s) => <option key={s} value={s}>{s}</option>)}
           </select></label>
       </div>
-      <label style={fieldLabel}>Project summary<textarea rows={4} value={f.projectSummary || ''} onChange={(e) => set('projectSummary', e.target.value)} style={area} placeholder="One point per line: scope, where the project stands, what is next" />
+      <label style={fieldLabel}>{head('projectSummary', 'Project summary')}<textarea rows={4} value={f.projectSummary || ''} onChange={(e) => set('projectSummary', e.target.value)} style={area} placeholder="One point per line: scope, where the project stands, what is next" />
         <span style={hint}>Shown on the summary page of the report (up to 4 points on the slide).</span></label>
-      <label style={fieldLabel}>Assessment rationale<textarea rows={3} value={f.rationale || ''} onChange={(e) => set('rationale', e.target.value)} style={area} placeholder="2–3 lines: the overall picture and why the status is what it is" /></label>
+      <label style={fieldLabel}>{head('rationale', 'Assessment rationale')}<textarea rows={3} value={f.rationale || ''} onChange={(e) => set('rationale', e.target.value)} style={area} placeholder="2–3 lines: the overall picture and why the status is what it is" /></label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <label style={fieldLabel}>Key accomplishments<textarea rows={6} value={f.accomplishments || ''} onChange={(e) => set('accomplishments', e.target.value)} style={area} placeholder="One per line" />
-          <span style={hint}>Empty = tasks finished in this half-month.</span></label>
-        <label style={fieldLabel}>Next steps<textarea rows={6} value={f.nextSteps || ''} onChange={(e) => set('nextSteps', e.target.value)} style={area} placeholder="One per line" />
-          <span style={hint}>Empty = tasks due in the next half-month.</span></label>
+        <label style={fieldLabel}>{head('accomplishments', 'Key accomplishments')}<textarea rows={6} value={f.accomplishments || ''} onChange={(e) => set('accomplishments', e.target.value)} style={area} placeholder="One per line" />
+          <span style={hint}>Auto = tasks finished in this half-month.</span></label>
+        <label style={fieldLabel}>{head('nextSteps', 'Next steps')}<textarea rows={6} value={f.nextSteps || ''} onChange={(e) => set('nextSteps', e.target.value)} style={area} placeholder="One per line" />
+          <span style={hint}>Auto = tasks due in the next half-month.</span></label>
       </div>
       <div style={hint}>Issues and risks come from the Issues and Risks tabs (mark them Internal to keep them off this report; set Steering to Decision or Acknowledge for "Items for Steering"). Key milestones come from the Milestones tab.</div>
     </FormModal>

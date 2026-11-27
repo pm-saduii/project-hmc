@@ -276,3 +276,47 @@ function chartData(input: ExternalInput, M: PsrModel, rd: number, rdDate: Date, 
   return { labels: points.map((p) => p.label), plan, actual, phases, milestones: { project: count('project'), billing: count('billing') } };
 }
 
+
+/* ── Auto text for the editable fields ─────────────────────────────────── */
+export interface SuggestedText { projectSummary: string; rationale: string; accomplishments: string; nextSteps: string }
+
+/** Draft text for the four fields, written from the project's numbers (the PM edits it; saved text always wins). */
+export function suggestText(psr: PsrApi, input: ExternalInput): SuggestedText {
+  const blank = { ...(input.record || {}), projectSummary: '', rationale: '', accomplishments: '', nextSteps: '', overallStatus: input.record?.overallStatus || '' } as StatusReport;
+  const { raw, rd } = buildRaw({ ...input, record: blank });
+  const M = computeModel(psr, { ...input, record: blank }) as unknown as Record<string, unknown> & { P: Record<string, unknown>; milestones: Record<string, unknown>[] };
+  const d = (ms: unknown) => (typeof ms === 'number' && Number.isFinite(ms) ? format(new Date(ms), 'dd/MM/yyyy') : '');
+  const pct = (x: unknown) => Math.round((Number(x) || 0) * 100);
+  const P = M.P;
+  const act = pct(P.overall); const plan = pct(P.overallPlanned); const gap = act - plan;
+  const status = String(P.overallStatus || P.overallAuto || '');
+  const phases = ((M.phases as Record<string, unknown>[]) || []);
+  const doneP = phases.filter((p) => pct(p.pct) >= 100);
+  const nowP = phases.filter((p) => pct(p.pct) < 100 && (Number(p.start) <= rd || pct(p.pct) > 0));
+  const nextP = phases.find((p) => pct(p.pct) === 0 && Number(p.start) > rd);
+  const behind = nowP.filter((p) => pct(p.planned) - pct(p.pct) >= 10);
+  const keyMs = M.milestones.filter((m) => m.key && m.status !== 'Completed').sort((a, b) => (Number(a.end) || Infinity) - (Number(b.end) || Infinity));
+  const lateMs = keyMs.filter((m) => m.status === 'Delayed');
+  const nextMs = keyMs.find((m) => m.status !== 'Delayed');
+  const openIssues = input.issues.filter((i) => i.status !== 'Resolved');
+  const blocked = openIssues.filter((i) => i.status === 'Blocked');
+  const { project } = input;
+
+  const summary = [
+    `${project.name}${project.client ? ` for ${project.client}` : ''}: ${d(dayOf(project.startDate)) || '—'} – ${d(dayOf(project.endDate)) || '—'}`,
+    `Overall progress ${act}% against ${plan}% planned (${status || '—'})${input.phaseName ? `; current stage: ${input.phaseName}` : ''}`,
+    doneP.length ? `Completed: ${doneP.map((p) => p.name).join(', ')}` : '',
+    nowP.length ? `In progress: ${nowP.map((p) => `${p.name} ${pct(p.pct)}%`).join(', ')}` : '',
+    nextP ? `Next: ${nextP.name} from ${d(nextP.start)}` : nextMs ? `Next: ${nextMs.name} by ${d(nextMs.end)}` : '',
+  ].filter(Boolean);
+
+  const why = [
+    gap === 0 ? `Overall progress is ${act}%, on plan.` : `Overall progress is ${act}% against ${plan}% planned (${gap > 0 ? '+' : ''}${gap} pts).`,
+    behind.length ? `${behind.map((p) => `${p.name} is ${pct(p.pct)}% against ${pct(p.planned)}% planned`).join('; ')}.` : nowP.length ? 'Phases in progress are tracking to plan.' : '',
+    lateMs.length ? `${lateMs.length} key milestone(s) past due: ${lateMs.slice(0, 2).map((m) => m.name).join(', ')}.` : nextMs ? `Next key milestone: ${nextMs.name} (${d(nextMs.end)}).` : '',
+    openIssues.length ? `${openIssues.length} open issue(s)${blocked.length ? `, ${blocked.length} blocked` : ''}.` : '',
+  ].filter(Boolean);
+
+  const hl = (type: string) => (raw.highlights as { type: string; text: string }[]).filter((h) => h.type === type).map((h) => h.text).join('\n');
+  return { projectSummary: summary.join('\n'), rationale: why.join(' '), accomplishments: hl('Accomplishment'), nextSteps: hl('Upcoming') };
+}
