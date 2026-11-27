@@ -318,24 +318,26 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
     });
   };
 
-  const addItem = () => {
-    const maxSort = itemsDraft.reduce((m, it) => Math.max(m, it.sortOrder || 0), 0);
-    setItemsDraft((prev) => [
-      ...prev,
-      {
-        id: '',
-        templateId: selectedTemplateId,
-        wbs: '',
-        parentWbs: '',
-        level: 0,
-        sortOrder: maxSort + 10,
-        taskName: '',
-        duration: 0,
-        effortManday: 0,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+  /** Parent and level follow the WBS ("4.2.3" → parent "4.2", level 2); rows always stay in WBS order. */
+  const withWbs = (it: TaskTemplateItem, wbs: string): TaskTemplateItem => {
+    const clean = wbs.trim().replace(/\.+$/, '');
+    const parts = clean ? clean.split('.') : [];
+    return { ...it, wbs: clean, parentWbs: parts.slice(0, -1).join('.'), level: Math.max(0, parts.length - 1) };
   };
+  const sortByWbs = (rows: TaskTemplateItem[]) => [...rows].sort((a, b) => (!a.wbs ? 1 : !b.wbs ? -1 : compareWbs(a.wbs, b.wbs)));
+  const nextChildWbs = (rows: TaskTemplateItem[], parent: string) => {
+    const kids = rows.filter((r) => (r.parentWbs || '') === parent).map((r) => Number(r.wbs.split('.').pop()) || 0);
+    return `${parent ? `${parent}.` : ''}${(kids.length ? Math.max(...kids) : 0) + 1}`;
+  };
+  const blankItem = (): TaskTemplateItem => ({
+    id: '', templateId: selectedTemplateId, wbs: '', parentWbs: '', level: 0, sortOrder: 0, taskName: '', duration: 0, effortManday: 0,
+    createdAt: new Date().toISOString(), resource: '', isMilestone: false, visibility: 'external',
+  });
+  /** Add a row: under `parent` (as its next sub-task) or as the next top-level item; it lands in WBS order. */
+  const addItem = (parent = '') => {
+    setItemsDraft((prev) => sortByWbs([...prev, withWbs(blankItem(), nextChildWbs(prev, parent))]));
+  };
+  const commitWbs = (index: number) => setItemsDraft((prev) => sortByWbs(prev.map((it, i) => (i === index ? withWbs(it, it.wbs) : it))));
 
   const removeItem = (index: number) => {
     setItemsDraft((prev) => prev.filter((_, i) => i !== index));
@@ -503,7 +505,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                     {/* Header */}
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: '64px 64px 1fr 92px 34px 58px 120px 60px 70px 32px',
+                      gridTemplateColumns: '64px 64px 1fr 92px 34px 58px 120px 60px 70px 56px',
                       background: C.bg2,
                       height: 32,
                       borderBottom: `1px solid ${C.border}`,
@@ -526,13 +528,13 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                           key={item.id || `draft-${index}`}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '64px 64px 1fr 92px 34px 58px 120px 60px 70px 32px',
+                            gridTemplateColumns: '64px 64px 1fr 92px 34px 58px 120px 60px 70px 56px',
                             height: 36,
                             borderBottom: `1px solid ${C.border}`,
                             background: index % 2 === 1 ? C.bg2 : C.white,
                           }}
                         >
-                          <input style={cellInput} value={item.wbs} onChange={(e) => updateItemField(index, 'wbs', e.target.value)} />
+                          <input style={cellInput} value={item.wbs} onChange={(e) => updateItemField(index, 'wbs', e.target.value)} onBlur={() => commitWbs(index)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} title="Parent and order follow the WBS" />
                           <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}` }} value={item.parentWbs || ''} onChange={(e) => updateItemField(index, 'parentWbs', e.target.value)} />
                           <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, fontWeight: Number(item.level || 0) < 2 ? 700 : 400, paddingLeft: 6 + Number(item.level || 0) * 12 }} value={item.taskName} onChange={(e) => updateItemField(index, 'taskName', e.target.value)} />
                           <select aria-label="Owner" value={item.resource || ''} onChange={(e) => updateItemFlag(index, { resource: e.target.value })} disabled={!isAdmin}
@@ -553,6 +555,11 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                           <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, textAlign: 'right' }} type="number" value={item.duration || 0} onChange={(e) => updateItemField(index, 'duration', e.target.value)} />
                           <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, textAlign: 'right' }} type="number" value={item.effortManday || 0} onChange={(e) => updateItemField(index, 'effortManday', e.target.value)} />
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: `1px solid ${C.border}` }}>
+                            <button type="button" onClick={() => addItem(item.wbs)} disabled={!isAdmin || !item.wbs || Number(item.level || 0) >= 2}
+                              title={`Add a sub-task under ${item.wbs}`}
+                              style={{ background: 'none', border: 'none', cursor: isAdmin ? 'pointer' : 'default', color: C.primary, opacity: isAdmin && item.wbs && Number(item.level || 0) < 2 ? 1 : 0.25, padding: 4, display: 'flex', alignItems: 'center' }}>
+                              <Plus size={13} />
+                            </button>
                             <button
                               type="button"
                               onClick={() => removeItem(index)}
@@ -570,7 +577,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
 
                   {/* Add row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                    <Btn small variant="ghost" onClick={addItem} disabled={!isAdmin}>
+                    <Btn small variant="ghost" onClick={() => addItem()} disabled={!isAdmin} title="Add the next top-level item (use + on a row to add a sub-task under it)">
                       <Plus size={13} /> Add Row
                     </Btn>
                     {savingItems && <span role="status" style={{ color: C.text3, fontSize: 11 }}>Saving…</span>}
