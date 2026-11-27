@@ -6,7 +6,7 @@
 import { addMonths, endOfMonth, format, isValid, parseISO, startOfMonth } from 'date-fns';
 import { projectHealth } from './projectHealth';
 import { computeBaselineProgress } from './index';
-import type { Issue, Member, Milestone, Project, ProjectProgressSnapshot, Risk, Task } from '../types';
+import { internalTaskIds, type Issue, type Member, type Milestone, type Project, type ProjectProgressSnapshot, type Risk, type Task } from '../types';
 import type { StatusReport } from '../services/statusReports';
 
 /* ── Half-month periods ─────────────────────────────────────────────── */
@@ -103,7 +103,10 @@ export interface ExternalInput {
 
 /** The engine's input ("raw") built from the project. */
 export function buildRaw(input: ExternalInput) {
-  const { project, period, record, tasks, milestones, issues, risks, members } = input;
+  const { project, period, record, milestones, issues, risks, members } = input;
+  // Internal tasks (and everything under them) never reach the customer: not in the timeline, activities, milestones or highlights.
+  const hidden = internalTaskIds(input.tasks);
+  const tasks = input.tasks.filter((t) => !hidden.has(t.id));
   const rdDate = reportDateOf(period, record, input.today);
   const rd = UTC(rdDate);
   const tag = project.customerAbbreviation || '';
@@ -323,7 +326,8 @@ export function suggestText(psr: PsrApi, input: ExternalInput): SuggestedText {
   const { project } = input;
 
   // Part 1 · Executive summary: status → progress → achievements → current work → dependencies/risks → next focus
-  const leavesNow = input.tasks.filter((t) => !input.tasks.some((k) => k.parentId === t.id))
+  const hiddenT = internalTaskIds(input.tasks);
+  const leavesNow = input.tasks.filter((t) => !hiddenT.has(t.id) && !input.tasks.some((k) => k.parentId === t.id))
     .filter((t) => !isDone(t) && dayOf(t.startDate) != null && Number(dayOf(t.startDate)) <= rd && (Number(t.percentComplete) || 0) > 0)
     .sort((x, y) => String(x.endDate).localeCompare(String(y.endDate)));
   const doing = (leavesNow.length ? leavesNow.map((t) => t.taskName) : nowP.map((p) => String(p.name))).filter(Boolean).slice(0, 2);

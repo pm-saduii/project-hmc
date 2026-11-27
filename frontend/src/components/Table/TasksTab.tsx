@@ -13,7 +13,7 @@ import { flattenTree, hasChildren, calcDuration, fmtDate, fmtDatePdf, fmtMonth, 
 import SuggestMilestonesModal from './SuggestMilestonesModal';
 import GanttChart, { ZOOM_LEVELS } from '../Gantt/GanttChart';
 import { ensureThaiFont } from '../../utils/pdfFont';
-import type { Task, ViewMode } from '../../types';
+import { internalTaskIds, type Task, type ViewMode } from '../../types';
 
 interface Props {
   projectId: string;
@@ -1974,7 +1974,7 @@ export default function TasksTab({ projectId, extraActions }: Props) {
   };
 
   // ── PDF export: redesigned with Poppins-like styling ──────────────────────
-  const exportPDF = async (opts?: { includeBaselineColumns?: boolean; fileName?: string; successMessage?: string }) => {
+  const exportPDF = async (opts?: { includeBaselineColumns?: boolean; fileName?: string; successMessage?: string; customer?: boolean }) => {
     const includeBaselineColumns = opts?.includeBaselineColumns === true;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = doc.internal.pageSize.getWidth();
@@ -2026,7 +2026,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
     };
 
     // ── Paginate ──
-    const all = [...projectTasks].sort((a, b) => compareWbs(a.wbs, b.wbs));
+    // Customer version: internal tasks (and everything under them) are left out
+    const hidden = opts?.customer ? internalTaskIds(projectTasks) : new Set<string>();
+    const all = [...projectTasks].filter((t) => !hidden.has(t.id)).sort((a, b) => compareWbs(a.wbs, b.wbs));
     const maxBody = H - startY - tHdrH - ftrH - 4;
     const pages: Task[][] = [];
     let curPage: Task[] = [], curH = 0;
@@ -2546,6 +2548,9 @@ export default function TasksTab({ projectId, extraActions }: Props) {
                             else handleUpdate(rowTask.id, { taskName: v });
                           }}
                         />
+                        {!isNew && rowTask.visibility === 'internal' && (
+                          <span title="Internal task: not shown to the customer (External Status, Weekly status, customer PDF)" style={{ flexShrink:0, fontSize:11, fontWeight:700, color:'#475569', background:'#E2E8F0', padding:'0 6px', borderRadius:999 }}>🔒 Internal</span>
+                        )}
                         {!isNew && rowTask.isMilestone && (
                           <span title="Key milestone (External Status report)" style={{ flexShrink:0, fontSize:11, fontWeight:700, color:'#B45309', background:'#FEF3C7', padding:'0 6px', borderRadius:999 }}>◆ Milestone</span>
                         )}
@@ -2936,7 +2941,8 @@ export default function TasksTab({ projectId, extraActions }: Props) {
               <div style={{ position:'absolute', right:0, top:'110%', background:C.white, border:`1px solid ${C.border}`, borderRadius:10, boxShadow:C.shadow2, zIndex:50, minWidth:160, overflow:'hidden' }}>
                 {[
                   ['📊 Excel Template (.xlsx)', exportXLSX],
-                  ['📄 PDF + Gantt', exportPDF],
+                  ['📄 PDF + Gantt', () => exportPDF()],
+                  ['📄 PDF + Gantt · Customer version (no internal tasks)', () => exportPDF({ customer: true, fileName: `tasks-customer-${projectId}.pdf`, successMessage: 'Exported customer PDF (internal tasks left out)' })],
                   ['📄 Export Plan vs Baseline', () => exportPDF({ includeBaselineColumns: true, fileName: `tasks-plan-vs-baseline-${projectId}.pdf`, successMessage: 'Exported Plan vs Baseline PDF' })],
                   ['📗 Export Plan vs Baseline (.xlsx)', exportPlanVsBaselineXLSX],
                   ['📥 Import Overwrite (.xlsx)', openImportDialog],
@@ -3648,6 +3654,10 @@ function TaskEditModal({ task, tasks, phaseOptions, onClose, onSave, onInsertBef
       <label style={{ display:'flex', alignItems:'center', gap:8, margin:'-4px 0 10px', fontSize:13, color:C.text, cursor:'pointer' }}>
         <input type="checkbox" checked={!!form.isMilestone} onChange={e => setForm(p => ({ ...p, isMilestone: e.target.checked }))} style={{ accentColor: C.primary }} />
         <span><b style={{ color: C.primary }}>◆</b> Key milestone <span style={{ fontSize:11, color:C.text3 }}>— shown on the External Status report (Key Milestone Tracker); target = this task's end date</span></span>
+      </label>
+      <label style={{ display:'flex', alignItems:'center', gap:8, margin:'-4px 0 10px', fontSize:13, color:C.text, cursor:'pointer' }}>
+        <input type="checkbox" checked={form.visibility === 'internal'} onChange={e => setForm(p => ({ ...p, visibility: e.target.checked ? 'internal' : 'external' }))} style={{ accentColor: '#475569' }} />
+        <span>🔒 Internal task <span style={{ fontSize:11, color:C.text3 }}>— HMC only: not shown to the customer (External Status, Weekly status, customer PDF); tasks under it are hidden too</span></span>
       </label>
       <FormRow label="Phase">
         <Select value={String(form.phase || phaseOptions[0]?.value)} onChange={v => up('phase', v)}

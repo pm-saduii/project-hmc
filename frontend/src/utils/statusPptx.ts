@@ -3,7 +3,7 @@
  * milestones & overdue work, issues / risks / change requests. Built from the project's live data.
  */
 import { addDays, differenceInCalendarDays, format, isValid, parseISO } from 'date-fns';
-import type { ChangeRequest, Issue, Member, Milestone, Project, Risk, Task } from '../types';
+import { internalTaskIds, type ChangeRequest, type Issue, type Member, type Milestone, type Project, type Risk, type Task } from '../types';
 import { projectHealth } from './projectHealth';
 import type PptxGenJSType from 'pptxgenjs';
 
@@ -35,7 +35,8 @@ export async function downloadWeeklyStatus(input: StatusInput) {
   const horizon = addDays(asOf, 14);
   const health = projectHealth(tasks);
   const parents = new Set(tasks.map((t) => t.parentId).filter(Boolean));
-  const leaves = tasks.filter((t) => !parents.has(t.id));
+  const hidden = internalTaskIds(tasks);   // internal tasks never reach the customer
+  const leaves = tasks.filter((t) => !parents.has(t.id) && !hidden.has(t.id));
   const finished = (t: Task) => toDate(t.actualFinish) || toDate(t.endDate);
   const done = leaves.filter((t) => isDone(t) && (() => { const d = finished(t); return !!d && d >= weekStart && d <= asOf; })())
     .sort((a, b) => (finished(b)?.getTime() || 0) - (finished(a)?.getTime() || 0));

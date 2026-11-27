@@ -100,6 +100,19 @@ export interface Task {
   sortOrder: number;
   /** Key milestone (External Status · Key Milestone Tracker). */
   isMilestone?: boolean;
+  /** internal = HMC only: never shown to the customer (External Status, Weekly status, customer exports). */
+  visibility?: TaskVisibility;
+}
+export type TaskVisibility = 'external' | 'internal';
+/** Internal tasks and everything under an internal parent. */
+export function internalTaskIds(tasks: Pick<Task, 'id' | 'parentId' | 'visibility'>[]): Set<string> {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const out = new Set<string>();
+  tasks.forEach((t) => {
+    let cur: Pick<Task, 'id' | 'parentId' | 'visibility'> | undefined = t; const seen = new Set<string>();
+    while (cur && !seen.has(cur.id)) { if (cur.visibility === 'internal') { out.add(t.id); return; } seen.add(cur.id); cur = cur.parentId ? byId.get(cur.parentId) : undefined; }
+  });
+  return out;
 }
 
 export interface Member {
@@ -164,6 +177,14 @@ export interface TaskTemplateItem {
   duration: number;
   effortManday: number;
   createdAt: string;
+  /** HMC · Customer · Joint (becomes the task's resource: Customer = the project's customer abbreviation). */
+  resource?: string;
+  isMilestone?: boolean;
+  visibility?: TaskVisibility;
+  /** Methodology phase this (top-level) task is — its phase gate links to the task. */
+  methodologyPhaseId?: string | null;
+  /** Methodology deliverable produced by this task — linked when the template is applied. */
+  deliverableId?: string | null;
 }
 
 // ── Change Request ────────────────────────────────────────────────────────────

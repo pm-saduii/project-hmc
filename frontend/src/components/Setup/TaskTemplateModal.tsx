@@ -4,6 +4,7 @@ import { Copy, FolderOpen, Layers, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../../store';
 import { useAuth } from '../../contexts/AuthContext';
 import { taskApi, taskTemplateApi } from '../../services/api';
+import { methodologyApi } from '../../services/methodology';
 import { compareWbs } from '../../utils';
 import type { TaskTemplateItem, TaskTemplate } from '../../types';
 import { Btn, C, FormRow, Input, Modal, Select } from '../Common';
@@ -46,6 +47,14 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
   const [templateNameDraft, setTemplateNameDraft] = useState('');
   const [templateNameDraftId, setTemplateNameDraftId] = useState('');
   const [itemsDraft, setItemsDraft] = useState<TaskTemplateItem[]>([]);
+  // Methodology names for the link column (phase of a top-level row / deliverable of a task)
+  const [methodNames, setMethodNames] = useState<{ phases: Record<string, string>; deliverables: Record<string, string> }>({ phases: {}, deliverables: {} });
+  useEffect(() => {
+    void methodologyApi.load().then((m) => setMethodNames({
+      phases: Object.fromEntries(m.phases.map((p) => [p.id, p.name])),
+      deliverables: Object.fromEntries(m.deliverables.map((d) => [d.id, d.shortName || d.name])),
+    })).catch(() => undefined);
+  }, []);
   const [itemsSavedSnapshot, setItemsSavedSnapshot] = useState('');
   const [itemsDraftId, setItemsDraftId] = useState('');
   const nameSaveQueue = useRef<Promise<void>>(Promise.resolve());
@@ -252,6 +261,11 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
               taskName: item.taskName,
               duration: Number(item.duration || 0),
               effortManday: Number(item.effortManday || 0),
+              resource: item.resource || '',
+              isMilestone: !!item.isMilestone,
+              visibility: item.visibility === 'internal' ? 'internal' : 'external',
+              methodologyPhaseId: item.methodologyPhaseId || null,
+              deliverableId: item.deliverableId || null,
             })),
           );
           if (revision === itemsSaveRevision.current) setItemsSavedSnapshot(JSON.stringify(itemsDraft));
@@ -285,6 +299,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
     }
   };
 
+  const updateItemFlag = (index: number, patch: Partial<TaskTemplateItem>) => setItemsDraft((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
   const updateItemField = (index: number, field: keyof TaskTemplateItem, value: string) => {
     setItemsDraft((prev) => {
       const next = [...prev];
@@ -329,7 +344,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
   };
 
   return (
-    <Modal title={only === 'templates' ? 'Task Templates' : only === 'copy' ? 'Replace Tasks' : 'Task Copy & WBS Template'} onClose={onClose} width={980} closeOnBackdrop={false} inline={inline}>
+    <Modal title={only === 'templates' ? 'Task Templates' : only === 'copy' ? 'Replace Tasks' : 'Task Copy & WBS Template'} onClose={onClose} width={1180} closeOnBackdrop={false} inline={inline}>
       <div style={{ display: 'grid', gap: 10 }}>
         {!only && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Btn small variant={activeView === 'copy' ? 'primary' : 'ghost'} onClick={() => setActiveView('copy')}>
@@ -482,12 +497,12 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                     {/* Header */}
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: '70px 80px 1fr 70px 80px 32px',
+                      gridTemplateColumns: '64px 64px 1fr 92px 34px 58px 120px 60px 70px 32px',
                       background: C.bg2,
                       height: 32,
                       borderBottom: `1px solid ${C.border}`,
                     }}>
-                      {['WBS', 'Parent WBS', 'Task Name', 'Duration', 'Effort (MD)', ''].map((label) => (
+                      {['WBS', 'Parent', 'Task Name', 'Owner', '◆', 'Internal', 'Methodology', 'Days', 'MD', ''].map((label) => (
                         <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0 6px', fontSize: 11, fontWeight: 700, color: C.text2 }}>
                           {label}
                         </div>
@@ -505,7 +520,7 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                           key={item.id || `draft-${index}`}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '70px 80px 1fr 70px 80px 32px',
+                            gridTemplateColumns: '64px 64px 1fr 92px 34px 58px 120px 60px 70px 32px',
                             height: 36,
                             borderBottom: `1px solid ${C.border}`,
                             background: index % 2 === 1 ? C.bg2 : C.white,
@@ -513,7 +528,22 @@ export default function TaskTemplateModal({ onClose, inline = false, only }: Pro
                         >
                           <input style={cellInput} value={item.wbs} onChange={(e) => updateItemField(index, 'wbs', e.target.value)} />
                           <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}` }} value={item.parentWbs || ''} onChange={(e) => updateItemField(index, 'parentWbs', e.target.value)} />
-                          <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}` }} value={item.taskName} onChange={(e) => updateItemField(index, 'taskName', e.target.value)} />
+                          <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, fontWeight: Number(item.level || 0) < 2 ? 700 : 400, paddingLeft: 6 + Number(item.level || 0) * 12 }} value={item.taskName} onChange={(e) => updateItemField(index, 'taskName', e.target.value)} />
+                          <select aria-label="Owner" value={item.resource || ''} onChange={(e) => updateItemFlag(index, { resource: e.target.value })} disabled={!isAdmin}
+                            style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, padding: '0 2px' }}>
+                            <option value="">—</option><option value="HMC">HMC</option><option value="Customer">Customer</option><option value="Joint">Joint</option>
+                          </select>
+                          <label title="Key milestone" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: `1px solid ${C.border}` }}>
+                            <input type="checkbox" checked={!!item.isMilestone} disabled={!isAdmin} onChange={(e) => updateItemFlag(index, { isMilestone: e.target.checked })} style={{ accentColor: C.primary }} />
+                          </label>
+                          <label title="Internal: never shown to the customer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, borderLeft: `1px solid ${C.border}`, fontSize: 11 }}>
+                            <input type="checkbox" checked={item.visibility === 'internal'} disabled={!isAdmin} onChange={(e) => updateItemFlag(index, { visibility: e.target.checked ? 'internal' : 'external' })} style={{ accentColor: '#B45309' }} />
+                            {item.visibility === 'internal' ? '🔒' : ''}
+                          </label>
+                          <div title={item.methodologyPhaseId ? 'Phase gate links to this task' : item.deliverableId ? 'Deliverable produced by this task' : ''}
+                            style={{ display: 'flex', alignItems: 'center', padding: '0 6px', borderLeft: `1px solid ${C.border}`, fontSize: 10.5, color: item.methodologyPhaseId ? C.primary : '#047857', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.methodologyPhaseId ? `Phase · ${methodNames.phases[item.methodologyPhaseId] || '…'}` : item.deliverableId ? `📄 ${methodNames.deliverables[item.deliverableId] || '…'}` : ''}
+                          </div>
                           <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, textAlign: 'right' }} type="number" value={item.duration || 0} onChange={(e) => updateItemField(index, 'duration', e.target.value)} />
                           <input style={{ ...cellInput, borderLeft: `1px solid ${C.border}`, textAlign: 'right' }} type="number" value={item.effortManday || 0} onChange={(e) => updateItemField(index, 'effortManday', e.target.value)} />
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: `1px solid ${C.border}` }}>

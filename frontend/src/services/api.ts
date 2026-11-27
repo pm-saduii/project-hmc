@@ -1325,7 +1325,27 @@ type UpsertTemplateItem = {
   taskName: string;
   duration: number;
   effortManday: number;
+  resource?: string;
+  isMilestone?: boolean;
+  visibility?: 'external' | 'internal';
+  methodologyPhaseId?: string | null;
+  deliverableId?: string | null;
 };
+const templateExtras = (item: UpsertTemplateItem) => ({
+  resource: String(item.resource || '').trim(),
+  is_milestone: !!item.isMilestone,
+  visibility: item.visibility === 'internal' ? 'internal' : 'external',
+  methodology_phase_id: item.methodologyPhaseId || null,
+  deliverable_id: item.deliverableId || null,
+});
+/** Template owner (HMC / Customer / Joint) → the task's resource in a project. */
+function resourceForProject(owner: string, customerTag: string): string {
+  const o = owner.trim().toLowerCase();
+  const cust = customerTag || 'Customer';
+  if (o === 'customer' || o === 'client') return cust;
+  if (o === 'joint') return `HMC,${cust}`;
+  return owner.trim();
+}
 
 async function ensureAdminRole(): Promise<string> {
   const { role, userId } = await getCurrentUserRoleAndId();
@@ -1376,6 +1396,8 @@ export const taskTemplateApi = {
       task_name: t.taskName || '',
       duration: Number(t.duration || 0),
       effort_manday: normalizeEffortManday(t.effortManday),
+      is_milestone: !!t.isMilestone,
+      visibility: t.visibility === 'internal' ? 'internal' : 'external',
     }));
 
     const { error: itemErr } = await supabase.from('task_template_items').insert(items);
@@ -1410,6 +1432,7 @@ export const taskTemplateApi = {
         task_name: String(item.taskName || '').trim(),
         duration: Math.max(0, Number(item.duration || 0)),
         effort_manday: normalizeEffortManday(item.effortManday),
+        ...templateExtras(item),
       }));
 
     const { error: deleteErr } = await supabase
@@ -1448,6 +1471,8 @@ export const taskTemplateApi = {
 
     const items = rowsToObjs<TaskTemplateItem>(itemRows || []);
     if (!items.length) throw new Error('TEMPLATE_HAS_NO_ITEMS');
+    const { data: projRow } = await supabase.from('projects').select('customer_abbreviation').eq('id', targetProjectId).maybeSingle();
+    const customerTag = String((projRow as { customer_abbreviation?: string } | null)?.customer_abbreviation || '');
 
     const sorted = [...items].sort((a, b) => {
       const levelDiff = Number(a.level || 0) - Number(b.level || 0);
@@ -1477,18 +1502,33 @@ export const taskTemplateApi = {
         duration: Math.max(0, Number(item.duration || 0)),
         percentComplete: 0,
         status: 'Todo',
-        resource: '',
+        resource: resourceForProject(String(item.resource || ''), customerTag),
         relatedTask: '',
         relatedTaskType: 'FS',
         relatedTaskLagDays: 0,
         parentId: parentId === id ? '' : parentId,
         level: Number(item.level || 0),
         sortOrder: Number(item.sortOrder || 0),
+        isMilestone: !!item.isMilestone,
+        visibility: item.visibility === 'internal' ? 'internal' : 'external',
       } as Record<string, unknown>);
     });
 
     breakParentCycles(payloads);
     await replaceProjectTasks(targetProjectId, payloads);
+
+    // Methodology: link each deliverable to the task that produces it, and each phase gate to its phase task.
+    const idOfItem = (item: TaskTemplateItem) => String(payloads[sorted.indexOf(item)]?.id || '');
+    const delLinks = sorted.filter((i) => i.deliverableId).map((i) => ({ project_id: targetProjectId, deliverable_id: i.deliverableId, task_id: idOfItem(i) }));
+    const gateLinks = sorted.filter((i) => i.methodologyPhaseId).map((i) => ({ project_id: targetProjectId, phase_id: i.methodologyPhaseId, task_id: idOfItem(i) }));
+    if (delLinks.length) {
+      const { error } = await supabase.from('project_deliverables').upsert(delLinks, { onConflict: 'project_id,deliverable_id' });
+      if (error) console.warn('Template: could not link deliverables', error.message);
+    }
+    if (gateLinks.length) {
+      const { error } = await supabase.from('project_phase_gates').upsert(gateLinks, { onConflict: 'project_id,phase_id' });
+      if (error) console.warn('Template: could not link phase gates', error.message);
+    }
     return { data: await recalcAndPersistProject(targetProjectId) };
   },
 };
