@@ -142,7 +142,23 @@
     // rationale
     var ry = y0 + ch + 0.12;
     // project summary (written by the PM) + assessment rationale
-    var sumL = (P.projectSummary || []).slice(0, 4), rh = sumL.length ? 0.42 + 0.21 * sumL.length + (P.rationale ? 0.22 : 0) : 0.56;
+    var exS = P.execSummary ? cut(P.execSummary, 620) : "", exP = (P.summaryPoints || []).slice(0, 3);
+    var sumL = exS || exP.length ? [] : (P.projectSummary || []).slice(0, 4), rh;
+    if (exS || exP.length) {
+      var exL = exS ? Math.min(4, Math.ceil(exS.length / 190)) : 0;
+      rh = Math.min(1.85, 0.42 + 0.19 * exL + (exP.length ? 0.26 + 0.2 * exP.length : 0));
+      card(s2, 0.5, ry, W - 1.0, rh, "Executive summary"); cardTitle(s2, 0.5, ry, W - 1.0, "Executive summary", K_.navy2);
+      var er = [];
+      if (exS) er.push({ text: exS, options: { breakLine: exP.length > 0, paraSpaceAfter: 4 } });
+      if (exP.length) er.push({ text: "KEY HIGHLIGHTS & ATTENTION REQUIRED", options: { fontSize: 8.5, bold: true, color: K_.mut, charSpacing: 1, breakLine: true } });
+      exP.forEach(function (x, i) {
+        var col = /attention|depend|risk|decision/i.test(x.label) ? K_.late : /progress|current/i.test(x.label) ? K_.ok : K_.blue;
+        if (x.label) er.push({ text: x.label + ": ", options: { bold: true, color: col, bullet: { indent: 12 } } });
+        er.push({ text: cut(x.text, 150), options: x.label ? { breakLine: i < exP.length - 1 } : { bullet: { indent: 12 }, breakLine: i < exP.length - 1 } });
+      });
+      s2.addText(er, { x: 0.7, y: ry + 0.38, w: W - 1.4, h: rh - 0.42, fontSize: 10, color: K_.ink, valign: "top", margin: 0, isTextBox: true });
+    } else {
+    rh = sumL.length ? 0.42 + 0.21 * sumL.length + (P.rationale ? 0.22 : 0) : 0.56;
     card(s2, 0.5, ry, W - 1.0, rh, sumL.length ? "Project summary" : "Assessment rationale");
     if (sumL.length) {
       cardTitle(s2, 0.5, ry, W - 1.0, "Project summary", K_.navy2);
@@ -151,6 +167,7 @@
       s2.addText(runs, { x: 0.7, y: ry + 0.38, w: W - 1.4, h: rh - 0.42, fontSize: 10, color: K_.ink, valign: "top", margin: 0, isTextBox: true });
     } else s2.addText(cut(P.rationale || (P.placeholder ? "Assessment Rationale – สรุปภาพรวมโครงการและเหตุผลของสถานะ 2–3 บรรทัด" : "–"), 300),
       { x: 0.7, y: ry + 0.03, w: W - 1.4, h: 0.5, fontSize: 10, color: K_.slate, italic: !P.rationale, valign: "middle", margin: 0, isTextBox: true });
+    }
     // three columns
     var vis = function (x) { return internal || x.vis !== "Internal"; };
     var acc = M.highlights.filter(function (x) { return x.type === "Accomplishment" && vis(x); });

@@ -758,7 +758,12 @@
       STATUS.map(function (s) { return cnt[s] ? '<span class="' + SCLASS[s] + '" style="flex:' + cnt[s] + '"></span>' : ""; }).join("") +
       '</div><div class="hleg">' + STATUS.map(function (s) { return cnt[s] ? "<span>" + dot(s) + "<b>" + cnt[s] + "</b> " + s + "</span>" : ""; }).join("") + "</div></div></div>";
     // project summary (written by the PM)
-    if (P.projectSummary && P.projectSummary.length) h += '<div class="card">' + title("Project summary") + '<ul class="ll">' +
+    if (P.execSummary || (P.summaryPoints && P.summaryPoints.length)) {
+      var ptCls = function (l) { return /attention|depend|risk|decision/i.test(l) ? "c-late" : /progress|current/i.test(l) ? "c-ok" : /achiev|complet/i.test(l) ? "c-done" : ""; };
+      h += '<div class="card es">' + title("Executive summary") + (P.execSummary ? '<p class="es-p">' + esc(P.execSummary) + "</p>" : "") +
+        (P.summaryPoints && P.summaryPoints.length ? '<div class="es-h">Key highlights &amp; attention required</div><div class="es-pts">' +
+          P.summaryPoints.map(function (x) { return '<div class="es-pt ' + ptCls(x.label) + '">' + (x.label ? "<b>" + esc(x.label) + "</b>" : "") + "<span>" + esc(x.text) + "</span></div>"; }).join("") + "</div>" : "") + "</div>";
+    } else if (P.projectSummary && P.projectSummary.length) h += '<div class="card">' + title("Project summary") + '<ul class="ll">' +
       P.projectSummary.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul></div>";
     // rationale
     if (P.rationale) h += '<div class="rat" title="คลิกเพื่อดูข้อความทั้งหมด" onclick="this.classList.toggle(\'xp\')"><div class="clamp">' + esc(P.rationale) + "</div></div>";
@@ -1866,6 +1871,10 @@
     ".st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--navy);background:var(--sky);margin:0 -16px 10px;padding:8px 16px;border-left:4px solid var(--navy2)}",
     ".st.c-done{border-color:var(--done)}.st.c-ok{border-color:var(--ok)}.st.c-late{border-color:var(--late)}",
     ".cnt{font-weight:700;color:#fff;background:var(--navy2);border-radius:999px;padding:1px 8px;letter-spacing:0;text-transform:none;margin-left:6px;font-size:10.5px}",
+    ".es-p{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink)}.es-h{margin:10px 0 6px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}" +
+    ".es-pts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.es-pt{border-left:3px solid var(--navy2);background:#f6f8fb;border-radius:0 6px 6px 0;padding:6px 10px;font-size:11.5px;line-height:1.45}" +
+    ".es-pt b{display:block;font-size:10px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px;color:var(--navy2)}.es-pt.c-done{border-color:#2f6fde}.es-pt.c-done b{color:#2f6fde}" +
+    ".es-pt.c-ok{border-color:#2e9e6b}.es-pt.c-ok b{color:#2e9e6b}.es-pt.c-late{border-color:#d64545}.es-pt.c-late b{color:#d64545}" +
     "ul.ll{margin:0;padding:0;list-style:none}ul.ll li{position:relative;margin:0 0 7px;padding-left:16px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}",
     "ul.ll li:before{content:'';position:absolute;left:2px;top:6px;width:6px;height:6px;border-radius:2px;background:var(--navy2)}",
     "ul.att,ul.al{margin:0;padding:0;list-style:none}ul.att li{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}ul.att .dot{margin-top:4px;flex:none}",

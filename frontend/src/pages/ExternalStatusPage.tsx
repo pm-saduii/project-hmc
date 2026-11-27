@@ -300,8 +300,9 @@ function EditReport({ record, period, busy, suggestion, onClose, onSave }: { rec
             {['On Track', 'At Risk', 'Delayed', 'Completed', 'Not Started'].map((s) => <option key={s} value={s}>{s}</option>)}
           </select></label>
       </div>
-      <label style={fieldLabel}>{head('projectSummary', 'Project summary')}<textarea rows={4} value={f.projectSummary || ''} onChange={(e) => set('projectSummary', e.target.value)} style={area} placeholder="One point per line: scope, where the project stands, what is next" />
-        <span style={hint}>Shown on the summary page of the report (up to 4 points on the slide).</span></label>
+      <label style={fieldLabel}>{head('projectSummary', 'Project summary')}<textarea rows={9} value={f.projectSummary || ''} onChange={(e) => set('projectSummary', e.target.value)} style={area}
+          placeholder={'Part 1 · Executive summary (3–5 sentences): status, progress vs plan, key achievements, current work, dependencies/risks, next focus\n\nPart 2 · Key highlights & attention required, one per line:\nAchieved: …\nIn progress: …\nAttention required: …'} />
+        <span style={hint}>Paragraph = Executive summary. Lines starting with "Achieved:", "In progress:", "Attention required:" (or "- ") = Key highlights &amp; attention required (up to 3 on the slide).</span></label>
       <label style={fieldLabel}>{head('rationale', 'Assessment rationale')}<textarea rows={3} value={f.rationale || ''} onChange={(e) => set('rationale', e.target.value)} style={area} placeholder="2–3 lines: the overall picture and why the status is what it is" /></label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <label style={fieldLabel}>{head('accomplishments', 'Key accomplishments')}<textarea rows={6} value={f.accomplishments || ''} onChange={(e) => set('accomplishments', e.target.value)} style={area} placeholder="One per line" />

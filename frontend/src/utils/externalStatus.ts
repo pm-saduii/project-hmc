@@ -207,7 +207,7 @@ export function computeModel(psr: PsrApi, input: ExternalInput): PsrModel {
   const auto: Rag = ov >= 1 ? 'Completed' : pl - ov > 2 * TOL ? 'Delayed' : pl - ov > TOL ? 'At Risk' : ov === 0 ? 'Not Started' : 'On Track';
   const override = String(input.record?.overallStatus || '');
   Object.assign(M.P, { overall: ov, overallPlanned: pl, overallAuto: auto, overallStatus: (STATUS as readonly string[]).includes(override) ? override : auto,
-    projectSummary: lines(String(input.record?.projectSummary || '')) });
+    projectSummary: lines(String(input.record?.projectSummary || '')), ...splitSummary(String(input.record?.projectSummary || '')) });
   // Key milestones: progress from the linked task (or billed/paid = done)
   M.milestones.forEach((m) => {
     if (!m.key) return;
@@ -278,6 +278,26 @@ function chartData(input: ExternalInput, M: PsrModel, rd: number, rdDate: Date, 
 
 
 /* ── Auto text for the editable fields ─────────────────────────────────── */
+const POINT_RE = /^\s*(?:[-•*]\s*)?(achieved|completed|in progress|work in progress|current activities|attention required|attention|dependencies|dependency|risks?|decision required|management focus|next steps?)\s*:\s*(.+)$/i;
+const PART_HEAD_RE = /^\s*(part\s*\d+\s*[:\-–]?\s*)?(executive summary|key highlights?( & | and )attention required)\s*:?\s*$/i;
+/**
+ * Project summary text → Part 1 "Executive summary" (the paragraph) and Part 2 "Key highlights & attention required"
+ * (lines "Achieved: …", "In progress: …", "Attention required: …", or any "- " bullet).
+ */
+export function splitSummary(text: string): { execSummary: string; summaryPoints: { label: string; text: string }[] } {
+  const para: string[] = []; const points: { label: string; text: string }[] = [];
+  text.split('\n').forEach((raw) => {
+    const l = raw.trim();
+    if (!l || PART_HEAD_RE.test(l)) return;
+    const m = l.match(POINT_RE);
+    if (m) { points.push({ label: m[1].replace(/^\w/, (c) => c.toUpperCase()), text: m[2].trim() }); return; }
+    if (/^[-•*]\s+/.test(l)) { points.push({ label: '', text: l.replace(/^[-•*]\s+/, '') }); return; }
+    para.push(l);
+  });
+  return { execSummary: para.join(' '), summaryPoints: points };
+}
+const joinList = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
 export interface SuggestedText { projectSummary: string; rationale: string; accomplishments: string; nextSteps: string }
 
 /** Draft text for the four fields, written from the project's numbers (the PM edits it; saved text always wins). */
@@ -302,13 +322,46 @@ export function suggestText(psr: PsrApi, input: ExternalInput): SuggestedText {
   const blocked = openIssues.filter((i) => i.status === 'Blocked');
   const { project } = input;
 
-  const summary = [
-    `${project.name}${project.client ? ` for ${project.client}` : ''}: ${d(dayOf(project.startDate)) || '—'} – ${d(dayOf(project.endDate)) || '—'}`,
-    `Overall progress ${act}% against ${plan}% planned (${status || '—'})${input.phaseName ? `; current stage: ${input.phaseName}` : ''}`,
-    doneP.length ? `Completed: ${doneP.map((p) => p.name).join(', ')}` : '',
-    nowP.length ? `In progress: ${nowP.map((p) => `${p.name} ${pct(p.pct)}%`).join(', ')}` : '',
-    nextP ? `Next: ${nextP.name} from ${d(nextP.start)}` : nextMs ? `Next: ${nextMs.name} by ${d(nextMs.end)}` : '',
+  // Part 1 · Executive summary: status → progress → achievements → current work → dependencies/risks → next focus
+  const leavesNow = input.tasks.filter((t) => !input.tasks.some((k) => k.parentId === t.id))
+    .filter((t) => !isDone(t) && dayOf(t.startDate) != null && Number(dayOf(t.startDate)) <= rd && (Number(t.percentComplete) || 0) > 0)
+    .sort((x, y) => String(x.endDate).localeCompare(String(y.endDate)));
+  const doing = (leavesNow.length ? leavesNow.map((t) => t.taskName) : nowP.map((p) => String(p.name))).filter(Boolean).slice(0, 2);
+  const hlAcc = (raw.highlights as { type: string; text: string }[]).filter((h) => h.type === 'Accomplishment').map((h) => h.text);
+  const standing = status === 'Completed' ? 'has been completed'
+    : gap >= 5 ? 'is currently ahead of the planned schedule'
+    : status === 'Delayed' ? `is currently behind the planned schedule (plan ${plan}%)`
+    : status === 'At Risk' ? `is slightly behind the plan (${plan}%) and is being closely monitored`
+    : status === 'Not Started' ? 'has not started yet' : 'is currently on track against the planned schedule';
+  const readyFor = nextP ? ` to ensure readiness for the upcoming ${nextP.name} phase` : nextMs ? ` towards ${nextMs.name}` : '';
+  const extIssues = openIssues.filter((i) => i.visibility !== 'Internal');
+  const extRisks = input.risks.filter((r) => r.status !== 'Closed' && r.visibility !== 'Internal')
+    .sort((x, y) => ({ High: 0, Medium: 1, Low: 2 }[x.impact] - { High: 0, Medium: 1, Low: 2 }[y.impact]));
+  const dep = [...extIssues.filter((i) => i.status === 'Blocked'), ...extIssues.filter((i) => i.status !== 'Blocked')][0];
+  const risk = extRisks[0];
+  const nextTarget = nextP ? `the next phase of ${nextP.name}` : nextMs ? nextMs.name : 'the next phase';
+  const para = [
+    status === 'Completed' ? `The project has been completed with ${act}% overall progress.` : `The project has achieved ${act}% overall progress and ${standing}.`,
+    hlAcc.length ? `Key work completed in this period includes ${joinList(hlAcc.slice(0, 2))}.` : doneP.length ? `${joinList(doneP.map((p) => String(p.name)))} ${doneP.length > 1 ? 'have' : 'has'} been completed.` : '',
+    doing.length ? `The team is progressing with ${joinList(doing)}${readyFor}.` : '',
+    dep ? `In parallel, the project team is working with ${dep.assignedTo || 'the customer'} on ${dep.title.replace(/\.$/, '')}, which is a key dependency for ${nextTarget}.`
+      : risk ? `The team is monitoring ${risk.title.replace(/\.$/, '')}, which may affect ${nextTarget}.` : '',
+    nextMs ? `The next key milestone is ${nextMs.name}, targeted for ${d(nextMs.end)}.` : '',
   ].filter(Boolean);
+  // Part 2 · Key highlights & attention required
+  const attention = [
+    ...lateMs.slice(0, 2).map((m) => `${m.name} is past its target date (${d(m.end)})`),
+    ...behind.slice(0, 1).map((p) => `${p.name} is ${pct(p.pct)}% against ${pct(p.planned)}% planned`),
+    ...extIssues.filter((i) => i.steering === 'Decision').slice(0, 1).map((i) => `decision needed: ${i.steeringAsk || i.title}`),
+    ...(dep ? [`${dep.title}${dep.dueDate ? ` (due ${d(dayOf(dep.dueDate))})` : ''}`] : []),
+  ];
+  const summary = [
+    para.join(' '),
+    '',
+    `Achieved: ${hlAcc.length ? joinList(hlAcc.slice(0, 3)) : doneP.length ? joinList(doneP.map((p) => String(p.name))) : 'no major item completed in this period'}`,
+    `In progress: ${doing.length ? joinList([...doing, ...nowP.map((p) => `${p.name} phase (${pct(p.pct)}%)`)].slice(0, 3)) : 'no work in progress'}`,
+    `Attention required: ${attention.length ? attention.slice(0, 2).join('; ') : 'none at this stage'}`,
+  ];
 
   const why = [
     gap === 0 ? `Overall progress is ${act}%, on plan.` : `Overall progress is ${act}% against ${plan}% planned (${gap > 0 ? '+' : ''}${gap} pts).`,
