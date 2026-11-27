@@ -1,7 +1,5 @@
 import { format } from 'date-fns';
-import { projectChecklistApi } from '../services/api';
-import { currentPhase, hasGate, methodologyApi } from '../services/methodology';
-import { PROJECT_CHECKLIST_STAGES } from './projectChecklist';
+import { currentPhase, hasGate, isComplete, methodologyApi } from '../services/methodology';
 import { computeModel, loadEngine, type ExternalInput } from './externalStatus';
 import type { MonthlyReportData } from './monthlyReport';
 
@@ -22,24 +20,23 @@ export async function timelineExtras(input: Omit<ExternalInput, 'period' | 'reco
   return { phasePlan: { phases }, progressChart: (M.chart as MonthlyReportData['progressChart']) || undefined };
 }
 
-/** Methodology phases with the project checklist topics of each stage (stage n = phase n in order). */
+/** Methodology phases with their steps, marked as on the Deliverables board (done / current / upcoming). */
 export async function stageExtras(projectId: string): Promise<Extras> {
-  const [m, st, topics, progress] = await Promise.all([
-    methodologyApi.load(), methodologyApi.projectState(projectId),
-    projectChecklistApi.getTopics().catch(() => []), projectChecklistApi.getProgress(projectId).catch(() => ({})),
-  ]);
+  const [m, st] = await Promise.all([methodologyApi.load(), methodologyApi.projectState(projectId)]);
   const phases = m.phases.filter((p) => p.active).sort((a, b) => a.sortOrder - b.sortOrder);
   if (!phases.length) return {};
   const now = currentPhase(phases, st.gates);
   const nowIndex = now ? phases.findIndex((p) => p.id === now.id) : phases.length;
   const passed = new Set(st.gates.filter((g) => g.status === 'passed').map((g) => g.phaseId));
   const stages = phases.map((p, i) => {
-    const stageId = PROJECT_CHECKLIST_STAGES[i]?.id;
-    const items = stageId ? topics.filter((t) => t.stage === stageId && t.category === 'project').sort((a, b) => a.orderNo - b.orderNo).map((t) => {
-      const pr = (progress as Record<string, { done: boolean; notRequired: boolean }>)[t.id];
-      return { title: t.title, state: (pr?.notRequired ? 'na' : pr?.done ? 'done' : 'open') as 'done' | 'open' | 'na' };
-    }) : [];
-    const dels = m.deliverables.filter((x) => x.active && x.phaseId === p.id).map((x) => st.deliverables.find((y) => y.deliverableId === x.id)?.status || 'planned')
+    const statusOf = (deliverableId: string) => st.deliverables.find((y) => y.deliverableId === deliverableId)?.status || 'planned';
+    const items = m.steps.filter((s) => s.phaseId === p.id).sort((a, b) => a.sortOrder - b.sortOrder).map((s) => {
+      const list = m.deliverables.filter((d) => d.active && d.stepId === s.id).map((d) => statusOf(d.id));
+      const state: 'done' | 'current' | 'upcoming' = passed.has(p.id) || (list.length > 0 && list.every(isComplete)) ? 'done'
+        : now?.id === p.id || list.some((x) => x !== 'planned') ? 'current' : 'upcoming';
+      return { title: s.name, state };
+    });
+    const dels = m.deliverables.filter((x) => x.active && x.phaseId === p.id).map((x) => statusOf(x.id))
       .filter((s) => s !== 'not_required');
     return {
       name: p.name, icon: p.icon || '', color: p.color || '',

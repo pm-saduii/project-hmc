@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Circle, MinusCircle } from 'lucide-react';
+import { CheckCircle2, Circle, CircleDot, MinusCircle } from 'lucide-react';
 import { addMonths, differenceInCalendarDays, format, isValid, parseISO, startOfMonth } from 'date-fns';
 import { C } from '../Common';
 import { PhaseIconBadge } from '../Methodology/MethodBoard';
@@ -173,12 +173,12 @@ export function ProgressOverview({ chart }: { chart: NonNullable<MonthlyReportDa
 /* ── Methodology stages with the project checklist of each stage ─────── */
 export function MethodologyStages({ stages, asOf, startDate }: { stages: NonNullable<MonthlyReportData['stages']>; asOf: string; startDate: string }) {
   const days = toDate(startDate) && toDate(asOf) ? differenceInCalendarDays(toDate(asOf)!, toDate(startDate)!) : null;
-  const LIM = 8;
+  const LIM = 12;
   return (
     <section style={card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <h3 style={h3}>Progress by methodology stage</h3>
-        <span style={{ fontSize: 11, color: C.text3 }}>Project checklist of each stage{days != null && days >= 0 ? ` · day ${days + 1} since project start (${dmy(startDate)})` : ''}</span>
+        <span style={{ fontSize: 11, color: C.text3 }}>Methodology steps of each stage{days != null && days >= 0 ? ` · day ${days + 1} since project start (${dmy(startDate)})` : ''}</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
         {stages.map((st, i) => {
@@ -197,15 +197,15 @@ export function MethodologyStages({ stages, asOf, startDate }: { stages: NonNull
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg2, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${pct}%`, background: st.state === 'passed' ? C.green : C.primary }} /></span>
-                <span style={{ fontSize: 10.5, color: C.text2, whiteSpace: 'nowrap' }}>{done}/{total} checklist</span>
+                <span style={{ fontSize: 10.5, color: C.text2, whiteSpace: 'nowrap' }}>{done}/{total} steps</span>
               </div>
               {st.deliverablesTotal > 0 && <div style={{ fontSize: 10.5, color: C.text2 }}>Deliverables {st.deliverablesDone}/{st.deliverablesTotal}</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {st.items.length === 0 && <span style={{ fontSize: 11, color: C.text3 }}>No checklist topics</span>}
+                {st.items.length === 0 && <span style={{ fontSize: 11, color: C.text3 }}>No steps</span>}
                 {st.items.slice(0, LIM).map((it, k) => (
-                  <div key={k} style={{ display: 'flex', gap: 5, alignItems: 'flex-start', fontSize: 11, lineHeight: 1.35, color: it.state === 'na' ? C.text3 : C.text, textDecoration: it.state === 'na' ? 'line-through' : 'none' }}>
+                  <div key={k} style={{ display: 'flex', gap: 5, alignItems: 'flex-start', fontSize: 12, lineHeight: 1.35, color: it.state === 'na' ? C.text3 : it.state === 'upcoming' ? C.text2 : C.text, textDecoration: it.state === 'na' ? 'line-through' : 'none' }}>
                     <span style={{ flexShrink: 0, marginTop: 1, display: 'inline-flex' }}>
-                      {it.state === 'done' ? <CheckCircle2 size={12} color="#047857" /> : it.state === 'na' ? <MinusCircle size={12} color={C.text3} /> : <Circle size={12} color={C.text3} />}
+                      {it.state === 'done' ? <CheckCircle2 size={12} color="#047857" /> : it.state === 'current' ? <CircleDot size={12} color={C.primary} /> : it.state === 'na' ? <MinusCircle size={12} color={C.text3} /> : <Circle size={12} color={C.text3} />}
                     </span>
                     <span>{it.title}</span>
                   </div>

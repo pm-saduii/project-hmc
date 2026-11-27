@@ -58,7 +58,8 @@ export interface MonthlyReportData {
   /** Methodology stages with the project checklist of each stage. */
   stages?: { name: string; icon: string; color: string; state: 'passed' | 'current' | 'upcoming'; noGate: boolean;
     deliverablesDone: number; deliverablesTotal: number;
-    items: { title: string; state: 'done' | 'open' | 'na' }[] }[];
+    /** Methodology steps of the stage (older published reports: checklist topics with 'open' / 'na'). */
+    items: { title: string; state: 'done' | 'current' | 'upcoming' | 'open' | 'na' }[] }[];
 }
 
 export interface ReportInputs {
