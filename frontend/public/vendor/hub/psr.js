@@ -708,15 +708,29 @@
   }
   function xtra(html, i, lim) { return i < lim ? html : html.replace(/^<(li|tr)/, '<$1 class="xtra"').replace('<li class="xtra" class="', '<li class="xtra '); }
 
+  // Page header (same as the slides): title + "Client | Update · date" on the left;
+  // client logo · HUMANICA logo on the right with the Project Manager under them.
+  function logos(P) {
+    var vendor = /humanica/i.test(P.vendor || "HUMANICA") ? '<img class="hlogo r" src="' + BRAND.hw + '" alt="HUMANICA">' : '<div class="vendor">' + esc(P.vendor) + "</div>";
+    return '<div class="rh-logos">' + (P.logo ? '<span class="clogo-box"><img src="' + esc(P.logo) + '" alt="' + esc(P.client) + '"></span>' : "") + vendor + "</div>";
+  }
   function header(M, mode, pageTitle) {
     var P = Object.assign({}, M.P), ph = M.P.placeholder;
-    if (ph) { P.name = P.name || "Project Name"; P.client = P.client || "Client Name"; P.lead = P.lead || "Project Lead"; P.model = P.model || "Model"; }
-    return '<header class="rh"><div class="rh-l">' + (/humanica/i.test(P.vendor || "HUMANICA") ? '<img class="hlogo" src="' + BRAND.hw + '" alt="HUMANICA">' : '<div class="vendor">' + esc(P.vendor) + "</div>") +
-      '<div class="rh-tt"><h1>' + esc(pageTitle) + '</h1>' +
-      '<div class="sub">' + esc(P.name) + " · " + esc(P.title) + " · <b>" + fmtD(P.rd) + "</b></div></div></div>" +
-      '<div class="rh-r">' + (P.logo ? '<img class="clogo" src="' + esc(P.logo) + '" alt="' + esc(P.client) + '">' : '<div class="clogo ph">CLIENT LOGO</div>') + '<div class="badge ' + (mode === "internal" ? "b-int" : "b-ext") + '">' +
-      (mode === "internal" ? "INTERNAL · CONFIDENTIAL" : "EXTERNAL") + '</div><div class="meta">' + esc(P.client) +
-      "<br>Project Lead <b>" + esc(P.lead) + "</b> · " + esc(P.model) + " · " + esc(P.phase) + "</div></div></header>";
+    if (ph) { P.name = P.name || "Project Name"; P.client = P.client || "Client Name"; P.lead = P.lead || "Project Manager"; }
+    return '<header class="rh"><div class="rh-l"><div class="rh-tt"><h1>' + esc(pageTitle) + '</h1>' +
+      '<div class="sub">' + esc(P.client || P.name) + " &nbsp;|&nbsp; Update · <b>" + fmtD(P.rd) + "</b></div></div></div>" +
+      '<div class="rh-rr">' + logos(P) + '<div class="rh-pm">' + (mode === "internal" ? '<span class="badge b-int">INTERNAL · CONFIDENTIAL</span> ' : "") +
+      "Project Manager: <b>" + esc(P.lead || "–") + "</b></div></div></header>";
+  }
+  // Cover page (same as the first slide)
+  function pageCover(M, mode) {
+    var P = M.P;
+    return '<section class="page cover">' +
+      '<div class="cv-top">' + (mode === "internal" ? '<span class="badge b-int">INTERNAL · CONFIDENTIAL</span>' : "<span></span>") + logos(P) + "</div>" +
+      '<div class="cv-mid"><h1>Project Progress Status</h1><div class="cv-client">' + esc(P.client || P.name) + '</div><div class="cv-date">Update · ' + fmtD(P.rd) + "</div></div>" +
+      '<div class="cv-bot"><div><div class="cv-k">OVERALL STATUS</div><div class="cv-row"><span class="cv-st ' + (SCLASS[P.overallStatus] || "s-ns") + '">' + esc(P.overallStatus) + "</span>" +
+      '<span class="cv-prog">Progress <b>' + fmtP(P.overall) + "</b> &nbsp;·&nbsp; Plan " + fmtP(P.overallPlanned) + "</span></div></div>" +
+      '<div class="cv-pm">Project Manager : <b>' + esc(P.lead || "–") + "</b></div></div></section>";
   }
   function footer(M, mode, n) {
     return '<footer class="rf"><div class="leg">' + STATUS.map(function (s) { return dot(s) + s; }).join("") +
@@ -1802,13 +1816,13 @@
     if (mode === "docs") return renderDocs(M);
     mode = mode === "internal" ? "internal" : "external";
     // order: summary · upcoming activities · steering · timeline · progress overview (charts) · key milestones
-    var pages = [pageSummary, pageCalendar];
+    var pages = [pageCover, pageSummary, pageCalendar];
     if (steerItems(M, mode).length) pages.push(pageSteering);
     pages.push(pageTimeline);
     if (M.chart) pages.push(pageProgress);
     pages.push(pageMilestones);
     if (mode === "internal") pages.push(pageBilling, pageActivities);
-    return '<div class="psr ' + mode + '">' + pages.map(function (f, i) { return f(M, mode, i + 1); }).join("") + "</div>";
+    return '<div class="psr ' + mode + '">' + pages.map(function (f, i) { return f(M, mode, i + 1); }).join("") + "</div>";   // page 1 = cover
   }
 
   // Poppins (Latin subset, embedded) · Thai falls back to Kanit (Google Fonts when online) → Thonburi / Leelawadee UI
@@ -2132,6 +2146,17 @@
     ".cr-m{display:grid;grid-template-columns:1fr 62px 72px;gap:6px;font-size:9px;line-height:1.55}.cr-m em{font-style:normal;color:var(--ks)}.cr-m b{text-align:right;color:var(--kb2)}.cr-m.na b{color:var(--ks);font-weight:400}",
     ".cr-box.chk{flex:1;overflow:hidden}.cr-c{font-size:9.5px;line-height:1.4;margin-bottom:3px}.cr-c.warn{color:#b45309;font-weight:600}.cr-c.ok{color:#1d7a4f}.cr-c.info{color:var(--kg)}",
     "@media print{body{background:#fff!important;padding:0!important}.page{box-shadow:none;margin:0;min-height:0;width:auto;padding:0 18px 10px;gap:12px;zoom:var(--fit,1)}.rh{margin:0 -18px;padding:14px 18px}.noprint{display:none!important}tr,.tl-row,.card li,.la-r{break-inside:avoid}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}"
+,
+    ".rh-rr{display:flex;flex-direction:column;align-items:flex-end;gap:7px}.rh-logos{display:flex;align-items:center;gap:16px}" +
+    ".clogo-box{display:flex;align-items:center;justify-content:center;background:#fff;border-radius:7px;padding:5px 12px;height:46px}.clogo-box img{max-height:36px;max-width:150px;display:block}" +
+    ".hlogo.r{padding:0 0 0 16px;border-right:0;border-left:1px solid rgba(255,255,255,.25);height:22px}.rh-logos .hlogo.r:first-child{padding-left:0;border-left:0}" +
+    ".rh-pm{font-size:11.5px;color:#b9cbe4;white-space:nowrap}.rh-pm b{color:#fff;font-weight:600}.rh-pm .badge{margin-right:8px}" +
+    ".page.cover{background:linear-gradient(115deg,#0f2a4a 0%,#163a66 62%,#1b4f8f 100%);color:#fff;padding:44px 60px;justify-content:space-between;gap:0}" +
+    ".cv-top{display:flex;justify-content:space-between;align-items:center}.cv-top .clogo-box{height:70px;padding:8px 18px}.cv-top .clogo-box img{max-height:54px;max-width:200px}.cv-top .hlogo.r{height:30px}" +
+    ".cv-mid h1{margin:0 0 10px;font-size:54px;font-weight:700;letter-spacing:-.01em;color:#fff}.cv-client{font-size:24px;font-weight:700;color:#fff}.cv-date{font-size:24px;color:#b9cbe4;margin-top:4px}" +
+    ".cv-bot{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}.cv-k{font-size:12px;font-weight:700;letter-spacing:.22em;color:#8fb4e8;margin-bottom:10px}" +
+    ".cv-row{display:flex;align-items:center;gap:28px}.cv-st{display:inline-block;min-width:200px;text-align:center;padding:12px 26px;border-radius:14px;font-size:24px;font-weight:700;color:#fff}" +
+    ".cv-prog{font-size:22px;color:#8fb4e8}.cv-prog b{color:#fff}.cv-pm{font-size:18px;color:#8fb4e8}.cv-pm b{color:#fff;font-weight:600}"
   ].join("\n");
 
   var FIT_JS = "function psrFit(){var P=document.querySelectorAll('.psr .page');for(var i=0;i<P.length;i++){var p=P[i];p.style.removeProperty('--fit');" +
