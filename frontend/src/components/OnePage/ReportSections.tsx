@@ -180,7 +180,7 @@ export function MethodologyStages({ stages, asOf, startDate }: { stages: NonNull
         <h3 style={h3}>Progress by methodology stage</h3>
         <span style={{ fontSize: 11, color: C.text3 }}>Project checklist of each stage{days != null && days >= 0 ? ` · day ${days + 1} since project start (${dmy(startDate)})` : ''}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
         {stages.map((st, i) => {
           const done = st.items.filter((x) => x.state === 'done').length;
           const total = st.items.filter((x) => x.state !== 'na').length;
