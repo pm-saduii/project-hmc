@@ -10,14 +10,18 @@ export interface StatusReport {
   /** '' = automatic */
   overallStatus: '' | 'Completed' | 'On Track' | 'At Risk' | 'Delayed' | 'Not Started';
   rationale: string;
+  /** Project summary written by the PM (one point per line). */
+  projectSummary?: string;
   accomplishments: string;
   nextSteps: string;
   sentAt: string | null;
   sentBy: string | null;
   sentTo: string;
+  /** The report model as it was when sent (numbers frozen). */
+  snapshot?: unknown | null;
   updatedAt: string;
 }
-export type StatusReportPatch = Partial<Pick<StatusReport, 'reportDate' | 'overallStatus' | 'rationale' | 'accomplishments' | 'nextSteps' | 'sentAt' | 'sentBy' | 'sentTo'>>;
+export type StatusReportPatch = Partial<Pick<StatusReport, 'reportDate' | 'overallStatus' | 'rationale' | 'projectSummary' | 'accomplishments' | 'nextSteps' | 'sentAt' | 'sentBy' | 'sentTo' | 'snapshot'>>;
 
 const camel = (row: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(row).map(([k, v]) => [k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()), v])) as unknown as StatusReport;

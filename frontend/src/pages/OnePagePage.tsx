@@ -11,6 +11,7 @@ import { Btn, C, Modal } from '../components/Common';
 import MonthlyReportView, { STATUS_LOOK, effectiveStatus } from '../components/OnePage/MonthlyReportView';
 import MonthlyReportEditor, { draftFrom, type ReportDraft } from '../components/OnePage/MonthlyReportEditor';
 import { isClosedStatus, isHyperCareStatus } from '../utils/projectHealth';
+import { stageExtras, timelineExtras } from '../utils/onePageExtras';
 import { REPORT_DATA_VERSION, buildMonthlyReport, periodLabel, shiftPeriod, type MonthlyReportData } from '../utils/monthlyReport';
 import type { MonthlyReport, Project, ReportStatus } from '../types';
 
@@ -60,9 +61,7 @@ export default function OnePagePage() {
   const monthParam = params.get('month') || '';
   const period = PERIOD_RE.test(monthParam) && monthParam <= thisMonth ? monthParam : thisMonth;
   const setPeriod = (next: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('month', next); return n; }, { replace: true });
-  const audience: 'internal' | 'external' = params.get('view') === 'external' ? 'external' : 'internal';
-  const setAudience = (v: 'internal' | 'external') => setParams((p) => { const n = new URLSearchParams(p); if (v === 'external') n.set('view', 'external'); else n.delete('view'); return n; }, { replace: true });
-  const withMonth = (path: string) => `${path}?month=${period}${audience === 'external' ? '&view=external' : ''}`;
+  const withMonth = (path: string) => `${path}?month=${period}`;
 
   const projects = useStore((s) => s.projects);
   const masterCodes = useStore((s) => s.masterCodes);
@@ -170,7 +169,24 @@ export default function OnePagePage() {
       previous: previousData,
     });
   }, [selected, ready, period, tasks, milestones, issues, risks, efforts, changeRequests, progressSnapshots, previousData, masterCodes]); // eslint-disable-line react-hooks/exhaustive-deps
-  const data = frozen || (recordReady ? live : null);
+  // Overall Project Timeline + Progress Overview (External report engine) and methodology stages with their checklist.
+  const [extras, setExtras] = React.useState<{ key: string; value: Partial<MonthlyReportData> }>({ key: '', value: {} });
+  const extrasKey = live ? `${selected?.id}|${live.asOf}|${tasks.length}|${milestones.length}` : '';
+  React.useEffect(() => {
+    if (!live || !selected || frozen) return;
+    let alive = true;
+    const mine = <T extends { projectId: string }>(xs: T[]) => xs.filter((x) => x.projectId === selected.id);
+    void Promise.allSettled([
+      timelineExtras({ project: selected, tasks: mine(tasks), milestones: mine(milestones), issues: mine(issues), risks: mine(risks), members: [], snapshots: mine(progressSnapshots) }, live.asOf),
+      stageExtras(selected.id),
+    ]).then((rs) => {
+      if (!alive) return;
+      setExtras({ key: extrasKey, value: Object.assign({}, ...rs.map((r) => (r.status === 'fulfilled' ? r.value : {}))) });
+    });
+    return () => { alive = false; };
+  }, [extrasKey, !!frozen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const liveFull = React.useMemo(() => (live ? { ...live, ...(extras.key === extrasKey ? extras.value : {}) } : null), [live, extras, extrasKey]);
+  const data = frozen || (recordReady ? liveFull : null);
 
   const afterChange = (saved: MonthlyReport) => {
     setRecord(saved);
@@ -178,24 +194,16 @@ export default function OnePagePage() {
     if (selected) void monthlyReportApi.publishedPeriods(selected.id).then(setPublishedPeriods).catch(() => undefined);
   };
 
-  /** Leave out the external fields while they are empty and the database has no columns for them yet. */
-  const cleanDraft = (draft: ReportDraft): Partial<ReportDraft> => {
-    const hasColumns = !record || 'externalSummary' in record;
-    if (hasColumns || draft.externalSummary.trim() || draft.clientActions.trim()) return draft;
-    const { externalSummary, clientActions, ...rest } = draft;
-    void externalSummary; void clientActions;
-    return rest;
-  };
   const reportError = (error: unknown, fallback: string) => {
     const message = error instanceof Error ? error.message : fallback;
-    toast.error(/external_summary|client_actions/i.test(message) ? 'Run the migration 2026-12-05-external-report-and-baseline-fix.sql to save the external report.' : message);
+    toast.error(/_check|violates check/i.test(message) ? 'Run the migration 2026-12-08-reports-alignment.sql to save the new statuses.' : message);
   };
 
   const saveDraft = async (draft: ReportDraft) => {
     if (!selected) return;
     setBusy(true);
     try {
-      afterChange(await monthlyReportApi.saveDraft(selected.id, period, cleanDraft(draft)));
+      afterChange(await monthlyReportApi.saveDraft(selected.id, period, draft));
       toast.success('Draft saved');
       setEditing(false);
     } catch (error) {
@@ -204,20 +212,20 @@ export default function OnePagePage() {
   };
 
   const publish = async (draft: ReportDraft) => {
-    if (!selected || !live) return;
+    if (!selected || !live || !liveFull) return;
     setBusy(true);
     try {
       // Store the statuses as shown, so the frozen report and the list badge agree.
       const pick = (v: ReportStatus | null, s: ReportStatus) => v ?? s;
       const patch: Partial<ReportDraft> = {
-        ...cleanDraft(draft),
+        ...draft,
         overallStatus: pick(draft.overallStatus, live.suggested.overall),
         scheduleStatus: pick(draft.scheduleStatus, live.suggested.schedule),
         budgetStatus: pick(draft.budgetStatus, live.suggested.budget),
         scopeStatus: pick(draft.scopeStatus, live.suggested.scope),
         paymentStatus: pick(draft.paymentStatus, live.suggested.payment),
       };
-      afterChange(await monthlyReportApi.publish(selected.id, period, patch, live, user?.id || null));
+      afterChange(await monthlyReportApi.publish(selected.id, period, patch, liveFull as MonthlyReportData, user?.id || null));
       toast.success(`${periodLabel(period)} report published`);
       setEditing(false);
     } catch (error) {
@@ -314,21 +322,7 @@ export default function OnePagePage() {
   } else {
     report = (
       <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '16px 24px 0' }}>
-        <div role="group" aria-label="Report version" style={{ display: 'inline-flex', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', background: C.white }}>
-          {([['internal', 'Internal'], ['external', 'External (customer)']] as const).map(([key, label]) => (
-            <button key={key} type="button" aria-pressed={audience === key} onClick={() => setAudience(key)}
-              style={{ height: 32, padding: '0 14px', border: 0, cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 600,
-                background: audience === key ? C.primary : C.white, color: audience === key ? '#fff' : C.text2 }}>{label}</button>
-          ))}
-        </div>
-        <span style={{ fontSize: 11, color: C.text3 }}>
-          {audience === 'external' ? 'For the customer: no man-days, amounts, billing or internal decisions.' : 'For management: includes man-days, payment and decisions.'}
-        </span>
-      </div>
       <MonthlyReportView
-        audience={audience}
-        logo={selected.logo}
         data={data}
         record={record}
         showAmounts={showAmounts}

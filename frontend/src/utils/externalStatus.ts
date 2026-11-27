@@ -206,7 +206,8 @@ export function computeModel(psr: PsrApi, input: ExternalInput): PsrModel {
   const ov = health.actual / 100; const pl = health.planned / 100;
   const auto: Rag = ov >= 1 ? 'Completed' : pl - ov > 2 * TOL ? 'Delayed' : pl - ov > TOL ? 'At Risk' : ov === 0 ? 'Not Started' : 'On Track';
   const override = String(input.record?.overallStatus || '');
-  Object.assign(M.P, { overall: ov, overallPlanned: pl, overallAuto: auto, overallStatus: (STATUS as readonly string[]).includes(override) ? override : auto });
+  Object.assign(M.P, { overall: ov, overallPlanned: pl, overallAuto: auto, overallStatus: (STATUS as readonly string[]).includes(override) ? override : auto,
+    projectSummary: lines(String(input.record?.projectSummary || '')) });
   // Key milestones: progress from the linked task (or billed/paid = done)
   M.milestones.forEach((m) => {
     if (!m.key) return;

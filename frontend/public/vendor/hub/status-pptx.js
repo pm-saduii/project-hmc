@@ -141,8 +141,15 @@
     if (leg.length) s2.addText(leg, { x: 9.5, y: y0 + 0.7, w: 3.2, h: 0.45, valign: "top", margin: 0, isTextBox: true, color: K_.ink });
     // rationale
     var ry = y0 + ch + 0.12;
-    card(s2, 0.5, ry, W - 1.0, 0.56, "Assessment rationale");
-    s2.addText(cut(P.rationale || (P.placeholder ? "Assessment Rationale – สรุปภาพรวมโครงการและเหตุผลของสถานะ 2–3 บรรทัด" : "–"), 300),
+    // project summary (written by the PM) + assessment rationale
+    var sumL = (P.projectSummary || []).slice(0, 4), rh = sumL.length ? 0.42 + 0.21 * sumL.length + (P.rationale ? 0.22 : 0) : 0.56;
+    card(s2, 0.5, ry, W - 1.0, rh, sumL.length ? "Project summary" : "Assessment rationale");
+    if (sumL.length) {
+      cardTitle(s2, 0.5, ry, W - 1.0, "Project summary", K_.navy2);
+      var runs = sumL.map(function (t, i) { return { text: cut(t, 160), options: { bullet: { indent: 12 }, breakLine: i < sumL.length - 1 || !!P.rationale } }; });
+      if (P.rationale) runs.push({ text: cut(P.rationale, 220), options: { italic: true, color: K_.mut } });
+      s2.addText(runs, { x: 0.7, y: ry + 0.38, w: W - 1.4, h: rh - 0.42, fontSize: 10, color: K_.ink, valign: "top", margin: 0, isTextBox: true });
+    } else s2.addText(cut(P.rationale || (P.placeholder ? "Assessment Rationale – สรุปภาพรวมโครงการและเหตุผลของสถานะ 2–3 บรรทัด" : "–"), 300),
       { x: 0.7, y: ry + 0.03, w: W - 1.4, h: 0.5, fontSize: 10, color: K_.slate, italic: !P.rationale, valign: "middle", margin: 0, isTextBox: true });
     // three columns
     var vis = function (x) { return internal || x.vis !== "Internal"; };
@@ -150,7 +157,7 @@
     var up = M.highlights.filter(function (x) { return x.type === "Upcoming" && vis(x); });
     var rank = { "Delayed": 0, "At Risk": 1, "On Track": 2, "Not Started": 3, "Completed": 4 };
     var attn = keyMs.filter(function (m) { return m.status === "Delayed" || m.status === "At Risk"; }).sort(function (a, b) { return (rank[a.status] - rank[b.status]) || (a.end - b.end); });
-    var cy = ry + 0.68, chh = 1.95, cw = (W - 1.0 - 0.3) / 3;
+    var cy = ry + rh + 0.12, chh = Math.max(1.3, 1.95 - (rh - 0.56)), cw = (W - 1.0 - 0.3) / 3;
     var bullets = function (arr) {
       if (!arr.length) return [{ text: "–", options: { color: K_.soft } }];
       var L = arr.slice(0, 3).map(function (x, i, a) { return { text: cut(x.text, 85), options: { bullet: { indent: 12 }, breakLine: i < a.length - 1 || arr.length > 3, paraSpaceAfter: 4 } }; });

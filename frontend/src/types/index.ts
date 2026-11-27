@@ -283,7 +283,8 @@ export interface Profile {
 }
 
 // ── Monthly executive report (One Page) ──────────────────────────────────────
-export type ReportStatus = 'on_track' | 'at_risk' | 'off_track';
+/** Same five statuses as the External Status report; off_track is shown as "Delayed". */
+export type ReportStatus = 'completed' | 'on_track' | 'at_risk' | 'off_track' | 'not_started';
 
 export interface MonthlyReport {
   id: string;

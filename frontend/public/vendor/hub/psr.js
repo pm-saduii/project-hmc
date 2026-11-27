@@ -757,6 +757,9 @@
       '<div class="tile"><div class="tl-k">Key milestones (' + keyMs.length + ')</div><div class="hbar">' +
       STATUS.map(function (s) { return cnt[s] ? '<span class="' + SCLASS[s] + '" style="flex:' + cnt[s] + '"></span>' : ""; }).join("") +
       '</div><div class="hleg">' + STATUS.map(function (s) { return cnt[s] ? "<span>" + dot(s) + "<b>" + cnt[s] + "</b> " + s + "</span>" : ""; }).join("") + "</div></div></div>";
+    // project summary (written by the PM)
+    if (P.projectSummary && P.projectSummary.length) h += '<div class="card">' + title("Project summary") + '<ul class="ll">' +
+      P.projectSummary.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul></div>";
     // rationale
     if (P.rationale) h += '<div class="rat" title="คลิกเพื่อดูข้อความทั้งหมด" onclick="this.classList.toggle(\'xp\')"><div class="clamp">' + esc(P.rationale) + "</div></div>";
     else if (P.placeholder) h += '<div class="rat ph"><div class="clamp">Assessment Rationale – สรุปภาพรวมโครงการและเหตุผลของสถานะ 2–3 บรรทัด (ชีท Project)</div></div>';

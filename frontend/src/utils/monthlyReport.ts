@@ -49,6 +49,16 @@ export interface MonthlyReportData {
   nextMonth: { count: number; items: ReportListItem[] };
   topIssues: { kind: 'Issue' | 'Risk'; title: string; status: string; meta: string }[];
   billing: { name: string; due: string; amount: number; status: string; overdueDays: number }[];
+  /** Overall Project Timeline as in the External report (added before publishing; missing in older reports). */
+  phasePlan?: { phases: { name: string; start: string; end: string; owner: string; percent: number; status: string }[] };
+  /** Progress Overview as in the External report: S-curve, phases, milestones by status. */
+  progressChart?: { labels: string[]; plan: (number | null)[]; actual: (number | null)[];
+    phases: { name: string; planned: number; actual: number; status: string }[];
+    milestones: { project: Record<string, number>; billing: Record<string, number> } };
+  /** Methodology stages with the project checklist of each stage. */
+  stages?: { name: string; icon: string; color: string; state: 'passed' | 'current' | 'upcoming'; noGate: boolean;
+    deliverablesDone: number; deliverablesTotal: number;
+    items: { title: string; state: 'done' | 'open' | 'na' }[] }[];
 }
 
 export interface ReportInputs {
@@ -67,9 +77,10 @@ export interface ReportInputs {
   today?: Date;
 }
 
-const STATUS_RANK: Record<ReportStatus, number> = { on_track: 0, at_risk: 1, off_track: 2 };
+const STATUS_RANK: Record<ReportStatus, number> = { completed: 0, not_started: 0, on_track: 1, at_risk: 2, off_track: 3 };
+/** The most serious of the statuses (Completed / Not Started count below On Track). */
 export const worstStatus = (...list: ReportStatus[]): ReportStatus =>
-  list.reduce((worst, s) => (STATUS_RANK[s] > STATUS_RANK[worst] ? s : worst), 'on_track' as ReportStatus);
+  list.reduce((worst, s) => (STATUS_RANK[s] > STATUS_RANK[worst] ? s : worst), list[0] ?? 'on_track');
 
 const toDate = (value?: string | null): Date | null => {
   if (!value) return null;
@@ -154,7 +165,9 @@ export function buildMonthlyReport(input: ReportInputs): MonthlyReportData {
   const pendingCr = changeRequests.filter((c) => ['Submitted', 'Under Review'].includes(c.status));
 
   // ── Suggested statuses (the PM can change them) ─────────────────────────
-  const schedule: ReportStatus = health.status === 'Stoper' ? 'off_track' : health.status === 'Delay' ? 'at_risk' : 'on_track';
+  const notStartedYet = health.actual === 0 && (toDate(project.startDate)?.getTime() ?? 0) > (toDate(asOf)?.getTime() ?? 0);
+  const schedule: ReportStatus = health.actual >= 100 ? 'completed' : notStartedYet ? 'not_started'
+    : health.status === 'Stoper' ? 'off_track' : health.status === 'Delay' ? 'at_risk' : 'on_track';
   const usedPct = budget > 0 ? (used / budget) * 100 : 0;
   const burnGap = usedPct - health.actual;
   const budgetStatus: ReportStatus = budget <= 0 ? 'on_track' : burnGap > 15 ? 'off_track' : burnGap > 5 ? 'at_risk' : 'on_track';

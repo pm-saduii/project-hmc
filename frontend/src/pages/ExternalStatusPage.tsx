@@ -105,11 +105,14 @@ export default function ExternalStatusPage() {
 
   const ready = !!selected && engineReady && loadedKey === selected.id;
   const rdDate = reportDateOf(period, record);
-  const model = React.useMemo(() => {
+  // Once sent, the report shows the numbers as they were sent (frozen); otherwise live numbers.
+  const frozen = !!record?.sentAt && !!record?.snapshot;
+  const liveModel = React.useMemo(() => {
     if (!ready || !selected || !window.PSR) return null;
     const mine = <T extends { projectId: string }>(xs: T[]) => xs.filter((x) => x.projectId === selected.id);
     return computeModel(window.PSR, { project: selected, period, record, tasks: mine(tasks), milestones: mine(milestones), issues: mine(issues), risks: mine(risks), members, phaseName, snapshots: mine(snapshots) });
   }, [ready, selected, period, record, tasks, milestones, issues, risks, members, phaseName, snapshots]);
+  const model = (frozen ? record!.snapshot : liveModel) as typeof liveModel;
   const html = React.useMemo(() => (model && window.PSR ? window.PSR.fullDocument(model, 'external') : ''), [model]);
 
   // Fit the 1123px report pages to the available width
@@ -134,7 +137,8 @@ export default function ExternalStatusPage() {
       return true;
     } catch (e) {
       const m = e instanceof Error ? e.message : 'Could not save';
-      toast.error(/status_reports|schema cache/i.test(m) ? 'Run the migration 2026-12-06-external-status.sql first.' : m);
+      toast.error(/project_summary|snapshot/i.test(m) ? 'Run the migration 2026-12-08-reports-alignment.sql first.'
+        : /status_reports|schema cache/i.test(m) ? 'Run the migration 2026-12-06-external-status.sql first.' : m);
       return false;
     } finally { setBusy(false); }
   };
@@ -207,10 +211,10 @@ export default function ExternalStatusPage() {
             <div style={{ flex: '1 1 240px', minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{selected.code}{selected.customerAbbreviation ? ` (${selected.customerAbbreviation})` : ''} · {periodLabel(period)}</div>
               <div style={{ fontSize: 11, color: C.text2 }}>
-                Report date {format(rdDate, 'dd/MM/yyyy')} · {record?.sentAt ? <span style={{ color: '#047857', fontWeight: 600 }}>Sent {format(new Date(record.sentAt), 'dd/MM/yyyy HH:mm')}{record.sentTo ? ` to ${record.sentTo}` : ''}</span> : <span style={{ color: '#B45309' }}>Not sent yet</span>}
+                Report date {format(rdDate, 'dd/MM/yyyy')} · {frozen && <span style={{ color: C.text2 }}>Numbers frozen when sent · </span>}{record?.sentAt ? <span style={{ color: '#047857', fontWeight: 600 }}>Sent {format(new Date(record.sentAt), 'dd/MM/yyyy HH:mm')}{record.sentTo ? ` to ${record.sentTo}` : ''}</span> : <span style={{ color: '#B45309' }}>Not sent yet</span>}
               </div>
             </div>
-            {canEdit && <Btn small variant="outline" onClick={() => setEditing(true)} disabled={busy || noTable}><Pencil size={13} style={{ marginRight: 6 }} />Edit</Btn>}
+            {canEdit && <Btn small variant="outline" onClick={() => setEditing(true)} disabled={busy || noTable || !!record?.sentAt} title={record?.sentAt ? 'Sent reports are frozen — mark as not sent to edit' : undefined}><Pencil size={13} style={{ marginRight: 6 }} />Edit</Btn>}
             <Btn small variant="ghost" onClick={printPdf} disabled={!html || busy} title="Print or save as PDF (A4 landscape, one page per section)"><FileDown size={14} style={{ marginRight: 6 }} />PDF</Btn>
             <Btn small variant="ghost" onClick={() => void pptx()} disabled={!model || busy} title="Editable PowerPoint"><Presentation size={14} style={{ marginRight: 6 }} />PowerPoint</Btn>
             {canEdit && <Btn small onClick={() => setSending(true)} disabled={busy || noTable}><Send size={13} style={{ marginRight: 6 }} />{record?.sentAt ? 'Sent ✓' : 'Mark as sent'}</Btn>}
@@ -242,7 +246,7 @@ export default function ExternalStatusPage() {
       )}
       {sending && selected && (
         <SendModal record={record} busy={busy} onClose={() => setSending(false)}
-          onSave={(sentTo, unsend) => void save(unsend ? { sentAt: null, sentBy: null, sentTo: '' } : { sentAt: new Date().toISOString(), sentBy: user?.id || null, sentTo }, unsend ? 'Marked as not sent' : 'Recorded in the report log')
+          onSave={(sentTo, unsend) => void save(unsend ? { sentAt: null, sentBy: null, sentTo: '', snapshot: null } : { sentAt: new Date().toISOString(), sentBy: user?.id || null, sentTo, snapshot: liveModel }, unsend ? 'Marked as not sent — numbers are live again' : 'Recorded in the report log · numbers frozen')
             .then((ok) => { if (ok) setSending(false); })} />
       )}
     </div>
@@ -254,7 +258,7 @@ const area: React.CSSProperties = { ...input, height: 'auto', padding: '8px 12px
 function EditReport({ record, period, busy, onClose, onSave }: { record: StatusReport | null; period: string; busy: boolean; onClose: () => void; onSave: (p: StatusReportPatch) => void }) {
   const [f, setF] = React.useState<StatusReportPatch>({
     reportDate: record?.reportDate || '', overallStatus: record?.overallStatus || '', rationale: record?.rationale || '',
-    accomplishments: record?.accomplishments || '', nextSteps: record?.nextSteps || '',
+    accomplishments: record?.accomplishments || '', nextSteps: record?.nextSteps || '', projectSummary: record?.projectSummary || '',
   });
   const set = (k: keyof StatusReportPatch, v: string) => setF((x) => ({ ...x, [k]: v }));
   return (
@@ -270,6 +274,8 @@ function EditReport({ record, period, busy, onClose, onSave }: { record: StatusR
             {['On Track', 'At Risk', 'Delayed', 'Completed', 'Not Started'].map((s) => <option key={s} value={s}>{s}</option>)}
           </select></label>
       </div>
+      <label style={fieldLabel}>Project summary<textarea rows={4} value={f.projectSummary || ''} onChange={(e) => set('projectSummary', e.target.value)} style={area} placeholder="One point per line: scope, where the project stands, what is next" />
+        <span style={hint}>Shown on the summary page of the report (up to 4 points on the slide).</span></label>
       <label style={fieldLabel}>Assessment rationale<textarea rows={3} value={f.rationale || ''} onChange={(e) => set('rationale', e.target.value)} style={area} placeholder="2–3 lines: the overall picture and why the status is what it is" /></label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <label style={fieldLabel}>Key accomplishments<textarea rows={6} value={f.accomplishments || ''} onChange={(e) => set('accomplishments', e.target.value)} style={area} placeholder="One per line" />
