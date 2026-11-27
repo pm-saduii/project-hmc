@@ -214,7 +214,7 @@ export default function ExternalStatusPage() {
                 Report date {format(rdDate, 'dd/MM/yyyy')} · {frozen && <span style={{ color: C.text2 }}>Numbers frozen when sent · </span>}{record?.sentAt ? <span style={{ color: '#047857', fontWeight: 600 }}>Sent {format(new Date(record.sentAt), 'dd/MM/yyyy HH:mm')}{record.sentTo ? ` to ${record.sentTo}` : ''}</span> : <span style={{ color: '#B45309' }}>Not sent yet</span>}
               </div>
             </div>
-            {canEdit && <Btn small variant="outline" onClick={() => setEditing(true)} disabled={busy || noTable || !!record?.sentAt} title={record?.sentAt ? 'Sent reports are frozen — mark as not sent to edit' : undefined}><Pencil size={13} style={{ marginRight: 6 }} />Edit</Btn>}
+            {canEdit && <Btn small variant="outline" onClick={() => setEditing(true)} disabled={busy || noTable || !!record?.sentAt} title={record?.sentAt ? 'Sent reports are frozen — mark as not sent to edit' : 'Project summary, rationale, accomplishments, next steps'}><Pencil size={13} style={{ marginRight: 6 }} />Edit report</Btn>}
             <Btn small variant="ghost" onClick={printPdf} disabled={!html || busy} title="Print or save as PDF (A4 landscape, one page per section)"><FileDown size={14} style={{ marginRight: 6 }} />PDF</Btn>
             <Btn small variant="ghost" onClick={() => void pptx()} disabled={!model || busy} title="Editable PowerPoint"><Presentation size={14} style={{ marginRight: 6 }} />PowerPoint</Btn>
             {canEdit && <Btn small onClick={() => setSending(true)} disabled={busy || noTable}><Send size={13} style={{ marginRight: 6 }} />{record?.sentAt ? 'Sent ✓' : 'Mark as sent'}</Btn>}
