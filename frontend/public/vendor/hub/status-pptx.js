@@ -34,8 +34,8 @@
       objects: [
         /humanica/i.test(P.vendor || "HUMANICA") ? { image: { x: 0.7, y: 0.6, w: 0.34 * h.BRAND.hratio, h: 0.34, data: h.BRAND.hw.replace(/^data:/, "") } }
           : { text: { text: (P.vendor || "").toUpperCase(), options: { x: 0.7, y: 0.6, w: 6, h: 0.35, fontSize: 12, bold: true, color: "8FB4E8", charSpacing: 6, margin: 0 } } },
-        { placeholder: { options: { name: "title", type: "title", x: 0.7, y: 2.2, w: 11.5, h: 1.5, fontSize: 40, bold: true, color: K_.white, align: "left", valign: "bottom", margin: 0 }, text: "Project name" } },
-        { placeholder: { options: { name: "body", type: "body", x: 0.7, y: 3.85, w: 11.5, h: 1.2, fontSize: 18, color: "B9CBE4", align: "left", valign: "top", margin: 0 }, text: "Client · Report title · Date" } }
+        { placeholder: { options: { name: "title", type: "title", x: 0.7, y: 2.6, w: 11.5, h: 1.05, fontSize: 40, bold: true, color: K_.white, align: "left", valign: "bottom", margin: 0 }, text: "Project Progress Status" } },
+        { placeholder: { options: { name: "body", type: "body", x: 0.7, y: 3.75, w: 11.5, h: 0.95, fontSize: 18, color: "B9CBE4", align: "left", valign: "top", margin: 0 }, text: "Client · Update · Date" } }
       ] });
     pres.defineSlideMaster({ title: "PSR Content", background: { color: K_.bg },
       objects: foot([
@@ -51,16 +51,21 @@
         { placeholder: { options: { name: "body", type: "body", x: 0.5, y: 1.35, w: W - 1.0, h: 5.5, fontSize: 16, color: K_.ink, align: "left", valign: "top", margin: 0.1 }, text: "Text" } }
       ]), slideNumber: { x: W - 1.0, y: H - 0.42, w: 0.5, h: 0.3, fontSize: 9, color: K_.mut, align: "right" } });
 
-    var subline = (P.name || "Project") + " · " + (P.title || "") + " · " + h.fmtD(P.rd);
+    var subline = (P.client || P.name || "Project") + "  |  Update · " + h.fmtD(P.rd);
+    var hasLogo = !!(P.logo && /^data:image\//.test(P.logo));
     function content(title, section) {
       var s = pres.addSlide({ masterName: "PSR Content", sectionTitle: section });
       s.addText(title, { placeholder: "title" });
       s.addText(subline, { placeholder: "sub" });
-      // client / lead / badge – per project, top right
-      s.addText([{ text: P.client || "", options: { breakLine: true } }, { text: "Project Lead " + (P.lead || "–") + " · " + (P.model || "") + " · " + (P.phase || ""), options: {} }],
-        { x: 8.0, y: 0.2, w: 3.35, h: 0.65, fontSize: 10, color: "B9CBE4", align: "right", valign: "middle", margin: 0, isTextBox: true, objectName: "Client info" });
-      s.addText(internal ? "INTERNAL" : "EXTERNAL", { shape: pres.ShapeType.roundRect, rectRadius: 0.15, x: 11.55, y: 0.36, w: 1.3, h: 0.32, fontSize: 9, bold: true, charSpacing: 2,
-        color: K_.white, align: "center", valign: "middle", fill: { color: internal ? K_.late : "2A4A72" }, line: { color: internal ? K_.late : "6F8BB0", width: 0.75 }, margin: 0, objectName: "Badge" });
+      // top right: client logo (white box) and the Project Manager under it
+      if (hasLogo) {
+        s.addShape(pres.ShapeType.roundRect, { x: W - 0.5 - 1.75, y: 0.1, w: 1.75, h: 0.6, rectRadius: 0.06, fill: { color: K_.white }, line: { type: "none" }, objectName: "Logo box" });
+        s.addImage({ data: P.logo.replace(/^data:/, ""), x: W - 0.5 - 1.65, y: 0.15, w: 1.55, h: 0.5, sizing: { type: "contain", w: 1.55, h: 0.5 }, altText: P.client || "Client logo" });
+      }
+      s.addText([{ text: "Project Manager: ", options: { color: "B9CBE4" } }, { text: P.lead || "–", options: { color: K_.white } }],
+        { x: W - 0.5 - 5.0, y: hasLogo ? 0.74 : 0.4, w: 5.0, h: 0.26, fontSize: 10, align: "right", valign: "middle", margin: 0, isTextBox: true, objectName: "Project manager" });
+      if (internal) s.addText("INTERNAL", { shape: pres.ShapeType.roundRect, rectRadius: 0.15, x: W - 0.5 - 1.75 - 1.45, y: 0.24, w: 1.3, h: 0.32, fontSize: 9, bold: true, charSpacing: 2,
+        color: K_.white, align: "center", valign: "middle", fill: { color: K_.late }, line: { color: K_.late, width: 0.75 }, margin: 0, objectName: "Badge" });
       return s;
     }
     function card(s, x, y, w, hh, name) {
@@ -80,21 +85,21 @@
     // ---------- 1. cover
     pres.addSection({ title: "Status report" });
     var cv = pres.addSlide({ masterName: "PSR Cover", sectionTitle: "Status report" });
-    cv.addText(P.name || "Project name", { placeholder: "title" });
-    cv.addText([{ text: P.client || "", options: { bold: true, color: K_.white, breakLine: true } },
-      { text: (P.title || "") + " · " + h.fmtD(P.rd), options: {} }], { placeholder: "body" });
+    cv.addText("Project Progress Status", { placeholder: "title" });
+    cv.addText([{ text: P.client || P.name || "", options: { bold: true, color: K_.white, fontSize: 20, breakLine: true } },
+      { text: "Update · " + h.fmtD(P.rd), options: { fontSize: 20 } }], { placeholder: "body" });
     var stc = SC[P.overallStatus] || K_.ns;
-    cv.addText("OVERALL STATUS", { x: 0.7, y: 5.55, w: 2.6, h: 0.3, fontSize: 10, bold: true, color: "8FB4E8", charSpacing: 2, margin: 0, isTextBox: true });
-    cv.addText(P.overallStatus, { shape: pres.ShapeType.roundRect, rectRadius: 0.2, x: 0.7, y: 5.9, w: 2.4, h: 0.55, fontSize: 18, bold: true, color: K_.white, fill: { color: stc }, line: { type: "none" }, align: "center", valign: "middle", margin: 0 });
+    cv.addText("OVERALL STATUS", { x: 0.7, y: 6.0, w: 2.6, h: 0.3, fontSize: 10, bold: true, color: "8FB4E8", charSpacing: 2, margin: 0, isTextBox: true });
+    cv.addText(P.overallStatus, { shape: pres.ShapeType.roundRect, rectRadius: 0.2, x: 0.7, y: 6.32, w: 2.4, h: 0.55, fontSize: 18, bold: true, color: K_.white, fill: { color: stc }, line: { type: "none" }, align: "center", valign: "middle", margin: 0 });
     cv.addText([{ text: "Progress ", options: { color: "8FB4E8" } }, { text: h.fmtP(P.overall), options: { bold: true, color: K_.white } },
-      { text: "  ·  Plan " + h.fmtP(P.overallPlanned), options: { color: "8FB4E8" } }], { x: 3.4, y: 5.9, w: 4.2, h: 0.55, fontSize: 16, valign: "middle", margin: 0, isTextBox: true });
-    cv.addText([{ text: "Project Lead ", options: { color: "8FB4E8" } }, { text: (P.lead || "–") + "  ·  " + (P.model || "") + "  ·  " + (P.phase || ""), options: { color: K_.white } }],
-      { x: 7.6, y: 5.9, w: 5.0, h: 0.55, fontSize: 13, valign: "middle", align: "right", margin: 0, isTextBox: true });
+      { text: "  ·  Plan " + h.fmtP(P.overallPlanned), options: { color: "8FB4E8" } }], { x: 3.4, y: 6.32, w: 4.2, h: 0.55, fontSize: 16, valign: "middle", margin: 0, isTextBox: true });
+    cv.addText([{ text: "Project Manager : ", options: { color: "8FB4E8" } }, { text: P.lead || "–", options: { color: K_.white } }],
+      { x: 7.6, y: 6.32, w: 5.0, h: 0.55, fontSize: 14, valign: "middle", align: "right", margin: 0, isTextBox: true });
     if (P.logo && /^data:image\//.test(P.logo)) {   // client logo (picture in sheet Kickoff B13, or chosen in the Generator)
-      cv.addShape(pres.ShapeType.roundRect, { x: 10.45, y: 1.1, w: 2.15, h: 0.95, rectRadius: 0.08, fill: { color: K_.white }, line: { type: "none" } });
-      cv.addImage({ data: P.logo.replace(/^data:/, ""), x: 10.6, y: 1.2, w: 1.85, h: 0.75, sizing: { type: "contain", w: 1.85, h: 0.75 } });
+      cv.addShape(pres.ShapeType.roundRect, { x: W - 0.4 - 2.15, y: 0.45, w: 2.15, h: 0.95, rectRadius: 0.08, fill: { color: K_.white }, line: { type: "none" } });
+      cv.addImage({ data: P.logo.replace(/^data:/, ""), x: W - 0.4 - 2.0, y: 0.55, w: 1.85, h: 0.75, sizing: { type: "contain", w: 1.85, h: 0.75 }, altText: P.client || "Client logo" });
     }
-    cv.addText(internal ? "INTERNAL · CONFIDENTIAL" : "EXTERNAL", { x: 8.6, y: 0.6, w: 4.0, h: 0.35, fontSize: 11, bold: true, align: "right", color: internal ? "FF8A8A" : "B9CBE4", charSpacing: 2, margin: 0, isTextBox: true });
+    if (internal) cv.addText("INTERNAL · CONFIDENTIAL", { x: 0.7, y: 1.2, w: 4.0, h: 0.35, fontSize: 11, bold: true, color: "FF8A8A", charSpacing: 2, margin: 0, isTextBox: true });
 
     // ---------- 2. summary
     var s2 = content("Project Status Summary", "Status report");
