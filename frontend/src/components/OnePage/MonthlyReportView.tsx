@@ -5,6 +5,7 @@ import { fmtDate, fmtMoney } from '../../utils';
 import { periodLabel, shiftPeriod, type MonthlyReportData } from '../../utils/monthlyReport';
 import type { MonthlyReport, ReportStatus } from '../../types';
 import { MethodologyStages, PhaseTimeline, ProgressOverview } from './ReportSections';
+import { splitSummary } from '../../utils/externalStatus';
 
 const F = 'Poppins, sans-serif';
 
@@ -129,6 +130,9 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
   };
 
   const summaryLines = lines(record?.summary || '');
+  // Paragraph = executive summary; "Achieved: / In progress: / Attention required:" lines = key highlights. Old bullet-only text stays a list.
+  const parsed = splitSummary(record?.summary || '');
+  const summaryParts = parsed.summaryPoints.some((x) => x.label) || summaryLines.length === 1 ? parsed : { execSummary: '', summaryPoints: [] as typeof parsed.summaryPoints };
   const decisionLines = lines(record?.decisions || '');
   const projectTitle = `${data.project.code}${data.project.customerAbbreviation ? ` (${data.project.customerAbbreviation})` : ''}`;
 
@@ -172,12 +176,32 @@ export default function MonthlyReportView({ data, record, showAmounts, canEdit, 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
         <div style={card}>
           <h3 style={{ ...h3, marginBottom: 10 }}>Executive summary</h3>
-          {summaryLines.length ? (
+          {summaryParts.execSummary || summaryParts.summaryPoints.length ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {summaryParts.execSummary && <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65 }}>{summaryParts.execSummary}</p>}
+              {summaryParts.summaryPoints.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: C.text2, marginBottom: 6 }}>KEY HIGHLIGHTS &amp; ATTENTION REQUIRED</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {summaryParts.summaryPoints.map((p, i) => {
+                      const color = /attention|depend|risk|decision/i.test(p.label) ? '#d64545' : /progress|current/i.test(p.label) ? '#2e9e6b' : /achiev|complet/i.test(p.label) ? '#2f6fde' : C.text2;
+                      return (
+                        <div key={i} style={{ borderLeft: `3px solid ${color}`, background: C.bg, borderRadius: '0 6px 6px 0', padding: '6px 10px', fontSize: 12.5, lineHeight: 1.5 }}>
+                          {p.label && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color }}>{p.label}</div>}
+                          {p.text}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : summaryLines.length ? (
             <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, lineHeight: 1.6 }}>
               {summaryLines.map((l, i) => <li key={i}>{l}</li>)}
             </ul>
           ) : (
-            <div style={{ fontSize: 13, color: C.text3 }}>{canEdit ? `No summary yet. Use "Edit summary" to write 3–5 points for this month.` : 'No summary for this month yet.'}</div>
+            <div style={{ fontSize: 13, color: C.text3 }}>{canEdit ? `No summary yet. Use "Edit summary": it opens with an auto draft from this month's numbers.` : 'No summary for this month yet.'}</div>
           )}
         </div>
         <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>

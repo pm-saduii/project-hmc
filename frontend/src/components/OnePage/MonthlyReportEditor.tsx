@@ -1,4 +1,6 @@
 import React from 'react';
+import { Sparkles } from 'lucide-react';
+import { suggestOnePageText } from '../../utils/onePageText';
 import { Btn, C, Modal } from '../Common';
 import { periodLabel, type MonthlyReportData } from '../../utils/monthlyReport';
 import type { MonthlyReport, ReportStatus } from '../../types';
@@ -43,8 +45,27 @@ interface Props {
 
 /** PM writes the month's summary, decisions and status by area, then saves or publishes. */
 export default function MonthlyReportEditor({ data, record, previousSummary, busy, onClose, onSave, onPublish }: Props) {
-  const [draft, setDraft] = React.useState<ReportDraft>(() => draftFrom(record));
-  const set = <K extends keyof ReportDraft>(key: K, value: ReportDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  // Saved text wins; a field never saved (empty) starts from the auto draft.
+  const suggestion = React.useMemo(() => { try { return suggestOnePageText(data); } catch { return null; } }, [data]);
+  const [draft, setDraft] = React.useState<ReportDraft>(() => {
+    const d = draftFrom(record);
+    return { ...d, summary: d.summary.trim() ? d.summary : suggestion?.summary || '', decisions: d.decisions.trim() ? d.decisions : suggestion?.decisions || '' };
+  });
+  const [auto, setAuto] = React.useState(() => ({ summary: !record?.summary?.trim() && !!suggestion?.summary, decisions: !record?.decisions?.trim() && !!suggestion?.decisions }));
+  const set = <K extends keyof ReportDraft>(key: K, value: ReportDraft[K]) => {
+    setDraft((d) => ({ ...d, [key]: value }));
+    if (key === 'summary' || key === 'decisions') setAuto((a) => ({ ...a, [key]: false }));
+  };
+  const autoTools = (key: 'summary' | 'decisions') => (
+    <>
+      {auto[key] && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: C.primaryBg, color: C.primary }}>Auto draft</span>}
+      <button type="button" disabled={!suggestion || busy} title="Replace this field with text written from this month's numbers"
+        onClick={() => { if (!suggestion) return; setDraft((d) => ({ ...d, [key]: suggestion[key] })); setAuto((a) => ({ ...a, [key]: true })); }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: 0, background: 'transparent', padding: 0, color: C.primary, fontFamily: F, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+        <Sparkles size={12} />Auto suggestion
+      </button>
+    </>
+  );
   const fieldOf = (key: AreaKey | 'overall') => (key === 'overall' ? 'overallStatus' : `${key}Status`) as keyof ReportDraft;
 
   const picker = (key: AreaKey | 'overall', label: string, reason: string) => {
@@ -90,16 +111,18 @@ export default function MonthlyReportEditor({ data, record, previousSummary, bus
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <label htmlFor="mr-summary" style={{ fontSize: 13, fontWeight: 600 }}>
-              Executive summary <span style={{ fontWeight: 400, color: C.text3 }}>· 3–5 short points: what happened and why</span>
+              Executive summary <span style={{ fontWeight: 400, color: C.text3 }}>· paragraph + key highlights &amp; attention required</span>
             </label>
-            {previousSummary && !draft.summary && (
+            <span style={{ flex: 1 }} />
+            {autoTools('summary')}
+            {previousSummary && (
               <button type="button" onClick={() => set('summary', previousSummary)}
                 style={{ border: 0, background: 'transparent', color: C.primary, fontFamily: F, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                 Copy last month's text
               </button>
             )}
           </div>
-          {textarea(draft.summary, (v) => set('summary', v), 6, 'One point per line', 'mr-summary')}
+          {textarea(draft.summary, (v) => set('summary', v), 9, 'Part 1 · Executive summary (3–5 sentences): status, progress vs plan, achievements, current work, risks, next focus\n\nPart 2 · one per line:\nAchieved: …\nIn progress: …\nAttention required: …', 'mr-summary')}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -111,9 +134,13 @@ export default function MonthlyReportEditor({ data, record, previousSummary, bus
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <label htmlFor="mr-decisions" style={{ fontSize: 13, fontWeight: 600 }}>
-            Decisions needed from management <span style={{ fontWeight: 400, color: C.text3 }}>· optional, one per line</span>
-          </label>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <label htmlFor="mr-decisions" style={{ fontSize: 13, fontWeight: 600 }}>
+              Decisions needed from management <span style={{ fontWeight: 400, color: C.text3 }}>· optional, one per line</span>
+            </label>
+            <span style={{ flex: 1 }} />
+            {autoTools('decisions')}
+          </div>
           {textarea(draft.decisions, (v) => set('decisions', v), 3, 'e.g. Approve moving UAT start to 15 Dec', 'mr-decisions')}
         </div>
 
